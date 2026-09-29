@@ -1,0 +1,71 @@
+import { z } from 'zod';
+import { TimeZoneSchema } from '../core/schedule/timezone.ts';
+
+/**
+ * Граница между Telegram и приложением. Адаптер telegram переводит апдейт в Incoming,
+ * а Rendered — в сообщение с клавиатурой. Фичи не знают про grammY.
+ */
+
+/** Действие кнопки. Кодируется в callback_data адаптером (лимит 64 байта) и проверяется при декодировании. */
+export const ActionSchema = z.discriminatedUnion('type', [
+  z.object({ type: z.literal('tz'), zone: TimeZoneSchema }).readonly(),
+]);
+export type Action = z.infer<typeof ActionSchema>;
+
+export const IncomingSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('command'), name: z.string(), args: z.string() }).readonly(),
+  z.object({ kind: z.literal('text'), text: z.string() }).readonly(),
+  z.object({
+    kind: z.literal('location'),
+    latitude: z.number().min(-90).max(90),
+    longitude: z.number().min(-180).max(180),
+  }).readonly(),
+  z.object({
+    kind: z.literal('callback'),
+    action: ActionSchema,
+    stepNo: z.number().int().nonnegative(),
+  }).readonly(),
+]);
+export type Incoming = z.infer<typeof IncomingSchema>;
+
+export const IncomingUpdateSchema = z.object({
+  updateId: z.number().int(),
+  userId: z.number().int().positive(),
+  chatId: z.number().int(),
+  /** Сообщение с нажатой кнопкой: его редактируем вместо отправки нового. */
+  messageId: z.number().int().nullable(),
+  /** language_code пользователя из Telegram. */
+  languageCode: z.string().nullable(),
+  input: IncomingSchema,
+}).readonly();
+export type IncomingUpdate = z.infer<typeof IncomingUpdateSchema>;
+
+export const ButtonSchema = z.object({ label: z.string(), action: ActionSchema }).readonly();
+export type Button = z.infer<typeof ButtonSchema>;
+
+/**
+ * Нижняя (reply) клавиатура: кнопка «отправить геопозицию» или её удаление.
+ * Такое сообщение всегда отправляется новым: reply-клавиатуру нельзя повесить при редактировании.
+ */
+export const ReplyKeyboardSchema = z.enum(['request_location', 'remove']);
+export type ReplyKeyboard = z.infer<typeof ReplyKeyboardSchema>;
+
+export const RenderedSchema = z.object({
+  text: z.string(),
+  keyboard: z.array(z.array(ButtonSchema).readonly()).readonly(),
+  replyKeyboard: ReplyKeyboardSchema.nullable(),
+}).readonly();
+export type Rendered = z.infer<typeof RenderedSchema>;
+
+/** Порт с поведением — обычный TS-тип: zod-схема функции ничего бы не проверяла. */
+export type Ui = {
+  /** Показать экран: отредактировать messageId, если он есть, иначе отправить новое сообщение. */
+  readonly show: (
+    chatId: number,
+    rendered: Rendered,
+    stepNo: number,
+    messageId: number | null,
+  ) => Promise<void>;
+  /** Убрать клавиатуру у сообщения с устаревшими кнопками. */
+  readonly dropKeyboard: (chatId: number, messageId: number) => Promise<void>;
+};
