@@ -19,6 +19,51 @@ export function parseProgram(input: unknown): Result<Program, readonly ProgramIs
   return issues.length ? err(issues) : ok(parsed.data);
 }
 
+/** Разбор программы из текста (файл или сообщение): сначала JSON, затем схема. */
+export function parseProgramText(text: string): Result<Program, readonly ProgramIssue[]> {
+  let json: unknown;
+  try {
+    json = JSON.parse(text);
+  } catch (e) {
+    const reason = e instanceof Error ? e.message : String(e);
+    return err([{ path: '(JSON)', message: `не получилось прочитать JSON: ${reason}` }]);
+  }
+  return parseProgram(json);
+}
+
+/** Краткая сводка для ответа бота: «5 дней, 10 упражнений. Дни: …». */
+export const ProgramSummarySchema = z.object({
+  name: z.string(),
+  days: z.number().int().nonnegative(),
+  exercises: z.number().int().nonnegative(),
+  dayNames: z.array(z.string()).readonly(),
+}).readonly();
+export type ProgramSummary = z.infer<typeof ProgramSummarySchema>;
+
+export function programSummary(program: Program): ProgramSummary {
+  const byId = new Map(program.days.map((d) => [d.id, d.name]));
+  return {
+    name: program.name,
+    days: program.days.length,
+    exercises: exerciseIndex(program).size,
+    dayNames: program.rotation.map((id) => byId.get(id) ?? id),
+  };
+}
+
+/** Та же программа по содержанию: сравнение без учёта порядка ключей. */
+export const sameProgram = (a: Program, b: Program): boolean => canonical(a) === canonical(b);
+
+function canonical(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`;
+  if (value !== null && typeof value === 'object') {
+    const entries = Object.entries(value).filter(([, v]) => v !== undefined).sort(([a], [b]) =>
+      a < b ? -1 : 1
+    );
+    return `{${entries.map(([k, v]) => `${JSON.stringify(k)}:${canonical(v)}`).join(',')}}`;
+  }
+  return JSON.stringify(value);
+}
+
 /** Все упражнения программы по id (описание, а не ссылки). */
 export function exerciseIndex(program: Program): ReadonlyMap<string, Exercise> {
   const index = new Map<string, Exercise>();

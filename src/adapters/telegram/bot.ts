@@ -1,5 +1,6 @@
 import { Bot, type Context, InlineKeyboard, Keyboard } from 'grammy';
 import type { UserFromGetMe } from 'grammy/types';
+import { FileProblemSchema } from '../../core/session/types.ts';
 import type { IncomingUpdate, Rendered, Ui } from '../../ports/ui.ts';
 import { decodeCallback, encodeCallback } from './callback.ts';
 
@@ -28,14 +29,34 @@ export function createBot(opts: BotOptions): Bot {
   });
 
   bot.use(async (ctx) => {
-    const update = toIncoming(ctx);
+    const update = await toIncoming(ctx, (fileId) => downloadText(bot, fileId));
     if (update) await opts.onUpdate(update);
   });
 
   return bot;
 }
 
-function toIncoming(ctx: Context): IncomingUpdate | null {
+/** Файл программы: не больше 100 КБ, расширение .json или тип application/json. */
+const MAX_FILE_BYTES = 100 * 1024;
+const { too_large, not_json, download_failed } = FileProblemSchema.enum;
+
+type Download = (fileId: string) => Promise<string | null>;
+
+/** Скачать файл из Telegram как текст; null — не получилось. */
+async function downloadText(bot: Bot, fileId: string): Promise<string | null> {
+  try {
+    const file = await bot.api.getFile(fileId);
+    if (!file.file_path) return null;
+    const res = await fetch(`https://api.telegram.org/file/bot${bot.token}/${file.file_path}`, {
+      signal: AbortSignal.timeout(10_000),
+    });
+    return res.ok ? await res.text() : null;
+  } catch {
+    return null;
+  }
+}
+
+async function toIncoming(ctx: Context, download: Download): Promise<IncomingUpdate | null> {
   const userId = ctx.from?.id;
   const chatId = ctx.chat?.id;
   if (userId === undefined || chatId === undefined) return null;
@@ -61,6 +82,22 @@ function toIncoming(ctx: Context): IncomingUpdate | null {
       messageId: null,
       input: { kind: 'location', latitude: location.latitude, longitude: location.longitude },
     };
+  }
+
+  const doc = ctx.message?.document;
+  if (doc) {
+    const fileName = doc.file_name ?? 'файл';
+    const isJson = fileName.toLowerCase().endsWith('.json') || doc.mime_type === 'application/json';
+    const tooLarge = (doc.file_size ?? 0) > MAX_FILE_BYTES;
+    const text = isJson && !tooLarge ? await download(doc.file_id) : null;
+    const problem = !isJson
+      ? not_json
+      : tooLarge
+      ? too_large
+      : text === null
+      ? download_failed
+      : null;
+    return { ...base, messageId: null, input: { kind: 'document', fileName, text, problem } };
   }
 
   const text = ctx.message?.text;

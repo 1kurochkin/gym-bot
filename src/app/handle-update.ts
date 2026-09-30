@@ -1,18 +1,18 @@
-import { parseTimeZone } from '../core/schedule/timezone.ts';
+import type { Settings } from '../core/settings/settings.ts';
 import { step } from '../core/session/step.ts';
-import type { BotEvent } from '../core/session/types.ts';
-import { toEvent } from '../features/onboarding/handlers.ts';
-import { renderView } from '../features/onboarding/views.ts';
 import type { Clock } from '../ports/clock.ts';
 import type { ZoneLocator } from '../ports/geo.ts';
-import type { Store } from '../ports/store.ts';
-import type { Incoming, IncomingUpdate, Ui } from '../ports/ui.ts';
+import type { Commit, Store } from '../ports/store.ts';
+import type { IncomingUpdate, Ui } from '../ports/ui.ts';
+import { render, routeEvent } from './route.ts';
 
 export type UpdateDeps = {
   readonly store: Store;
   readonly ui: Ui;
   readonly clock: Clock;
   readonly zoneAt: ZoneLocator;
+  /** Новый id для записи (программы и т. п.): в тестах — предсказуемый. */
+  readonly newId: () => string;
 };
 
 /**
@@ -20,7 +20,7 @@ export type UpdateDeps = {
  * уже сделал адаптер telegram. Здесь: идемпотентность → событие → step() → одна транзакция → отрисовка.
  */
 export async function handleUpdate(deps: UpdateDeps, update: IncomingUpdate): Promise<void> {
-  const { session, settings } = await deps.store.load(update.userId);
+  const { session, settings, activeProgram } = await deps.store.load(update.userId);
 
   // Telegram повторяет webhook при таймауте: уже обработанный update_id игнорируем.
   if (update.updateId <= session.lastUpdateId) return;
@@ -44,26 +44,28 @@ export async function handleUpdate(deps: UpdateDeps, update: IncomingUpdate): Pr
     now: deps.clock.now(),
     settings,
     languageCode: update.languageCode,
+    activeProgram,
   });
 
-  let newSettings = undefined;
-  for (const e of result.effects) if (e.type === 'save_settings') newSettings = e.settings;
-  await deps.store.commit(update.userId, { session: result.state, settings: newSettings });
+  // Все эффекты записи — одной транзакцией вместе с новым состоянием сессии.
+  let newSettings: Settings | undefined;
+  let newProgram: Commit['newProgram'];
+  for (const e of result.effects) {
+    if (e.type === 'save_settings') newSettings = e.settings;
+    if (e.type === 'save_program') {
+      newProgram = { id: deps.newId(), program: e.program };
+      newSettings = { ...(newSettings ?? settings), activeProgramId: newProgram.id };
+    }
+  }
+  await deps.store.commit(update.userId, {
+    session: result.state,
+    settings: newSettings,
+    newProgram,
+  });
 
   for (const e of result.effects) {
     if (e.type !== 'render') continue;
     const messageId = input.kind === 'callback' ? update.messageId : null;
-    await deps.ui.show(update.chatId, renderView(e.view), result.state.stepNo, messageId);
+    await deps.ui.show(update.chatId, render(e.view), result.state.stepNo, messageId);
   }
-}
-
-/** Роутинг по фичам. Пока одна фича; новые добавляются сюда. */
-async function routeEvent(input: Incoming, zoneAt: ZoneLocator): Promise<BotEvent | null> {
-  if (input.kind === 'location') {
-    // Поиск зоны по координатам — I/O-зависимость, поэтому здесь, а не в фиче. Координаты не сохраняем.
-    const name = await zoneAt(input.latitude, input.longitude);
-    const zone = name === null ? null : parseTimeZone(name);
-    return { type: 'tz_located', zone: zone?.ok ? zone.value : null };
-  }
-  return toEvent(input);
 }

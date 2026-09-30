@@ -1,10 +1,32 @@
 import { z } from 'zod';
+import { ProgramIssueSchema, ProgramSummarySchema } from '../program/program.ts';
+import { ProgramSchema } from '../program/schema.ts';
 import { SettingsSchema } from '../settings/settings.ts';
 import { TimeInputErrorSchema, TimeZoneSchema } from '../schedule/timezone.ts';
 
 /** Шаг диалога. Новые ветки диалога добавляются сюда и в step(). */
-export const SessionStepSchema = z.enum(['idle', 'onboarding_tz', 'onboarding_tz_pick']);
+export const SessionStepSchema = z.enum([
+  'idle',
+  'onboarding_tz',
+  'onboarding_tz_pick',
+  'program_upload',
+  'program_confirm',
+]);
 export type SessionStep = z.infer<typeof SessionStepSchema>;
+
+/** Почему файл программы не принят ещё до разбора: размер, тип, загрузка. */
+export const FileProblemSchema = z.enum(['too_large', 'not_json', 'download_failed']);
+export type FileProblem = z.infer<typeof FileProblemSchema>;
+
+/** Данные, которые шаг диалога помнит между сообщениями. */
+export const SessionContextSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('none') }).readonly(),
+  /** Новая программа ждёт подтверждения замены текущей. */
+  z.object({ kind: z.literal('program_pending'), program: ProgramSchema }).readonly(),
+]);
+export type SessionContext = z.infer<typeof SessionContextSchema>;
+
+export const emptyContext: SessionContext = { kind: 'none' };
 
 /** Состояние диалога; хранится в таблице session, функция stateless. */
 export const SessionSchema = z.object({
@@ -14,6 +36,7 @@ export const SessionSchema = z.object({
   stepNo: z.number().int().nonnegative(),
   /** Последний обработанный update_id Telegram (идемпотентность). */
   lastUpdateId: z.number().int().nonnegative(),
+  context: SessionContextSchema,
 }).readonly();
 export type Session = z.infer<typeof SessionSchema>;
 
@@ -22,6 +45,7 @@ export const initialSession = (userId: number): Session => ({
   step: SessionStepSchema.enum.idle,
   stepNo: 0,
   lastUpdateId: 0,
+  context: emptyContext,
 });
 
 export const BotEventSchema = z.discriminatedUnion('type', [
@@ -30,6 +54,12 @@ export const BotEventSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('tz_chosen'), zone: TimeZoneSchema }).readonly(),
   /** Геопозиция уже переведена в зону оболочкой; null — по координатам зону не нашли. */
   z.object({ type: z.literal('tz_located'), zone: TimeZoneSchema.nullable() }).readonly(),
+  z.object({ type: z.literal('program_requested') }).readonly(),
+  /** Файл программы уже скачан оболочкой: текст или причина, почему не получилось. */
+  z.object({ type: z.literal('program_file'), text: z.string() }).readonly(),
+  z.object({ type: z.literal('program_file_rejected'), reason: FileProblemSchema }).readonly(),
+  z.object({ type: z.literal('program_confirmed') }).readonly(),
+  z.object({ type: z.literal('program_cancelled') }).readonly(),
 ]);
 export type BotEvent = z.infer<typeof BotEventSchema>;
 
@@ -52,13 +82,35 @@ export const ViewSchema = z.discriminatedUnion('type', [
     offsetLabel: z.string(),
     options: z.array(TimeZoneOptionSchema).readonly(),
   }).readonly(),
-  z.object({ type: z.literal('home'), timezoneLabel: z.string() }).readonly(),
+  z.object({
+    type: z.literal('home'),
+    timezoneLabel: z.string(),
+    programName: z.string().nullable(),
+  }).readonly(),
+  z.object({ type: z.literal('program_status'), current: ProgramSummarySchema.nullable() })
+    .readonly(),
+  z.object({ type: z.literal('program_invalid'), issues: z.array(ProgramIssueSchema).readonly() })
+    .readonly(),
+  z.object({
+    type: z.literal('program_confirm'),
+    incoming: ProgramSummarySchema,
+    currentName: z.string(),
+  }).readonly(),
+  z.object({ type: z.literal('program_saved'), summary: ProgramSummarySchema }).readonly(),
+  z.object({ type: z.literal('program_unchanged') }).readonly(),
+  z.object({ type: z.literal('program_cancelled') }).readonly(),
+  z.object({
+    type: z.literal('program_file_rejected'),
+    reason: FileProblemSchema,
+  }).readonly(),
 ]);
 export type View = z.infer<typeof ViewSchema>;
 
 export const EffectSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('save_settings'), settings: SettingsSchema }).readonly(),
   z.object({ type: z.literal('render'), view: ViewSchema }).readonly(),
+  /** Сохранить программу активной; предыдущая архивируется. */
+  z.object({ type: z.literal('save_program'), program: ProgramSchema }).readonly(),
 ]);
 export type Effect = z.infer<typeof EffectSchema>;
 
@@ -67,6 +119,8 @@ export const StepContextSchema = z.object({
   settings: SettingsSchema,
   /** language_code из Telegram: по нему зоны-кандидаты сортируются. */
   languageCode: z.string().nullable(),
+  /** Активная программа пользователя; null — ещё не загружена. */
+  activeProgram: ProgramSchema.nullable(),
 }).readonly();
 export type StepContext = z.infer<typeof StepContextSchema>;
 

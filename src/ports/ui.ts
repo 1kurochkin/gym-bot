@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { TimeZoneSchema } from '../core/schedule/timezone.ts';
+import { FileProblemSchema } from '../core/session/types.ts';
 
 /**
  * Граница между Telegram и приложением. Адаптер telegram переводит апдейт в Incoming,
@@ -9,12 +10,21 @@ import { TimeZoneSchema } from '../core/schedule/timezone.ts';
 /** Действие кнопки. Кодируется в callback_data адаптером (лимит 64 байта) и проверяется при декодировании. */
 export const ActionSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('tz'), zone: TimeZoneSchema }).readonly(),
+  z.object({ type: z.literal('program_confirm') }).readonly(),
+  z.object({ type: z.literal('program_cancel') }).readonly(),
 ]);
 export type Action = z.infer<typeof ActionSchema>;
 
 export const IncomingSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('command'), name: z.string(), args: z.string() }).readonly(),
   z.object({ kind: z.literal('text'), text: z.string() }).readonly(),
+  /** Файл уже скачан адаптером: текст или причина отказа (размер, тип, загрузка). */
+  z.object({
+    kind: z.literal('document'),
+    fileName: z.string(),
+    text: z.string().nullable(),
+    problem: FileProblemSchema.nullable(),
+  }).readonly(),
   z.object({
     kind: z.literal('location'),
     latitude: z.number().min(-90).max(90),

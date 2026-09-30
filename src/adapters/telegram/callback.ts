@@ -19,17 +19,24 @@ export function decodeCallback(data: string): { stepNo: number; action: Action }
   return action ? { stepNo: Number(m[1]), action } : null;
 }
 
+/** Короткие коды действий без параметров. */
+const SIMPLE_CODES = { program_confirm: 'pc', program_cancel: 'px' } as const;
+
 function encodeAction(a: Action): string {
   switch (a.type) {
     case 'tz':
       return `tz:${a.zone}`;
+    case 'program_confirm':
+    case 'program_cancel':
+      return SIMPLE_CODES[a.type];
   }
 }
 
 /** Код → сырой объект → ActionSchema: в приложение попадает только проверенное действие. */
 function decodeAction(code: string): Action | null {
   const tz = /^tz:([A-Za-z0-9_+\-/]+)$/.exec(code);
-  const raw = tz ? { type: 'tz', zone: tz[1] } : null;
+  const simple = Object.entries(SIMPLE_CODES).find(([, c]) => c === code)?.[0];
+  const raw = tz ? { type: 'tz', zone: tz[1] } : simple ? { type: simple } : null;
   const r = ActionSchema.safeParse(raw);
   return r.success ? r.data : null;
 }

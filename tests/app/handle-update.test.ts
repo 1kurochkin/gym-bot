@@ -16,6 +16,7 @@ function setup(): {
     ui,
     clock: { now: () => new Date('2026-09-28T22:40:00Z') },
     zoneAt: (lat) => Promise.resolve(lat > 50 ? 'Europe/Moscow' : null),
+    newId: () => crypto.randomUUID(),
   };
   return { deps, store, ui };
 }
