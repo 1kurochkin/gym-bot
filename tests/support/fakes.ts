@@ -1,3 +1,8 @@
+import {
+  type LastResult,
+  LogSourceSchema,
+  type ManualResult,
+} from '../../src/core/history/schema.ts';
 import type { Program } from '../../src/core/program/schema.ts';
 import { defaultSettings, type Settings } from '../../src/core/settings/settings.ts';
 import { initialSession, type Session } from '../../src/core/session/types.ts';
@@ -9,6 +14,8 @@ export type MemoryStore = Store & {
   readonly settings: Map<number, Settings>;
   /** Все сохранённые программы по id, с версией и статусом — как таблица programs. */
   readonly programs: Map<string, { program: Program; version: number; active: boolean }>;
+  /** Результаты /seed в порядке записи — как exercise_logs + sets с source manual_import. */
+  readonly manual: ManualResult[];
   commits: number;
 };
 
@@ -17,6 +24,7 @@ export function memoryStore(): MemoryStore {
     sessions: new Map(),
     settings: new Map(),
     programs: new Map(),
+    manual: [],
     commits: 0,
     load(userId: number): Promise<UserState> {
       const settings = store.settings.get(userId) ?? defaultSettings(userId);
@@ -27,6 +35,7 @@ export function memoryStore(): MemoryStore {
         session: store.sessions.get(userId) ?? initialSession(userId),
         settings,
         activeProgram: active?.program ?? null,
+        lastResults: lastResults(store.manual),
       });
     },
     commit(userId: number, change: Commit): Promise<void> {
@@ -41,6 +50,7 @@ export function memoryStore(): MemoryStore {
           active: true,
         });
       }
+      for (const r of change.manualResults ?? []) store.manual.push(r.result);
       store.sessions.set(userId, change.session);
       if (change.settings) store.settings.set(userId, change.settings);
       return Promise.resolve();
@@ -72,4 +82,19 @@ export function fakeUi(): Ui & { shown: Shown[]; dropped: number[] } {
       return Promise.resolve();
     },
   };
+}
+
+/** «Прошлый раз»: последняя запись каждого упражнения (в фейке — только ручные результаты). */
+function lastResults(results: readonly ManualResult[]): Record<string, LastResult> {
+  const last: Record<string, LastResult> = {};
+  for (const r of results) {
+    last[r.exerciseId] = {
+      localDate: r.localDate,
+      weightLb: r.weightLb,
+      reps: r.reps,
+      source: LogSourceSchema.enum.manual_import,
+      comment: r.comment,
+    };
+  }
+  return last;
 }

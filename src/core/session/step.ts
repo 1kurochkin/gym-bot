@@ -8,6 +8,7 @@ import {
   rejectProgramFile,
   requestProgram,
 } from './program.ts';
+import { requestSeed, seedText, skipSeed, stopSeed } from './seed.ts';
 import {
   AskTimeErrorSchema,
   type BotEvent,
@@ -17,7 +18,7 @@ import {
   type StepResult,
 } from './types.ts';
 
-const { idle, onboarding_tz, onboarding_tz_pick, program_upload, program_confirm } =
+const { idle, onboarding_tz, onboarding_tz_pick, program_upload, program_confirm, seed } =
   SessionStepSchema.enum;
 const { location_unknown } = AskTimeErrorSchema.enum;
 
@@ -55,6 +56,18 @@ function transition(state: Session, event: BotEvent, ctx: StepContext): StepResu
       return confirmProgram(state);
     case 'program_cancelled':
       return state.step === program_confirm ? cancelProgram(state) : unchanged(state);
+    case 'seed_requested':
+      return requestSeed(state, ctx);
+    case 'seed_next':
+      return skipSeed(state, ctx);
+    case 'seed_stopped':
+      return stopSeed(state, ctx);
+    case 'unknown_command':
+      // Подсказка поверх текущего шага: шаг и его данные не теряются.
+      return {
+        state,
+        effects: [{ type: 'render', view: { type: 'unknown_command', name: event.name } }],
+      };
     default:
       return assertNever(event);
   }
@@ -68,6 +81,8 @@ function onText(state: Session, text: string, ctx: StepContext): StepResult {
     case program_upload:
     case program_confirm:
       return receiveProgram(state, text, ctx);
+    case seed:
+      return seedText(state, text, ctx);
     case idle:
       return ctx.settings.timezone === null
         ? askTime(state, null)

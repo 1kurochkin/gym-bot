@@ -12,6 +12,8 @@ export const ActionSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('tz'), zone: TimeZoneSchema }).readonly(),
   z.object({ type: z.literal('program_confirm') }).readonly(),
   z.object({ type: z.literal('program_cancel') }).readonly(),
+  z.object({ type: z.literal('seed_next') }).readonly(),
+  z.object({ type: z.literal('seed_stop') }).readonly(),
 ]);
 export type Action = z.infer<typeof ActionSchema>;
 

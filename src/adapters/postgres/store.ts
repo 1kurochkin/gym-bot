@@ -1,6 +1,16 @@
-import { and, eq, max, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, max, sql } from 'drizzle-orm';
 import { drizzle, type PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
+import {
+  ExerciseLogStatusSchema,
+  type LastResult,
+  LastResultSchema,
+  LogSourceSchema,
+  SetKindSchema,
+  topSet,
+  WarmupVariantSchema,
+} from '../../core/history/schema.ts';
+import { exerciseIndex } from '../../core/program/program.ts';
 import { type Program, ProgramSchema } from '../../core/program/schema.ts';
 import { TimeZoneSchema } from '../../core/schedule/timezone.ts';
 import { defaultSettings, type Settings, SettingsSchema } from '../../core/settings/settings.ts';
@@ -12,6 +22,7 @@ import {
   SessionSchema,
   SessionStepSchema,
 } from '../../core/session/types.ts';
+import { lb } from '../../core/units/lb.ts';
 import type { Commit, Store, UserState } from '../../ports/store.ts';
 import { ProgramStatusSchema } from './program-status.ts';
 import * as schema from './schema.ts';
@@ -43,16 +54,21 @@ export function createPostgresStore(db: Db): Store {
         db.select().from(schema.settings).where(eq(schema.settings.userId, userId)),
       ]);
       const settings = st[0] ? toSettings(st[0]) : defaultSettings(userId);
+      const activeProgram = await loadProgram(db, settings.activeProgramId);
       return {
         session: s[0] ? toSession(s[0]) : initialSession(userId),
         settings,
-        activeProgram: await loadProgram(db, settings.activeProgramId),
+        activeProgram,
+        lastResults: activeProgram
+          ? await loadLastResults(db, userId, [...exerciseIndex(activeProgram).keys()])
+          : {},
       };
     },
 
     async commit(userId: number, change: Commit): Promise<void> {
       await db.transaction(async (tx) => {
         if (change.newProgram) await saveProgram(tx, userId, change.newProgram);
+        for (const r of change.manualResults ?? []) await saveManualResult(tx, userId, r);
         if (change.settings) {
           const row = fromSettings(change.settings);
           await tx.insert(schema.settings).values(row).onConflictDoUpdate({
@@ -86,6 +102,95 @@ async function loadProgram(db: Db, id: string | null): Promise<Program | null> {
   const rows = await db.select({ definition: schema.programs.definition }).from(schema.programs)
     .where(eq(schema.programs.id, id));
   return StoredProgramSchema.parse(rows[0]?.definition ?? null);
+}
+
+const { done } = ExerciseLogStatusSchema.enum;
+const { work } = SetKindSchema.enum;
+
+/**
+ * «Прошлый раз» (.specs/product.md → US-6): последняя выполненная запись каждого упражнения
+ * (любой источник, по всем программам) и лучший её рабочий подход.
+ */
+async function loadLastResults(
+  db: Db,
+  userId: number,
+  exerciseIds: readonly string[],
+): Promise<Record<string, LastResult>> {
+  if (exerciseIds.length === 0) return {};
+  const logs = await db.selectDistinctOn([schema.exerciseLogs.exerciseId], {
+    id: schema.exerciseLogs.id,
+    exerciseId: schema.exerciseLogs.exerciseId,
+    localDate: schema.exerciseLogs.localDate,
+    source: schema.exerciseLogs.source,
+    comment: schema.exerciseLogs.comment,
+  }).from(schema.exerciseLogs).where(and(
+    eq(schema.exerciseLogs.userId, userId),
+    eq(schema.exerciseLogs.status, done),
+    inArray(schema.exerciseLogs.exerciseId, [...exerciseIds]),
+  )).orderBy(
+    schema.exerciseLogs.exerciseId,
+    desc(schema.exerciseLogs.localDate),
+    desc(schema.exerciseLogs.createdAt),
+  );
+  if (logs.length === 0) return {};
+  const workSets = await db.select({
+    logId: schema.sets.exerciseLogId,
+    weightLb: schema.sets.weightLb,
+    reps: schema.sets.reps,
+  }).from(schema.sets).where(and(
+    inArray(schema.sets.exerciseLogId, logs.map((l) => l.id)),
+    eq(schema.sets.kind, work),
+    eq(schema.sets.skipped, false),
+  ));
+  const result: Record<string, LastResult> = {};
+  for (const log of logs) {
+    const best = topSet(
+      workSets.filter((w) => w.logId === log.id).map((w) => ({
+        weightLb: w.weightLb === null ? null : lb(w.weightLb),
+        reps: w.reps,
+      })),
+    );
+    if (!best) continue;
+    const parsed = LastResultSchema.safeParse({ ...log, weightLb: best.weightLb, reps: best.reps });
+    if (parsed.success) result[log.exerciseId] = parsed.data;
+  }
+  return result;
+}
+
+/** Результат /seed: запись manual_import без тренировки и один рабочий подход. */
+async function saveManualResult(
+  tx: Tx,
+  userId: number,
+  r: NonNullable<Commit['manualResults']>[number],
+): Promise<void> {
+  const { result } = r;
+  await tx.insert(schema.exerciseLogs).values({
+    id: r.logId,
+    userId,
+    workoutId: null,
+    programId: r.programId,
+    exerciseId: result.exerciseId,
+    exerciseName: result.exerciseName,
+    order: 0,
+    status: done,
+    stepLbUsed: result.stepLbUsed,
+    warmupVariant: WarmupVariantSchema.enum.none,
+    comment: result.comment,
+    source: LogSourceSchema.enum.manual_import,
+    localDate: result.localDate,
+  });
+  await tx.insert(schema.sets).values({
+    id: r.setId,
+    userId,
+    exerciseLogId: r.logId,
+    workoutId: null,
+    programId: r.programId,
+    exerciseId: result.exerciseId,
+    kind: work,
+    index: 1,
+    weightLb: result.weightLb,
+    reps: result.reps,
+  });
 }
 
 /** Архивировать активную программу и сохранить новую следующей версией того же program_key. */

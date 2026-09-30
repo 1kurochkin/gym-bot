@@ -2,8 +2,12 @@ import { parseTimeZone } from '../core/schedule/timezone.ts';
 import type { BotEvent, View } from '../core/session/types.ts';
 import { toEvent as onboardingEvent } from '../features/onboarding/handlers.ts';
 import { renderView as renderOnboarding } from '../features/onboarding/views.ts';
+import { KNOWN_COMMANDS } from '../features/help/commands.ts';
+import { renderHelpView } from '../features/help/views.ts';
 import { toEvent as programEvent } from '../features/program/handlers.ts';
 import { renderProgramView } from '../features/program/views.ts';
+import { toEvent as seedEvent } from '../features/seed/handlers.ts';
+import { renderSeedView } from '../features/seed/views.ts';
 import { assertNever } from '../shared/result.ts';
 import type { ZoneLocator } from '../ports/geo.ts';
 import type { Incoming, Rendered } from '../ports/ui.ts';
@@ -19,7 +23,10 @@ export async function routeEvent(input: Incoming, zoneAt: ZoneLocator): Promise<
     const zone = name === null ? null : parseTimeZone(name);
     return { type: 'tz_located', zone: zone?.ok ? zone.value : null };
   }
-  return programEvent(input) ?? onboardingEvent(input);
+  if (input.kind === 'command' && !KNOWN_COMMANDS.has(input.name)) {
+    return { type: 'unknown_command', name: input.name };
+  }
+  return programEvent(input) ?? seedEvent(input) ?? onboardingEvent(input);
 }
 
 /** Экран → текст и кнопки фичи, которой он принадлежит. */
@@ -37,6 +44,12 @@ export function render(view: View): Rendered {
     case 'program_cancelled':
     case 'program_file_rejected':
       return renderProgramView(view);
+    case 'seed_prompt':
+    case 'seed_done':
+    case 'seed_needs_program':
+      return renderSeedView(view);
+    case 'unknown_command':
+      return renderHelpView(view);
     default:
       return assertNever(view);
   }

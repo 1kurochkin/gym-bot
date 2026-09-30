@@ -15,6 +15,13 @@
       "when": 1790810423039,
       "tag": "20260930232023_programs",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1790811850794,
+      "tag": "20260930234410_exercise_logs_and_sets",
+      "breakpoints": true
     }
   ]
 }

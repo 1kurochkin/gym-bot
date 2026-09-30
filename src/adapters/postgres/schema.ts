@@ -1,5 +1,8 @@
 import {
   bigint,
+  boolean,
+  date,
+  doublePrecision,
   index,
   integer,
   jsonb,
@@ -9,6 +12,13 @@ import {
   uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
+import type {
+  ExerciseLogStatus,
+  LogSource,
+  SetKind,
+  WarmupVariant,
+} from '../../core/history/schema.ts';
+import type { Intensity } from '../../core/program/schema.ts';
 import type { SessionStep } from '../../core/session/types.ts';
 import type { ProgramStatus } from './program-status.ts';
 
@@ -54,4 +64,55 @@ export const programs = pgTable('programs', {
 }, (t) => [
   uniqueIndex('programs_user_key_version').on(t.userId, t.programKey, t.version),
   index('programs_user_status').on(t.userId, t.status),
+]).enableRLS();
+
+/**
+ * Запись упражнения: из тренировки или введённая вручную (/seed). workout_id пуст у записей
+ * не из тренировки; внешний ключ на workouts появится вместе с таблицей тренировок.
+ */
+export const exerciseLogs = pgTable('exercise_logs', {
+  id: uuid('id').primaryKey(),
+  userId: bigint('user_id', { mode: 'number' }).notNull(),
+  workoutId: uuid('workout_id'),
+  programId: uuid('program_id').notNull().references(() => programs.id),
+  exerciseId: text('exercise_id').notNull(),
+  exerciseName: text('exercise_name').notNull(),
+  order: integer('order').notNull(),
+  status: text('status').$type<ExerciseLogStatus>().notNull(),
+  substitutedFor: text('substituted_for'),
+  intensity: text('intensity').$type<Intensity>(),
+  plannedWorkWeightLb: doublePrecision('planned_work_weight_lb'),
+  stepLbUsed: doublePrecision('step_lb_used'),
+  warmupTier: integer('warmup_tier'),
+  warmupVariant: text('warmup_variant').$type<WarmupVariant>().notNull(),
+  warmupComment: text('warmup_comment'),
+  comment: text('comment'),
+  source: text('source').$type<LogSource>().notNull(),
+  localDate: date('local_date').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  index('exercise_logs_last_result').on(t.userId, t.exerciseId, t.status, t.localDate.desc()),
+]).enableRLS();
+
+/** Подход: разминочный, рабочий или дополнительный. weight_lb — null для reps_only; для допвеса — допвес. */
+export const sets = pgTable('sets', {
+  id: uuid('id').primaryKey(),
+  userId: bigint('user_id', { mode: 'number' }).notNull(),
+  exerciseLogId: uuid('exercise_log_id').notNull().references(() => exerciseLogs.id, {
+    onDelete: 'cascade',
+  }),
+  workoutId: uuid('workout_id'),
+  programId: uuid('program_id').notNull(),
+  exerciseId: text('exercise_id').notNull(),
+  kind: text('kind').$type<SetKind>().notNull(),
+  index: integer('index').notNull(),
+  plannedWeightLb: doublePrecision('planned_weight_lb'),
+  plannedReps: integer('planned_reps'),
+  weightLb: doublePrecision('weight_lb'),
+  reps: integer('reps').notNull(),
+  skipped: boolean('skipped').notNull().default(false),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  index('sets_exercise_log').on(t.exerciseLogId),
+  index('sets_program').on(t.programId),
 ]).enableRLS();

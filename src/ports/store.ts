@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { LastResultSchema, ManualResultSchema } from '../core/history/schema.ts';
 import { ProgramSchema } from '../core/program/schema.ts';
 import { SessionSchema } from '../core/session/types.ts';
 import { SettingsSchema } from '../core/settings/settings.ts';
@@ -8,6 +9,8 @@ export const UserStateSchema = z.object({
   settings: SettingsSchema,
   /** Активная программа (по settings.activeProgramId); null — не загружена. */
   activeProgram: ProgramSchema.nullable(),
+  /** «Прошлый раз» по упражнениям активной программы (по exerciseId). */
+  lastResults: z.record(z.string(), LastResultSchema).readonly(),
 }).readonly();
 export type UserState = z.infer<typeof UserStateSchema>;
 
@@ -17,6 +20,15 @@ export const CommitSchema = z.object({
   settings: SettingsSchema.optional(),
   /** Новая активная программа: предыдущая архивируется, версия — следующая для того же id. */
   newProgram: z.object({ id: z.uuid(), program: ProgramSchema }).readonly().optional(),
+  /** Результаты /seed: запись упражнения и один рабочий подход, без тренировки. */
+  manualResults: z.array(
+    z.object({
+      logId: z.uuid(),
+      setId: z.uuid(),
+      programId: z.uuid(),
+      result: ManualResultSchema,
+    }).readonly(),
+  ).readonly().optional(),
 }).readonly();
 export type Commit = z.infer<typeof CommitSchema>;
 
