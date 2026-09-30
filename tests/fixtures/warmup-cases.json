@@ -120,7 +120,7 @@
         { "addedLb": 0, "reps": 8 },
         { "addedLb": 10, "reps": 4 }
       ],
-      "afterWork": { "addedLb": 0, "reps": "max", "restSec": 240 }
+      "afterWork": { "addedLb": 0, "reps": "max" }
     }
   ]
 }

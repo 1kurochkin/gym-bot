@@ -21,7 +21,7 @@ updated: 2026-09-28
 | `reps_only` | Вес не пишется | Пресс | Без разминки, подходы с целевым усилием | — |
 | `light_load` | Вес блина (может быть 0) | Шея | Без разминки | 2,5 lb |
 
-**Поля упражнения:** `id`, `name`, `loadType`, `isBase` (базовое упражнение: получает перегрузочный сингл), `repRange {min, max}`, `workSets {min, max}`, `warmup` (`"tiers"` — по умолчанию, id фиксированной схемы или `null`), `stepLb` (необязательно, переопределяет шаг веса), `restBeforeWorkSec`, `notes` (показываются перед упражнением), `intensityGroup` (для чередования 100/70), `setTargets` (для `reps_only`: подписи подходов вроде «80% от отказа»).
+**Поля упражнения:** `id`, `name`, `loadType`, `isBase` (базовое упражнение: получает перегрузочный сингл), `repRange {min, max}`, `workSets {min, max}`, `warmup` (`"tiers"` — по умолчанию, id фиксированной схемы или `null`), `stepLb` (необязательно, переопределяет шаг веса), `notes` (показываются перед упражнением), `intensityGroup` (для чередования 100/70), `setTargets` (для `reps_only`: подписи подходов вроде «80% от отказа»).
 
 **Шаг веса.** Итоговый шаг для упражнения выбирается так: переопределение в `/settings` → `stepLb` в программе → значение по умолчанию для `loadType`. Если сменили тренажёр, достаточно поменять шаг в настройках, программу трогать не нужно.
 
@@ -44,14 +44,13 @@ updated: 2026-09-28
       {"minLb": 135, "steps": [{"pct": 0.45, "reps": 8}, {"pct": 0.70, "reps": 5}, {"pct": 0.85, "reps": 3}]},
       {"minLb": 225, "steps": [{"pct": 0.40, "reps": 10}, {"pct": 0.60, "reps": 8}, {"pct": 0.75, "reps": 5}, {"pct": 0.90, "reps": 3}]}
     ],
-    "overloadSingle": {"pct": 1.05, "reps": 1, "onlyBase": true, "skipOnLowIntensity": true},
-    "restSec": {"first": 90, "beforeWork": 270}
+    "overloadSingle": {"pct": 1.05, "reps": 1, "onlyBase": true, "skipOnLowIntensity": true}
   },
   "addedWeightTiers": {
-    "zero": {"steps": [{"assist": true, "reps": 12}], "afterWork": {"bodyweight": true, "reps": "max", "restSec": 240}},
+    "zero": {"steps": [{"assist": true, "reps": 12}], "afterWork": {"bodyweight": true, "reps": "max"}},
     "byAddedWeight": [
       {"minLb": 1,  "steps": [{"pct": 0, "reps": 8}, {"pct": 0.80, "reps": 4}],
-       "afterWork": {"bodyweight": true, "reps": "max", "restSec": 240}},
+       "afterWork": {"bodyweight": true, "reps": "max"}},
       {"minLb": 25, "steps": [{"pct": 0, "reps": 10}, {"pct": 0.50, "reps": 5}, {"pct": 0.85, "reps": 3}]},
       {"minLb": 60, "steps": [{"pct": 0, "reps": 10}, {"pct": 0.40, "reps": 6}, {"pct": 0.75, "reps": 4}]}
     ],
@@ -67,7 +66,7 @@ updated: 2026-09-28
     {"id": "mon", "name": "Фронтальный присед", "exercises": [
       {"id": "front_squat", "name": "Фронтальный присед", "loadType": "barbell", "isBase": true,
        "repRange": {"min": 6, "max": 8}, "workSets": {"min": 1, "max": 1},
-       "warmup": "tiers", "restBeforeWorkSec": 300, "intensityGroup": "sq_dl"},
+       "warmup": "tiers", "intensityGroup": "sq_dl"},
       {"id": "calves", "name": "Икры стоя", "loadType": "machine",
        "repRange": {"min": 10, "max": 12}, "workSets": {"min": 2, "max": 3},
        "warmup": "calves", "notes": "Смит или тренажёр, именно стоя"}
@@ -75,9 +74,9 @@ updated: 2026-09-28
     {"id": "tue", "name": "Жим на наклонной", "exercises": [
       {"id": "incline_press", "name": "Жим на наклонной", "loadType": "barbell", "isBase": true,
        "repRange": {"min": 6, "max": 8}, "workSets": {"min": 1, "max": 1},
-       "warmup": "tiers", "restBeforeWorkSec": 270},
+       "warmup": "tiers"},
       {"id": "abs", "name": "Пресс", "loadType": "reps_only", "workSets": {"min": 3, "max": 3},
-       "setTargets": ["80% от отказа", "90% от отказа", "в отказ"], "restBeforeWorkSec": 120,
+       "setTargets": ["80% от отказа", "90% от отказа", "в отказ"],
        "notes": "Сразу после жима"},
       {"id": "neck_flex", "name": "Шея: сгибания", "loadType": "light_load",
        "repRange": {"min": 12, "max": 20}, "workSets": {"min": 2, "max": 2}, "warmup": null,
@@ -88,7 +87,7 @@ updated: 2026-09-28
     {"id": "wed", "name": "Мёртвая тяга", "exercises": [
       {"id": "deadlift", "name": "Мёртвая тяга", "loadType": "barbell", "isBase": true,
        "repRange": {"min": 6, "max": 8}, "workSets": {"min": 1, "max": 1},
-       "warmup": "tiers", "restBeforeWorkSec": 300, "intensityGroup": "sq_dl"}
+       "warmup": "tiers", "intensityGroup": "sq_dl"}
     ]},
     {"id": "thu", "name": "Брусья", "exercises": [
       {"id": "dips", "name": "Брусья узким хватом", "loadType": "weighted_bodyweight", "isBase": true,
