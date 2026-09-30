@@ -10,7 +10,7 @@
 ## Решение
 Supabase, бесплатный план: одна Edge Function `bot` (Deno, grammY, webhook) и Postgres через Drizzle
 и пулер Supavisor (transaction mode, порт 6543, `prepare: false`). Функция деплоится с `--no-verify-jwt`,
-защита — секретный заголовок и whitelist. Бэкап и защита от паузы — GitHub Actions (`backup.yml`).
+защита — секретный заголовок и whitelist. Бэкап и защита от паузы — ежедневный workflow GitHub Actions.
 
 ## Альтернативы
 - Cloudflare Workers + D1 — нет холодных стартов, но не полный Node, лимит CPU ~10 мс на бесплатном плане может не хватить для `.xlsx`.
@@ -21,4 +21,4 @@ Supabase, бесплатный план: одна Edge Function `bot` (Deno, gra
 - Бесплатный проект засыпает после 7 дней без активности в БД → ежедневный `/health` из GitHub Actions (не `pg_cron`).
 - Нет автоматических бэкапов на бесплатном плане → свой ежедневный дамп в Telegram, миграции в git.
 - Весь тулчейн — Deno (см. ADR-0006); npm-пакеты через `npm:`.
-- Хранилище за портами (`src/ports/`), смена провайдера затрагивает `src/adapters/postgres/`.
+- Хранилище спрятано за портом: смена провайдера затрагивает один адаптер, а не ядро.

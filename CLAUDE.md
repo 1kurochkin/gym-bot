@@ -16,15 +16,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Ссылки «раздел N» в файлах — номера исходного брифа; карта «раздел → файл» в .specs/README.md.
 
 ## Архитектура (подробно: docs/architecture.md)
-Functional core, imperative shell. Диалог — чистый автомат step(state, event, ctx) → { state, effects }.
-- src/core/      — чистая логика: units, warmup, program, schedule, session. Без I/O, без Date.now().
-- src/features/  — вертикальные срезы: handlers (апдейт → event) и views (render).
-- src/ports/     — интерфейсы репозиториев, Clock, Llm, Notifier.
-- src/adapters/  — postgres, telegram, deepseek, xlsx: реализации портов.
-- src/app/       — composition root и роутинг; единственное место, где встречаются адаптеры.
-- supabase/functions/bot/index.ts — тонкая точка входа (Deno.serve(app)).
+Functional core, imperative shell. Диалог — чистый конечный автомат: (состояние, событие, контекст) → (новое состояние, эффекты).
+- src/core/      — чистая логика и автомат диалога. Без I/O и без чтения текущего времени.
+- src/features/  — срезы по фичам: апдейт → событие, данные экрана → текст и кнопки.
+- src/ports/     — интерфейсы внешнего мира.
+- src/adapters/  — реализации портов (Postgres, Telegram, …).
+- src/app/       — composition root и HTTP-роутинг; единственное место, где встречаются адаптеры.
+- supabase/      — конфиг, миграции, тонкая точка входа Edge Function.
 - tests/fixtures/ — контрольные примеры из .specs/ как данные (только синтетические).
-Правило зависимостей: shared ← core ← features ← app; adapters → ports. Проверяется tests/architecture.test.ts.
+Правило зависимостей: shared ← core ← features ← app; adapters → ports. Проверяется architecture test в deno task check.
+Конкретные модули и функции ищи поиском по коду, а не в документации.
 
 ## Команды
 - deno task dev    — локальный Supabase + бот в long polling
@@ -40,6 +41,7 @@ Functional core, imperative shell. Диалог — чистый автомат 
 ## Правила
 - Спека — источник истины. Меняешь поведение → сначала .specs/, потом код, в одном коммите.
 - Дорогое для отката техрешение → новый ADR по docs/adr/0000-template.md.
+- Документация без ссылок на функции и файлы глубже слоя (правило — docs/harness.md → «Что писать в документах»). Пути в .md проверяет тест ссылок.
 - Пример в спеке без фикстуры в tests/fixtures/ = баг.
 - Типы данных — только из zod-схем (type X = z.infer<typeof XSchema>), перечисления — z.enum и их .enum/.options, без строковых литералов. Рукописные TS-типы — только для портов-функций и Result.
 - Ядро без классов и исключений: discriminated union, Result<T, E>, .readonly(). Никаких any и as в core/.

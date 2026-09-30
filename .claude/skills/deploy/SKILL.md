@@ -91,8 +91,8 @@ supabase functions deploy bot --no-verify-jwt --use-api --project-ref "$(.claude
 
 - `db-push` упал на аутентификации → неверный пароль в `MIGRATION_DB_URL`, попроси поправить файл.
 - Ошибка сборки функции про импорт `../../../src/...` → код вне `supabase/functions/` не попал в
-  бандл. Остановись, опиши пользователю и предложи ADR (перенос `src/` в
-  `supabase/functions/_shared/`).
+  бандл. Остановись, опиши пользователю и предложи ADR: перенести общий код внутрь каталога функций
+  Supabase.
 
 ### 7. Webhook
 
