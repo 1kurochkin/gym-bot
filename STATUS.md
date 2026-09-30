@@ -14,7 +14,7 @@
 - [x] Фикстуры разминки tests/fixtures/warmup-cases.json
 - [x] Прогон на локальном Supabase (`supabase functions serve`): миграция, /health, секрет webhook, whitelist, геопозиция → зона в БД, повтор update_id
 - [x] Живой диалог с dev-ботом (`deno task dev`): онбординг по геопозиции работает
-- [ ] Деплой владельцем по README.md → Деплой: /start отвечает только владельцу
+- [x] Деплой (2026-09-30, проект gym-bot, ref kxuvbsvptqwvlzzxamsm): миграции, функция, webhook; /health 200; онбординг в проде работает
 - [ ] Первый бэкап и проверка восстановления по docs/runbook-restore.md
 
 ## Последние решения
@@ -26,11 +26,12 @@
 
 - 2026-09-30: документы без ссылок на функции и файлы глубже слоя; ADR и спеки — без путей в код; пути в .md проверяет tests/docs.test.ts (docs/harness.md §12.1)
 
+- 2026-09-30: один бот @ma_gym_bot на dev и прод (решение владельца): после `deno task dev` нужно снова `deno task webhook:set`
+
 ## Следующий шаг
-Закрыть этап 0: деплой по README.md → Деплой и первый бэкап. Затем этап 1: zod-схема программы и buildWarmup() по tests/fixtures/warmup-cases.json.
+Закрыть этап 0: секреты GitHub для бэкапа (README → Деплой → шаг 5), ручной запуск workflow backup, проверка восстановления. Затем этап 1: zod-схема программы и buildWarmup() по tests/fixtures/warmup-cases.json.
 
 ## Известные проблемы / вопросы к владельцу
-- Нужны: dev- и боевой бот, проект Supabase, секреты (README.md → Деплой)
-- Импорт src/ вне supabase/functions/ работает в `functions serve`; в `functions deploy` проверить при первом деплое.
+- Импорт src/ вне supabase/functions/ работает и в `functions serve`, и в облачном `functions deploy --use-api` (проверено 2026-09-30).
 - Edge runtime локально — supabase-edge-runtime 1.76 (совместим с Deno 2.1.4), а тулчейн — Deno 2.9: новые API Deno использовать осторожно, проверять через `supabase functions serve`.
 - Если отправка ответа в Telegram упала после записи в БД, webhook вернёт 500, а ретрай Telegram будет проигнорирован по update_id: ответ пользователю потеряется, данные — нет.
