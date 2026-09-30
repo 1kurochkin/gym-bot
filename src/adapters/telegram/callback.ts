@@ -20,7 +20,12 @@ export function decodeCallback(data: string): { stepNo: number; action: Action }
 }
 
 /** Короткие коды действий без параметров. */
-const SIMPLE_CODES = { program_confirm: 'pc', program_cancel: 'px' } as const;
+const SIMPLE_CODES = {
+  program_confirm: 'pc',
+  program_cancel: 'px',
+  seed_next: 'sn',
+  seed_stop: 'ss',
+} as const;
 
 function encodeAction(a: Action): string {
   switch (a.type) {
@@ -28,6 +33,8 @@ function encodeAction(a: Action): string {
       return `tz:${a.zone}`;
     case 'program_confirm':
     case 'program_cancel':
+    case 'seed_next':
+    case 'seed_stop':
       return SIMPLE_CODES[a.type];
   }
 }

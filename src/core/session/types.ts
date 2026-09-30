@@ -1,4 +1,6 @@
 import { z } from 'zod';
+import { LastResultSchema, ManualResultSchema } from '../history/schema.ts';
+import { SetInputErrorSchema } from '../input/set-input.ts';
 import { ProgramIssueSchema, ProgramSummarySchema } from '../program/program.ts';
 import { ProgramSchema } from '../program/schema.ts';
 import { SettingsSchema } from '../settings/settings.ts';
@@ -11,6 +13,7 @@ export const SessionStepSchema = z.enum([
   'onboarding_tz_pick',
   'program_upload',
   'program_confirm',
+  'seed',
 ]);
 export type SessionStep = z.infer<typeof SessionStepSchema>;
 
@@ -23,6 +26,12 @@ export const SessionContextSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('none') }).readonly(),
   /** Новая программа ждёт подтверждения замены текущей. */
   z.object({ kind: z.literal('program_pending'), program: ProgramSchema }).readonly(),
+  /** /seed: номер текущего упражнения и сколько заполнено за этот проход. */
+  z.object({
+    kind: z.literal('seed'),
+    index: z.number().int().nonnegative(),
+    filled: z.number().int().nonnegative(),
+  }).readonly(),
 ]);
 export type SessionContext = z.infer<typeof SessionContextSchema>;
 
@@ -60,6 +69,11 @@ export const BotEventSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('program_file_rejected'), reason: FileProblemSchema }).readonly(),
   z.object({ type: z.literal('program_confirmed') }).readonly(),
   z.object({ type: z.literal('program_cancelled') }).readonly(),
+  z.object({ type: z.literal('seed_requested') }).readonly(),
+  /** [Нет данных] / [Оставить] — к следующему упражнению без записи; [Закончить] — выход. */
+  z.object({ type: z.literal('seed_next') }).readonly(),
+  z.object({ type: z.literal('seed_stopped') }).readonly(),
+  z.object({ type: z.literal('unknown_command'), name: z.string() }).readonly(),
 ]);
 export type BotEvent = z.infer<typeof BotEventSchema>;
 
@@ -103,6 +117,23 @@ export const ViewSchema = z.discriminatedUnion('type', [
     type: z.literal('program_file_rejected'),
     reason: FileProblemSchema,
   }).readonly(),
+  z.object({
+    type: z.literal('seed_prompt'),
+    exerciseName: z.string(),
+    position: z.number().int().positive(),
+    total: z.number().int().positive(),
+    /** Для допвеса подсказка другая: «+25x8». */
+    addedWeight: z.boolean(),
+    current: LastResultSchema.nullable(),
+    error: SetInputErrorSchema.nullable(),
+  }).readonly(),
+  z.object({
+    type: z.literal('seed_done'),
+    filled: z.number().int().nonnegative(),
+    total: z.number().int().nonnegative(),
+  }).readonly(),
+  z.object({ type: z.literal('seed_needs_program') }).readonly(),
+  z.object({ type: z.literal('unknown_command'), name: z.string() }).readonly(),
 ]);
 export type View = z.infer<typeof ViewSchema>;
 
@@ -111,6 +142,8 @@ export const EffectSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('render'), view: ViewSchema }).readonly(),
   /** Сохранить программу активной; предыдущая архивируется. */
   z.object({ type: z.literal('save_program'), program: ProgramSchema }).readonly(),
+  /** Записать результат, введённый вручную (/seed). */
+  z.object({ type: z.literal('record_manual_result'), result: ManualResultSchema }).readonly(),
 ]);
 export type Effect = z.infer<typeof EffectSchema>;
 
@@ -121,6 +154,8 @@ export const StepContextSchema = z.object({
   languageCode: z.string().nullable(),
   /** Активная программа пользователя; null — ещё не загружена. */
   activeProgram: ProgramSchema.nullable(),
+  /** «Прошлый раз» по упражнениям активной программы. */
+  lastResults: z.record(z.string(), LastResultSchema).readonly(),
 }).readonly();
 export type StepContext = z.infer<typeof StepContextSchema>;
 

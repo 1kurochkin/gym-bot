@@ -27,7 +27,13 @@ function run(
   let s = settings;
   const views: View[] = [];
   for (const ev of events) {
-    const r = step(state, ev, { now, settings: s, languageCode, activeProgram: null });
+    const r = step(state, ev, {
+      now,
+      settings: s,
+      languageCode,
+      activeProgram: null,
+      lastResults: {},
+    });
     state = r.state;
     for (const e of r.effects) {
       if (e.type === 'save_settings') s = e.settings;
@@ -105,7 +111,13 @@ Deno.test('повторный /start после онбординга сразу 
 });
 
 Deno.test('stepNo растёт с каждым экраном; выбор зоны вне онбординга игнорируется', () => {
-  const ctx = { now, settings: defaultSettings(1), languageCode: null, activeProgram: null };
+  const ctx = {
+    now,
+    settings: defaultSettings(1),
+    languageCode: null,
+    activeProgram: null,
+    lastResults: {},
+  };
   assertEquals(step(initialSession(1), { type: 'start' }, ctx).state.stepNo, 1);
   const ignored = step(initialSession(1), { type: 'tz_chosen', zone: zone('Europe/Moscow') }, ctx);
   assertEquals(ignored, { state: initialSession(1), effects: [] });

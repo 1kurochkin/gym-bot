@@ -64,6 +64,22 @@ function canonical(value: unknown): string {
   return JSON.stringify(value);
 }
 
+/**
+ * Упражнения для /seed: по дням в порядке rotation, каждое один раз, без reps_only (US-6).
+ */
+export function seedExercises(program: Program): readonly Exercise[] {
+  const seen = new Set<string>();
+  const result: Exercise[] = [];
+  for (const dayId of program.rotation) {
+    for (const e of dayExercises(program, dayId)) {
+      if (seen.has(e.id) || e.loadType === LoadTypeSchema.enum.reps_only) continue;
+      seen.add(e.id);
+      result.push(e);
+    }
+  }
+  return result;
+}
+
 /** Все упражнения программы по id (описание, а не ссылки). */
 export function exerciseIndex(program: Program): ReadonlyMap<string, Exercise> {
   const index = new Map<string, Exercise>();

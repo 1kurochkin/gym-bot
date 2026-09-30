@@ -20,7 +20,7 @@ export type UpdateDeps = {
  * уже сделал адаптер telegram. Здесь: идемпотентность → событие → step() → одна транзакция → отрисовка.
  */
 export async function handleUpdate(deps: UpdateDeps, update: IncomingUpdate): Promise<void> {
-  const { session, settings, activeProgram } = await deps.store.load(update.userId);
+  const { session, settings, activeProgram, lastResults } = await deps.store.load(update.userId);
 
   // Telegram повторяет webhook при таймауте: уже обработанный update_id игнорируем.
   if (update.updateId <= session.lastUpdateId) return;
@@ -45,13 +45,23 @@ export async function handleUpdate(deps: UpdateDeps, update: IncomingUpdate): Pr
     settings,
     languageCode: update.languageCode,
     activeProgram,
+    lastResults,
   });
 
   // Все эффекты записи — одной транзакцией вместе с новым состоянием сессии.
   let newSettings: Settings | undefined;
   let newProgram: Commit['newProgram'];
+  const manualResults: NonNullable<Commit['manualResults']>[number][] = [];
   for (const e of result.effects) {
     if (e.type === 'save_settings') newSettings = e.settings;
+    if (e.type === 'record_manual_result' && settings.activeProgramId !== null) {
+      manualResults.push({
+        logId: deps.newId(),
+        setId: deps.newId(),
+        programId: settings.activeProgramId,
+        result: e.result,
+      });
+    }
     if (e.type === 'save_program') {
       newProgram = { id: deps.newId(), program: e.program };
       newSettings = { ...(newSettings ?? settings), activeProgramId: newProgram.id };
@@ -61,6 +71,7 @@ export async function handleUpdate(deps: UpdateDeps, update: IncomingUpdate): Pr
     session: result.state,
     settings: newSettings,
     newProgram,
+    manualResults,
   });
 
   for (const e of result.effects) {

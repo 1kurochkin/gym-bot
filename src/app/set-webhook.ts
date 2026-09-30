@@ -1,4 +1,5 @@
 import { Api } from 'grammy';
+import { COMMANDS } from '../features/help/commands.ts';
 
 /**
  * Регистрирует webhook с секретным токеном: `deno task webhook:set`.
@@ -19,5 +20,7 @@ await api.setWebhook(`${base.replace(/\/$/, '')}/webhook`, {
   allowed_updates: ['message', 'callback_query'],
   drop_pending_updates: true,
 });
+await api.setMyCommands(COMMANDS);
 const info = await api.getWebhookInfo();
 console.log(`Webhook: ${info.url}; ожидают обработки: ${info.pending_update_count}`);
+console.log(`Меню команд: ${COMMANDS.map((c) => '/' + c.command).join(' ')}`);

@@ -52,7 +52,7 @@ updated: 2026-09-28
 **`exercise_logs`**
 
 ```ts
-{ id, workoutId, programId, exerciseId, exerciseName, order,
+{ id, workoutId?, programId, exerciseId, exerciseName, order,
   status: 'done' | 'skipped' | 'substituted', substitutedFor?,
   intensity?: 'high' | 'low',
   plannedWorkWeightLb?, stepLbUsed,
@@ -61,12 +61,14 @@ updated: 2026-09-28
   source: 'workout' | 'manual_import' | 'llm_import', localDate }
 ```
 
+`workoutId` пуст у записей не из тренировки (`source: manual_import`, `llm_import`): у стартовых результатов тренировки нет. У их подходов `workoutId` тоже пуст.
+
 `stepLbUsed` и `warmupTier` сохраняются, чтобы при анализе было видно, по какому шагу и какой ступени шла тренировка (шаг может меняться при смене тренажёра или покупке блинов).
 
 **`sets`**
 
 ```ts
-{ id, exerciseLogId, workoutId, programId, exerciseId,
+{ id, exerciseLogId, workoutId?, programId, exerciseId,
   kind: 'warmup' | 'work' | 'extra', index,
   plannedWeightLb?, plannedReps?,
   weightLb: number | null,   // null для reps_only; для weighted_bodyweight — допвес
