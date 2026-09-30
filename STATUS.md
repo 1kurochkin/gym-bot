@@ -1,21 +1,20 @@
 # Status — обновлено 2026-09-30
 
 ## Текущий этап
-Этап 0. Каркас (.specs/roadmap.md)
+Этап 1. Домен (.specs/roadmap.md)
 
 ## Чеклист этапа
-- [x] Харнесс: CLAUDE.md, .specs/ + индекс, docs/ (architecture, harness, runbook'и), ADR 0000–0006, STATUS.md, хуки
-- [x] deno.json (tasks, import map), каркас src/ по слоям, tests/architecture.test.ts
-- [x] Supabase: config.toml (verify_jwt = false), функция bot, миграция settings + session (RLS)
-- [x] grammY, Drizzle, postgres, drizzle-kit работают под Deno 2.9
-- [x] Whitelist, секрет webhook, /health с секретом, идемпотентность update_id, устаревшие кнопки
-- [x] Онбординг часового пояса: текущее время → кнопки зон с этим смещением, или геопозиция (tz-lookup)
-- [x] GitHub Actions: ci.yml, backup.yml
-- [x] Фикстуры разминки tests/fixtures/warmup-cases.json
-- [x] Прогон на локальном Supabase (`supabase functions serve`): миграция, /health, секрет webhook, whitelist, геопозиция → зона в БД, повтор update_id
-- [x] Живой диалог с dev-ботом (`deno task dev`): онбординг по геопозиции работает
-- [x] Деплой (2026-09-30, проект gym-bot, ref kxuvbsvptqwvlzzxamsm): миграции, функция, webhook; /health 200; онбординг в проде работает
-- [ ] Первый бэкап и проверка восстановления по docs/runbook-restore.md
+- [ ] zod-схема программы и валидация программы владельца из .specs/program-format.md (понятные ошибки с путём поля)
+- [ ] Собираемые веса штанги по набору блинов (.specs/warmup.md §6.1)
+- [ ] Разминка ступенями от рабочего веса (§6.2) — все контрольные примеры из tests/fixtures/
+- [ ] Разминка с допвесом (§6.3) — контрольные примеры из tests/fixtures/
+- [ ] Ротация дней и чередование 100/70 по ISO-неделе (§6.4)
+- [ ] Парсер ввода «195x7», «+25x8», «x20» (.specs/product.md → ввод свободным текстом)
+
+Готово, когда: все контрольные примеры раздела 6 проходят в тестах; JSON программы владельца валиден.
+
+## Завершено
+- Этап 0 (2026-09-30): харнесс, каркас по слоям, онбординг часового пояса, деплой в прод (ref kxuvbsvptqwvlzzxamsm), ежедневный бэкап, проверка восстановления.
 
 ## Последние решения
 - 2026-09-28: устаревшая кнопка — убираем клавиатуру у старого сообщения (answerCallbackQuery уже отправлен до БД, всплывающую подсказку показать нельзя)
@@ -29,7 +28,7 @@
 - 2026-09-30: один бот @ma_gym_bot на dev и прод (решение владельца): после `deno task dev` нужно снова `deno task webhook:set`
 
 ## Следующий шаг
-Закрыть этап 0: секреты GitHub для бэкапа (README → Деплой → шаг 5), ручной запуск workflow backup, проверка восстановления. Затем этап 1: zod-схема программы и buildWarmup() по tests/fixtures/warmup-cases.json.
+Этап 1: начать с zod-схемы программы и расчёта разминки ступенями по контрольным примерам (tests/fixtures/).
 
 ## Известные проблемы / вопросы к владельцу
 - Импорт src/ вне supabase/functions/ работает и в `functions serve`, и в облачном `functions deploy --use-api` (проверено 2026-09-30).
