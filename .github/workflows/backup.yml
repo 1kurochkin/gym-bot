@@ -48,7 +48,8 @@ jobs:
         env:
           FUNCTION_URL: ${{ secrets.FUNCTION_URL }}
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
-        run: curl -fsS -o /dev/null -H "x-cron-secret: $CRON_SECRET" "$FUNCTION_URL/health"
+        run: |
+          curl -fsS -o /dev/null -H "x-cron-secret: $CRON_SECRET" "$FUNCTION_URL/health"
 
       - name: Cleanup
         if: always()

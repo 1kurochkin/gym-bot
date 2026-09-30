@@ -38,6 +38,10 @@ brew install deno supabase/tap/supabase jq
    deno task dev
    ```
 
+> **Если dev и прод — один бот** (одинаковый `BOT_TOKEN` в `.env` и `.env.prod`): `deno task dev`
+> при старте снимает webhook, и прод перестаёт отвечать. После локальной разработки верните его:
+> `deno task webhook:set`.
+
 Данные — в Supabase Studio: http://127.0.0.1:54323 → Table Editor. Сбросить локальную БД к
 миграциям: `supabase db reset`.
 
