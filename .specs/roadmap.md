@@ -11,9 +11,9 @@ updated: 2026-09-28
 
 ### Этап 0. Каркас (≈ 0,5 дня)
 
-- [ ] Харнесс репозитория по разделу 12: `CLAUDE.md`, `.specs/`, `docs/adr/` (ADR-0001…0005), `STATUS.md`, хуки.
-- [ ] Проект Supabase (Edge Function `bot` на Deno + grammY, Postgres + Drizzle, `verify_jwt = false`), каркас папок и правило зависимостей из раздела 13, `deno task dev` (локальный Supabase + long polling) и `deno task check`; GitHub Actions `ci.yml` и `backup.yml`.
-- [ ] Whitelist, секреты, webhook с секретным токеном, онбординг часового пояса.
+- [x] Харнесс репозитория по разделу 12: `CLAUDE.md`, `.specs/`, `docs/adr/` (ADR-0001…0005), `STATUS.md`, хуки.
+- [x] Проект Supabase (Edge Function `bot` на Deno + grammY, Postgres + Drizzle, `verify_jwt = false`), каркас папок и правило зависимостей из раздела 13, `deno task dev` (локальный Supabase + long polling) и `deno task check`; GitHub Actions `ci.yml` и `backup.yml`.
+- [x] Whitelist, секреты, webhook с секретным токеном, онбординг часового пояса.
 
 - **Готово, когда:** бот отвечает на `/start` только владельцу локально и после деплоя; `deno task check` зелёный, включая architecture test; агент в новой сессии по одному `CLAUDE.md` находит, где лежит спецификация разминки.
 
