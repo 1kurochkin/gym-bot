@@ -6,6 +6,7 @@ export const COMMANDS: readonly { readonly command: string; readonly description
   { command: 'start', description: 'Главный экран' },
   { command: 'program', description: 'Загрузить или показать программу' },
   { command: 'seed', description: 'Ввести последние рабочие результаты' },
+  { command: 'settings', description: 'Часовой пояс, гриф, блины, шаг веса' },
 ];
 
 export const KNOWN_COMMANDS: ReadonlySet<string> = new Set(COMMANDS.map((c) => c.command));

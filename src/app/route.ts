@@ -8,6 +8,8 @@ import { toEvent as programEvent } from '../features/program/handlers.ts';
 import { renderProgramView } from '../features/program/views.ts';
 import { toEvent as seedEvent } from '../features/seed/handlers.ts';
 import { renderSeedView } from '../features/seed/views.ts';
+import { toEvent as settingsEvent } from '../features/settings/handlers.ts';
+import { renderSettingsView } from '../features/settings/views.ts';
 import { assertNever } from '../shared/result.ts';
 import type { ZoneLocator } from '../ports/geo.ts';
 import type { Incoming, Rendered } from '../ports/ui.ts';
@@ -26,7 +28,7 @@ export async function routeEvent(input: Incoming, zoneAt: ZoneLocator): Promise<
   if (input.kind === 'command' && !KNOWN_COMMANDS.has(input.name)) {
     return { type: 'unknown_command', name: input.name };
   }
-  return programEvent(input) ?? seedEvent(input) ?? onboardingEvent(input);
+  return programEvent(input) ?? seedEvent(input) ?? settingsEvent(input) ?? onboardingEvent(input);
 }
 
 /** Экран → текст и кнопки фичи, которой он принадлежит. */
@@ -46,10 +48,16 @@ export function render(view: View): Rendered {
       return renderProgramView(view);
     case 'seed_prompt':
     case 'seed_done':
-    case 'seed_needs_program':
+    case 'needs_program':
       return renderSeedView(view);
     case 'unknown_command':
       return renderHelpView(view);
+    case 'settings_menu':
+    case 'settings_bar':
+    case 'settings_plates':
+    case 'settings_steps':
+    case 'settings_step_edit':
+      return renderSettingsView(view);
     default:
       return assertNever(view);
   }
