@@ -25,6 +25,19 @@ const SIMPLE_CODES = {
   program_cancel: 'px',
   seed_next: 'sn',
   seed_stop: 'ss',
+  settings_back: 'sb',
+  settings_close: 'sc',
+  plates_save: 'ps',
+  step_reset: 'sr',
+} as const;
+
+/** Коды действий с одним параметром: «bs:45», «sp:calves». */
+const PARAM_CODES = {
+  settings_section: 'se',
+  bar_set: 'bs',
+  plate_toggle: 'pt',
+  step_pick: 'sp',
+  step_set: 'st',
 } as const;
 
 function encodeAction(a: Action): string {
@@ -35,15 +48,44 @@ function encodeAction(a: Action): string {
     case 'program_cancel':
     case 'seed_next':
     case 'seed_stop':
+    case 'settings_back':
+    case 'settings_close':
+    case 'plates_save':
+    case 'step_reset':
       return SIMPLE_CODES[a.type];
+    case 'settings_section':
+      return `${PARAM_CODES[a.type]}:${a.section}`;
+    case 'bar_set':
+    case 'plate_toggle':
+    case 'step_set':
+      return `${PARAM_CODES[a.type]}:${a.lb}`;
+    case 'step_pick':
+      return `${PARAM_CODES[a.type]}:${a.exerciseId}`;
   }
 }
 
 /** Код → сырой объект → ActionSchema: в приложение попадает только проверенное действие. */
 function decodeAction(code: string): Action | null {
-  const tz = /^tz:([A-Za-z0-9_+\-/]+)$/.exec(code);
-  const simple = Object.entries(SIMPLE_CODES).find(([, c]) => c === code)?.[0];
-  const raw = tz ? { type: 'tz', zone: tz[1] } : simple ? { type: simple } : null;
-  const r = ActionSchema.safeParse(raw);
+  const r = ActionSchema.safeParse(rawAction(code));
   return r.success ? r.data : null;
+}
+
+/** Код → сырой объект; проверку типов и значений делает ActionSchema. */
+function rawAction(code: string): Record<string, unknown> | null {
+  const tz = /^tz:([A-Za-z0-9_+\-/]+)$/.exec(code);
+  if (tz) return { type: 'tz', zone: tz[1] };
+  const simple = Object.entries(SIMPLE_CODES).find(([, c]) => c === code)?.[0];
+  if (simple) return { type: simple };
+  const m = /^([a-z]{2}):([A-Za-z0-9_.]+)$/.exec(code);
+  const type = m && Object.entries(PARAM_CODES).find(([, c]) => c === m[1])?.[0];
+  if (!m || !type) return null;
+  const value = m[2] ?? '';
+  switch (type) {
+    case 'settings_section':
+      return { type, section: value };
+    case 'step_pick':
+      return { type, exerciseId: value };
+    default:
+      return { type, lb: Number(value) };
+  }
 }

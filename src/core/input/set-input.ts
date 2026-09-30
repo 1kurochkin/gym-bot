@@ -96,3 +96,9 @@ export function parseSetInput(
   if (ctx.suggestedLb === null) return err(E.weight_required);
   return ok({ weightLb: ctx.suggestedLb, reps, weightSource: W.suggested, comment });
 }
+
+/** Одно число в фунтах: «33», «2,5», «2.5 lb». null — не число. */
+export function parseLbNumber(input: string): number | null {
+  const m = /^\s*(\d+(?:[.,]\d+)?)\s*(?:lb|lbs|фунт\S*)?\s*$/i.exec(input);
+  return m ? Number((m[1] ?? '').replace(',', '.')) : null;
+}

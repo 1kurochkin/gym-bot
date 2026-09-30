@@ -1,6 +1,9 @@
 import { z } from 'zod';
 import { TimeZoneSchema } from '../core/schedule/timezone.ts';
+import { IdSchema } from '../core/program/schema.ts';
+import { SettingsSectionSchema } from '../core/settings/options.ts';
 import { FileProblemSchema } from '../core/session/types.ts';
+import { LbSchema } from '../core/units/lb.ts';
 
 /**
  * Граница между Telegram и приложением. Адаптер telegram переводит апдейт в Incoming,
@@ -14,6 +17,15 @@ export const ActionSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('program_cancel') }).readonly(),
   z.object({ type: z.literal('seed_next') }).readonly(),
   z.object({ type: z.literal('seed_stop') }).readonly(),
+  z.object({ type: z.literal('settings_section'), section: SettingsSectionSchema }).readonly(),
+  z.object({ type: z.literal('settings_back') }).readonly(),
+  z.object({ type: z.literal('settings_close') }).readonly(),
+  z.object({ type: z.literal('bar_set'), lb: LbSchema }).readonly(),
+  z.object({ type: z.literal('plate_toggle'), lb: LbSchema }).readonly(),
+  z.object({ type: z.literal('plates_save') }).readonly(),
+  z.object({ type: z.literal('step_pick'), exerciseId: IdSchema }).readonly(),
+  z.object({ type: z.literal('step_set'), lb: LbSchema }).readonly(),
+  z.object({ type: z.literal('step_reset') }).readonly(),
 ]);
 export type Action = z.infer<typeof ActionSchema>;
 

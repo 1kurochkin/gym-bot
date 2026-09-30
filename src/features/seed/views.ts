@@ -4,7 +4,7 @@ import { type SetInputError, SetInputErrorSchema } from '../../core/input/set-in
 import type { View } from '../../core/session/types.ts';
 import type { Button, Rendered } from '../../ports/ui.ts';
 
-export type SeedView = Extract<View, { type: 'seed_prompt' | 'seed_done' | 'seed_needs_program' }>;
+export type SeedView = Extract<View, { type: 'seed_prompt' | 'seed_done' | 'needs_program' }>;
 
 const E = SetInputErrorSchema.enum;
 const text = (value: string): Rendered => ({ text: value, keyboard: [], replyKeyboard: null });
@@ -34,7 +34,7 @@ export function renderSeedView(view: SeedView): Rendered {
           ? `Готово: записал ${view.filled} из ${view.total}. Это будет «прошлым разом» на тренировке.`
           : 'Ничего не записал. Вернуться можно в любой момент: /seed',
       );
-    case 'seed_needs_program':
+    case 'needs_program':
       return text('Сначала загрузи программу: /program');
     default:
       return assertNever(view);
