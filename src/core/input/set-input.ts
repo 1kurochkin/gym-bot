@@ -44,9 +44,9 @@ const W = WeightSourceSchema.enum;
 const MAX_REPS = 100;
 const MAX_WEIGHT_LB = 1500;
 
-const SEP = '[xXхХ×*]';
+const SEP = '[xXхХ×*/]';
 const NUM = String.raw`(\d+(?:[.,]\d+)?)`;
-/** Вес и повторения: «185x6», «185 х 6», «+25x8», «185 6». */
+/** Вес и повторения: «185x6», «185/6», «185 х 6», «+25x8», «185 6». */
 const WEIGHT_REPS = new RegExp(String.raw`^(\+)?${NUM}\s*(?:${SEP}\s*|\s+)(\d+)(?=\s|$)`);
 /** Только повторения, явно: «x7». */
 const X_REPS = new RegExp(String.raw`^${SEP}\s*(\d+)(?=\s|$)`);

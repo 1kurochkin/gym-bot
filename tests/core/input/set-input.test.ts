@@ -20,6 +20,9 @@ Deno.test('свой вес и повторения — записывается 
   assertEquals(parse('185 х 6'), [185, 6, 'entered', null]);
   assertEquals(parse('185×6'), [185, 6, 'entered', null]);
   assertEquals(parse('185*6'), [185, 6, 'entered', null]);
+  assertEquals(parse('185/7'), [185, 7, 'entered', null]);
+  assertEquals(parse('185 / 7 тяжело'), [185, 7, 'entered', 'тяжело']);
+  assertEquals(parse('182,5/7'), [182.5, 7, 'entered', null]);
   assertEquals(parse('185 6'), [185, 6, 'entered', null]);
   assertEquals(parse('182,5x7'), [182.5, 7, 'entered', null]);
   assertEquals(parse('182.5x7'), [182.5, 7, 'entered', null]);
@@ -35,6 +38,7 @@ Deno.test('допвес: со знаком + или без, 0 — свой ве�
   const dips: SetInputContext = { loadType: 'weighted_bodyweight', suggestedLb: lb(25) };
   assertEquals(parse('8', dips), [25, 8, 'suggested', null]);
   assertEquals(parse('+30x6', dips), [30, 6, 'entered', null]);
+  assertEquals(parse('+30/6', dips), [30, 6, 'entered', null]);
   assertEquals(parse('30x6', dips), [30, 6, 'entered', null]);
   assertEquals(parse('0x12', dips), [0, 12, 'entered', null]);
 });
