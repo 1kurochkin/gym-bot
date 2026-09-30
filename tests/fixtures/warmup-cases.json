@@ -1,0 +1,126 @@
+{
+  "$comment": "Контрольные примеры .specs/warmup.md §6.2 (штанга) и §6.3 (допвес). Синтетические. Тесты — этап 1.",
+  "barbell": [
+    {
+      "name": "лёгкий вес, ступень < 135",
+      "barLb": 45,
+      "platesLb": [5, 10, 25, 35, 45],
+      "workLb": 95,
+      "isBase": true,
+      "intensity": "high",
+      "expected": [
+        { "weightLb": 45, "reps": 8, "perSideLb": 0 },
+        { "weightLb": 75, "reps": 3, "perSideLb": 15 },
+        { "weightLb": 105, "reps": 1, "perSideLb": 30 }
+      ]
+    },
+    {
+      "name": "ступень 135–224",
+      "barLb": 45,
+      "platesLb": [5, 10, 25, 35, 45],
+      "workLb": 195,
+      "isBase": true,
+      "intensity": "high",
+      "expected": [
+        { "weightLb": 85, "reps": 8, "perSideLb": 20 },
+        { "weightLb": 135, "reps": 5, "perSideLb": 45 },
+        { "weightLb": 165, "reps": 3, "perSideLb": 60 },
+        { "weightLb": 205, "reps": 1, "perSideLb": 80 }
+      ]
+    },
+    {
+      "name": "граница 225",
+      "barLb": 45,
+      "platesLb": [5, 10, 25, 35, 45],
+      "workLb": 225,
+      "isBase": true,
+      "intensity": "high",
+      "expected": [
+        { "weightLb": 85, "reps": 10, "perSideLb": 20 },
+        { "weightLb": 135, "reps": 8, "perSideLb": 45 },
+        { "weightLb": 165, "reps": 5, "perSideLb": 60 },
+        { "weightLb": 205, "reps": 3, "perSideLb": 80 },
+        { "weightLb": 235, "reps": 1, "perSideLb": 95 }
+      ]
+    },
+    {
+      "name": "тяжёлый вес",
+      "barLb": 45,
+      "platesLb": [5, 10, 25, 35, 45],
+      "workLb": 315,
+      "isBase": true,
+      "intensity": "high",
+      "expected": [
+        { "weightLb": 125, "reps": 10, "perSideLb": 40 },
+        { "weightLb": 185, "reps": 8, "perSideLb": 70 },
+        { "weightLb": 235, "reps": 5, "perSideLb": 95 },
+        { "weightLb": 285, "reps": 3, "perSideLb": 120 },
+        { "weightLb": 335, "reps": 1, "perSideLb": 145 }
+      ]
+    },
+    {
+      "name": "с блинами 2,5 lb",
+      "barLb": 45,
+      "platesLb": [2.5, 5, 10, 25, 35, 45],
+      "workLb": 195,
+      "isBase": true,
+      "intensity": "high",
+      "expected": [
+        { "weightLb": 90, "reps": 8, "perSideLb": 22.5 },
+        { "weightLb": 135, "reps": 5, "perSideLb": 45 },
+        { "weightLb": 165, "reps": 3, "perSideLb": 60 },
+        { "weightLb": 205, "reps": 1, "perSideLb": 80 }
+      ]
+    },
+    {
+      "name": "день 70%: 225 → 155, без сингла",
+      "barLb": 45,
+      "platesLb": [5, 10, 25, 35, 45],
+      "lastHighLb": 225,
+      "workLb": 155,
+      "isBase": true,
+      "intensity": "low",
+      "expected": [
+        { "weightLb": 65, "reps": 8, "perSideLb": 10 },
+        { "weightLb": 105, "reps": 5, "perSideLb": 30 },
+        { "weightLb": 135, "reps": 3, "perSideLb": 45 }
+      ]
+    }
+  ],
+  "addedWeight": [
+    {
+      "name": "A = 90",
+      "stepLb": 5,
+      "addedLb": 90,
+      "expected": [
+        { "addedLb": 0, "reps": 10 },
+        { "addedLb": 35, "reps": 6 },
+        { "addedLb": 65, "reps": 4 },
+        { "addedLb": 100, "reps": 1 }
+      ],
+      "afterWork": null
+    },
+    {
+      "name": "A = 40",
+      "stepLb": 5,
+      "addedLb": 40,
+      "expected": [
+        { "addedLb": 0, "reps": 10 },
+        { "addedLb": 20, "reps": 5 },
+        { "addedLb": 35, "reps": 3 },
+        { "addedLb": 45, "reps": 1 }
+      ],
+      "afterWork": null
+    },
+    {
+      "name": "A = 15: без сингла, после рабочего — свой вес на максимум",
+      "stepLb": 5,
+      "addedLb": 15,
+      "expected": [
+        { "addedLb": 0, "reps": 8 },
+        { "addedLb": 10, "reps": 4 }
+      ],
+      "afterWork": { "addedLb": 0, "reps": "max", "restSec": 240 }
+    }
+  ]
+}

@@ -1,0 +1,55 @@
+# Ежедневный бэкап БД (.specs/nfr.md, docs/architecture.md §3).
+# Репозиторий публичный: дамп не коммитится, не сохраняется как артефакт и не печатается в лог.
+# Дамп уходит только в BACKUP_CHAT_ID. Затем /health — защита бесплатного проекта от паузы.
+name: backup
+
+on:
+  schedule:
+    - cron: '17 7 * * *' # ежедневно, 07:17 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Dump
+        env:
+          DB_URL: ${{ secrets.BACKUP_DB_URL }}
+        run: |
+          set -euo pipefail
+          supabase db dump --db-url "$DB_URL" -f schema.sql > /dev/null
+          supabase db dump --db-url "$DB_URL" --data-only -f data.sql > /dev/null
+          gzip -9 schema.sql data.sql
+
+      - name: Send to Telegram
+        env:
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+          CHAT_ID: ${{ secrets.BACKUP_CHAT_ID }}
+        run: |
+          set -euo pipefail
+          day=$(date -u +%F)
+          mv schema.sql.gz "gym-bot-schema-$day.sql.gz"
+          mv data.sql.gz "gym-bot-data-$day.sql.gz"
+          media='[{"type":"document","media":"attach://schema"},{"type":"document","media":"attach://data","caption":"Бэкап БД '"$day"'"}]'
+          code=$(curl -sS -o /dev/null -w '%{http_code}' \
+            -F chat_id="$CHAT_ID" -F media="$media" \
+            -F schema=@"gym-bot-schema-$day.sql.gz" -F data=@"gym-bot-data-$day.sql.gz" \
+            "https://api.telegram.org/bot$BOT_TOKEN/sendMediaGroup")
+          test "$code" = 200 || { echo "Telegram вернул HTTP $code"; exit 1; }
+
+      - name: Health ping
+        env:
+          FUNCTION_URL: ${{ secrets.FUNCTION_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: curl -fsS -o /dev/null -H "x-cron-secret: $CRON_SECRET" "$FUNCTION_URL/health"
+
+      - name: Cleanup
+        if: always()
+        run: rm -f ./*.sql ./*.sql.gz
