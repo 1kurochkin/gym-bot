@@ -27,7 +27,7 @@ function run(
   let s = settings;
   const views: View[] = [];
   for (const ev of events) {
-    const r = step(state, ev, { now, settings: s, languageCode });
+    const r = step(state, ev, { now, settings: s, languageCode, activeProgram: null });
     state = r.state;
     for (const e of r.effects) {
       if (e.type === 'save_settings') s = e.settings;
@@ -62,7 +62,11 @@ Deno.test('время → кнопки зон с этим смещением →
   ]);
   assertEquals(done.settings.timezone, 'America/New_York');
   assertEquals(done.state.step, 'idle');
-  assertEquals(done.views.at(-1), { type: 'home', timezoneLabel: 'UTC−4 · New York' });
+  assertEquals(done.views.at(-1), {
+    type: 'home',
+    timezoneLabel: 'UTC−4 · New York',
+    programName: null,
+  });
 });
 
 Deno.test('единственный город с таким смещением сохраняется сразу', () => {
@@ -101,7 +105,7 @@ Deno.test('повторный /start после онбординга сразу 
 });
 
 Deno.test('stepNo растёт с каждым экраном; выбор зоны вне онбординга игнорируется', () => {
-  const ctx = { now, settings: defaultSettings(1), languageCode: null };
+  const ctx = { now, settings: defaultSettings(1), languageCode: null, activeProgram: null };
   assertEquals(step(initialSession(1), { type: 'start' }, ctx).state.stepNo, 1);
   const ignored = step(initialSession(1), { type: 'tz_chosen', zone: zone('Europe/Moscow') }, ctx);
   assertEquals(ignored, { state: initialSession(1), effects: [] });

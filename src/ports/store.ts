@@ -1,15 +1,22 @@
 import { z } from 'zod';
+import { ProgramSchema } from '../core/program/schema.ts';
 import { SessionSchema } from '../core/session/types.ts';
 import { SettingsSchema } from '../core/settings/settings.ts';
 
-export const UserStateSchema = z.object({ session: SessionSchema, settings: SettingsSchema })
-  .readonly();
+export const UserStateSchema = z.object({
+  session: SessionSchema,
+  settings: SettingsSchema,
+  /** Активная программа (по settings.activeProgramId); null — не загружена. */
+  activeProgram: ProgramSchema.nullable(),
+}).readonly();
 export type UserState = z.infer<typeof UserStateSchema>;
 
 export const CommitSchema = z.object({
   session: SessionSchema,
   /** Передаётся, только если настройки изменились. */
   settings: SettingsSchema.optional(),
+  /** Новая активная программа: предыдущая архивируется, версия — следующая для того же id. */
+  newProgram: z.object({ id: z.uuid(), program: ProgramSchema }).readonly().optional(),
 }).readonly();
 export type Commit = z.infer<typeof CommitSchema>;
 

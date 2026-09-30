@@ -30,6 +30,7 @@ export function buildDeps(
     ui: createTelegramUi(bot),
     clock: { now: () => new Date() },
     zoneAt: tzLookup,
+    newId: () => crypto.randomUUID(),
   };
   return { bot, store };
 }

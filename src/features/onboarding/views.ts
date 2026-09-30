@@ -5,7 +5,9 @@ import { type Rendered, ReplyKeyboardSchema } from '../../ports/ui.ts';
 const { request_location, remove } = ReplyKeyboardSchema.enum;
 const { not_time, location_unknown } = AskTimeErrorSchema.enum;
 
-export function renderView(view: View): Rendered {
+export type OnboardingView = Extract<View, { type: 'ask_time' | 'pick_zone' | 'home' }>;
+
+export function renderView(view: OnboardingView): Rendered {
   switch (view.type) {
     case 'ask_time':
       return {
@@ -24,7 +26,10 @@ export function renderView(view: View): Rendered {
       };
     case 'home':
       return {
-        text: `Часовой пояс: ${view.timezoneLabel}\n\nПрограмма ещё не загружена.`,
+        text: `Часовой пояс: ${view.timezoneLabel}\n\n` +
+          (view.programName
+            ? `Программа: «${view.programName}».`
+            : 'Программа ещё не загружена — /program'),
         keyboard: [],
         replyKeyboard: remove,
       };

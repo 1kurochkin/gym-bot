@@ -13,8 +13,9 @@ export function toEvent(input: Incoming): BotEvent | null {
       return { type: 'text_entered', text: input.text };
     case 'callback':
       // Зона уже проверена ActionSchema при декодировании callback_data.
-      return { type: 'tz_chosen', zone: input.action.zone };
+      return input.action.type === 'tz' ? { type: 'tz_chosen', zone: input.action.zone } : null;
     case 'location':
+    case 'document':
       return null;
   }
 }
