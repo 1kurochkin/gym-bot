@@ -41,23 +41,18 @@ import * as schema from './schema.ts';
 type Db = PostgresJsDatabase<typeof schema>;
 type Tx = Parameters<Parameters<Db['transaction']>[0]>[0];
 
-/** Подключение через пулер Supavisor в режиме transaction: prepared statements не поддерживаются. */
+/**
+ * Подключение через пулер Supavisor в режиме transaction: prepared statements не поддерживаются,
+ * и запросы нельзя слать пачкой по одному соединению (pipelining): на параллельных запросах
+ * загрузки (Promise.all) пулер терял ответ, и апдейт висел до таймаута (docs/architecture.md §3).
+ * max_pipeline: 0 — следующий запрос уходит только после ответа на предыдущий (при 1 в полёте
+ * остаются два: активный запрос в счётчик не входит).
+ */
 export function connect(databaseUrl: string): Db {
-  const t0 = performance.now();
-  return drizzle(
-    postgres(databaseUrl, {
-      prepare: false,
-      max: 1,
-      // Диагностика зависаний в проде: какой запрос ушёл в БД (начало SQL, без параметров) и когда.
-      debug: (connection, query) =>
-        console.log(JSON.stringify({
-          db: query.replace(/\s+/g, ' ').slice(0, 60),
-          conn: connection,
-          at: Math.round(performance.now() - t0),
-        })),
-    }),
-    { schema },
-  );
+  // max_pipeline есть в рантайме postgres.js (по умолчанию 100), но не в его типах:
+  // объект через переменную, чтобы TS не отверг неизвестное поле.
+  const options = { prepare: false, max: 1, max_pipeline: 0 };
+  return drizzle(postgres(databaseUrl, options), { schema });
 }
 
 /** Шаг, которого больше нет в автомате (после рефакторинга), сбрасывается в idle. */
