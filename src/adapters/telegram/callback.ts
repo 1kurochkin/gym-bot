@@ -29,6 +29,11 @@ const SIMPLE_CODES = {
   settings_close: 'sc',
   plates_save: 'ps',
   step_reset: 'sr',
+  set_more: 'sm',
+  exercise_next: 'en',
+  exercise_skip: 'ek',
+  comment: 'cm',
+  workout_done: 'wd',
 } as const;
 
 /** Коды действий с одним параметром: «bs:45», «sp:calves». */
@@ -38,6 +43,13 @@ const PARAM_CODES = {
   plate_toggle: 'pt',
   step_pick: 'sp',
   step_set: 'st',
+  day_pick: 'dp',
+  resume: 'rs',
+  intensity_set: 'is',
+  weight_set: 'ws',
+  warmup: 'wu',
+  reps_set: 'rp',
+  cancel_answer: 'ca',
 } as const;
 
 function encodeAction(a: Action): string {
@@ -52,7 +64,26 @@ function encodeAction(a: Action): string {
     case 'settings_close':
     case 'plates_save':
     case 'step_reset':
+    case 'set_more':
+    case 'exercise_next':
+    case 'exercise_skip':
+    case 'comment':
+    case 'workout_done':
       return SIMPLE_CODES[a.type];
+    case 'day_pick':
+      return `${PARAM_CODES[a.type]}:${a.dayId}`;
+    case 'resume':
+      return `${PARAM_CODES[a.type]}:${a.choice}`;
+    case 'intensity_set':
+      return `${PARAM_CODES[a.type]}:${a.intensity}`;
+    case 'weight_set':
+      return `${PARAM_CODES[a.type]}:${a.lb}`;
+    case 'warmup':
+      return `${PARAM_CODES[a.type]}:${a.variant}`;
+    case 'reps_set':
+      return `${PARAM_CODES[a.type]}:${a.reps}`;
+    case 'cancel_answer':
+      return `${PARAM_CODES[a.type]}:${a.confirm ? 1 : 0}`;
     case 'settings_section':
       return `${PARAM_CODES[a.type]}:${a.section}`;
     case 'bar_set':
@@ -85,6 +116,18 @@ function rawAction(code: string): Record<string, unknown> | null {
       return { type, section: value };
     case 'step_pick':
       return { type, exerciseId: value };
+    case 'day_pick':
+      return { type, dayId: value };
+    case 'resume':
+      return { type, choice: value };
+    case 'intensity_set':
+      return { type, intensity: value };
+    case 'warmup':
+      return { type, variant: value };
+    case 'reps_set':
+      return { type, reps: Number(value) };
+    case 'cancel_answer':
+      return { type, confirm: value === '1' };
     default:
       return { type, lb: Number(value) };
   }

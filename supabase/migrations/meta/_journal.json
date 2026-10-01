@@ -22,6 +22,13 @@
       "when": 1790811850794,
       "tag": "20260930234410_exercise_logs_and_sets",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1790812800644,
+      "tag": "20261001000000_workouts",
+      "breakpoints": true
     }
   ]
 }

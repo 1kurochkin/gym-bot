@@ -2,9 +2,12 @@ import type { Settings } from '../core/settings/settings.ts';
 import { step } from '../core/session/step.ts';
 import type { Clock } from '../ports/clock.ts';
 import type { ZoneLocator } from '../ports/geo.ts';
-import type { Commit, Store } from '../ports/store.ts';
+import { type Commit, isWorkoutWrite, type Store } from '../ports/store.ts';
 import type { IncomingUpdate, Ui } from '../ports/ui.ts';
 import { render, routeEvent } from './route.ts';
+
+/** Свежих id на апдейт: тренировка, запись упражнения, до ~10 подходов разминки и рабочий. */
+const IDS_PER_UPDATE = 16;
 
 export type UpdateDeps = {
   readonly store: Store;
@@ -20,7 +23,8 @@ export type UpdateDeps = {
  * уже сделал адаптер telegram. Здесь: идемпотентность → событие → step() → одна транзакция → отрисовка.
  */
 export async function handleUpdate(deps: UpdateDeps, update: IncomingUpdate): Promise<void> {
-  const { session, settings, activeProgram, lastResults } = await deps.store.load(update.userId);
+  const loaded = await deps.store.load(update.userId);
+  const { session, settings, activeProgram, lastResults } = loaded;
 
   // Telegram повторяет webhook при таймауте: уже обработанный update_id игнорируем.
   if (update.updateId <= session.lastUpdateId) return;
@@ -46,6 +50,11 @@ export async function handleUpdate(deps: UpdateDeps, update: IncomingUpdate): Pr
     languageCode: update.languageCode,
     activeProgram,
     lastResults,
+    activeWorkout: loaded.activeWorkout,
+    lastWorkout: loaded.lastWorkout,
+    intensityLogs: loaded.intensityLogs,
+    lastHighLb: loaded.lastHighLb,
+    newIds: Array.from({ length: IDS_PER_UPDATE }, () => deps.newId()),
   });
 
   // Все эффекты записи — одной транзакцией вместе с новым состоянием сессии.
@@ -67,11 +76,15 @@ export async function handleUpdate(deps: UpdateDeps, update: IncomingUpdate): Pr
       newSettings = { ...(newSettings ?? settings), activeProgramId: newProgram.id };
     }
   }
+  const writes = result.effects.filter(isWorkoutWrite);
   await deps.store.commit(update.userId, {
     session: result.state,
     settings: newSettings,
     newProgram,
     manualResults,
+    workout: writes.length && settings.activeProgramId !== null
+      ? { programId: settings.activeProgramId, writes }
+      : undefined,
   });
 
   for (const e of result.effects) {
