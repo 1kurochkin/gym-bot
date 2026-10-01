@@ -425,6 +425,7 @@ function toSettings(row: typeof schema.settings.$inferSelect): Settings {
     barWeightLb: row.barWeightLb,
     platesLb: row.platesLb,
     exerciseOverrides: row.exerciseOverrides,
+    language: row.language,
     activeProgramId: row.activeProgramId,
   });
 }
@@ -436,6 +437,7 @@ function fromSettings(s: Settings): typeof schema.settings.$inferInsert {
     barWeightLb: s.barWeightLb,
     platesLb: [...s.platesLb],
     exerciseOverrides: { ...s.exerciseOverrides },
+    language: s.language,
     activeProgramId: s.activeProgramId,
   };
 }

@@ -1,0 +1,153 @@
+import { type SetInputError, SetInputErrorSchema } from '../../core/input/set-input.ts';
+import type { Language } from '../../core/settings/settings.ts';
+import { pluralEn } from '../i18n/format.ts';
+
+/** Тексты тренировки на языках пользователя. Ключи en проверяет typeof ru. */
+
+const E = SetInputErrorSchema.enum;
+
+const ru = {
+  bodyweight: 'свой вес',
+  skip: '⏭ Пропустить',
+  lastWorkout: (weekday: string, date: string, day: string) =>
+    `Прошлая тренировка: ${weekday}, ${date} — ${day}.`,
+  pickDay: 'Выбери день:',
+  resume: (time: string, day: string, done: number, total: number) =>
+    `Продолжить тренировку от ${time} (${day}, ${done} из ${
+      total % 10 === 1 && total % 100 !== 11 ? `${total} упражнения` : `${total} упражнений`
+    })?`,
+  continue: 'Продолжить',
+  finishOld: 'Завершить её',
+  startNew: 'Начать новую',
+  intensityAsk: (exercise: string, a: string, b: string) =>
+    `${exercise}: на этой неделе ещё не ясно, что из пары «${a} / ${b}» идёт на 100%. Как делаешь сегодня?`,
+  workSets: (min: number, max: number) =>
+    min === max ? `${min} ${min === 1 ? 'рабочий' : 'рабочих'}` : `${min}–${max} рабочих`,
+  goal: 'Цель',
+  thisWeek: 'На этой неделе',
+  noLast: 'Прошлого раза нет.',
+  invalidWeight: '⚠️ Не понял вес. Напиши число, например 185.',
+  askAdded: 'Допвес сегодня? Нажми или напиши число (0 — свой вес).',
+  askWeight: 'Рабочий вес сегодня? Нажми или напиши число.',
+  make70: 'Сделать 70%',
+  make100: 'Сделать 100%',
+  warmupFor: (work: string) => `Разминка под ${work}`,
+  orWorkSet: 'Или сразу напиши рабочий подход.',
+  warmupFull: '✅ Всё по плану',
+  warmupNone: '⏭ Без разминки',
+  setTarget: (i: number, target: string) => `Подход ${i} — ${target}`,
+  workSet: (i: number) => `Рабочий подход ${i}:`,
+  overMax: ' (сверх программы)',
+  recorded: (set: string) => `Записал ${set}.`,
+  askReps: 'Нажми или напиши повторения.',
+  askRepsOrWeight: 'Нажми или напиши: 7 — повторения, 185/6 — другой вес.',
+  commentSaved: '💬 Комментарий сохранён.',
+  nextSetHint: 'Следующий подход можно сразу написать.',
+  moreSet: '➕ Ещё подход',
+  comment: '💬 Комментарий',
+  finishWorkout: '🏁 Завершить тренировку',
+  nextExercise: '➡️ Следующее упражнение',
+  workoutCommentAsk: 'Комментарий к тренировке (самочувствие, сон и т. п.) — напиши текстом.',
+  exerciseCommentAsk: (name: string) =>
+    `Комментарий к «${name}» — напиши текстом. Покажу его в карточке в следующий раз.`,
+  skipped: 'пропущено',
+  previous: 'прошлый',
+  finished: (day: string, date: string, minutes: number) =>
+    `Тренировка завершена: ${day}, ${date}, ${minutes} мин`,
+  workoutCommentSaved: '💬 Комментарий к тренировке сохранён.',
+  workoutComment: '💬 Комментарий к тренировке',
+  done: 'Готово',
+  cancelAsk: (day: string) => `Прервать тренировку «${day}»? Записанное сохранится.`,
+  cancelYes: 'Прервать',
+  cancelled: 'Тренировка прервана, записанное сохранено. Новая — /workout',
+  none: 'Сейчас нет начатой тренировки. Начать — /workout',
+  lastTime: (date: string, set: string) => `Прошлый раз (${date}): ${set}`,
+  aboveRange: ' — выше диапазона',
+  assisted: 'с помощью (блок/резина)',
+  emptyBar: 'пустой гриф',
+  perSide: (lb: string) => `по ${lb}`,
+  overload: 'перегруз',
+  errors: {
+    [E.reps_required]: 'Не хватает повторений: например 185/6.',
+    [E.reps_out_of_range]: 'Повторений должно быть от 1 до 100.',
+    [E.weight_out_of_range]: 'Вес — от 0 до 1500 lb.',
+    [E.weight_required]: 'Нужен вес и повторения, например 185/6.',
+    [E.weight_not_allowed]: 'Здесь вес не пишется, только повторения.',
+    [E.empty]: 'Не понял. Напиши повторения (7) или вес и повторения (185/6).',
+    [E.not_recognized]: 'Не понял. Напиши повторения (7) или вес и повторения (185/6).',
+  } satisfies Record<SetInputError, string>,
+};
+
+const en: typeof ru = {
+  bodyweight: 'bodyweight',
+  skip: '⏭ Skip',
+  lastWorkout: (weekday: string, date: string, day: string) =>
+    `Last workout: ${weekday}, ${date} — ${day}.`,
+  pickDay: 'Pick a day:',
+  resume: (time: string, day: string, done: number, total: number) =>
+    `Resume the workout started at ${time} (${day}, ${done} of ${
+      pluralEn(total, 'exercise', 'exercises')
+    })?`,
+  continue: 'Resume',
+  finishOld: 'Finish it',
+  startNew: 'Start new',
+  intensityAsk: (exercise: string, a: string, b: string) =>
+    `${exercise}: it’s not clear yet which of “${a} / ${b}” goes at 100% this week. What are you doing today?`,
+  workSets: (min: number, max: number) =>
+    min === max ? pluralEn(min, 'working set', 'working sets') : `${min}–${max} working sets`,
+  goal: 'Goal',
+  thisWeek: 'This week',
+  noLast: 'No previous result.',
+  invalidWeight: '⚠️ Didn’t get the weight. Type a number, e.g. 185.',
+  askAdded: 'Added weight today? Tap or type a number (0 — bodyweight).',
+  askWeight: 'Working weight today? Tap or type a number.',
+  make70: 'Do 70%',
+  make100: 'Do 100%',
+  warmupFor: (work: string) => `Warm-up for ${work}`,
+  orWorkSet: 'Or type your working set right away.',
+  warmupFull: '✅ As planned',
+  warmupNone: '⏭ No warm-up',
+  setTarget: (i: number, target: string) => `Set ${i} — ${target}`,
+  workSet: (i: number) => `Working set ${i}:`,
+  overMax: ' (extra)',
+  recorded: (set: string) => `Saved ${set}.`,
+  askReps: 'Tap or type the reps.',
+  askRepsOrWeight: 'Tap or type: 7 — reps, 185/6 — a different weight.',
+  commentSaved: '💬 Comment saved.',
+  nextSetHint: 'You can type the next set right away.',
+  moreSet: '➕ One more set',
+  comment: '💬 Comment',
+  finishWorkout: '🏁 Finish workout',
+  nextExercise: '➡️ Next exercise',
+  workoutCommentAsk: 'Workout comment (how you feel, sleep, etc.) — type it.',
+  exerciseCommentAsk: (name: string) =>
+    `Comment on “${name}” — type it. I’ll show it on the card next time.`,
+  skipped: 'skipped',
+  previous: 'last',
+  finished: (day: string, date: string, minutes: number) =>
+    `Workout finished: ${day}, ${date}, ${minutes} min`,
+  workoutCommentSaved: '💬 Workout comment saved.',
+  workoutComment: '💬 Workout comment',
+  done: 'Done',
+  cancelAsk: (day: string) => `Stop the “${day}” workout? Everything saved stays.`,
+  cancelYes: 'Stop',
+  cancelled: 'Workout stopped, everything saved stays. New one — /workout',
+  none: 'No workout in progress. Start one — /workout',
+  lastTime: (date: string, set: string) => `Last time (${date}): ${set}`,
+  aboveRange: ' — above the range',
+  assisted: 'assisted (machine/band)',
+  emptyBar: 'empty bar',
+  perSide: (lb: string) => `${lb} per side`,
+  overload: 'overload',
+  errors: {
+    [E.reps_required]: 'Reps are missing: e.g. 185/6.',
+    [E.reps_out_of_range]: 'Reps must be from 1 to 100.',
+    [E.weight_out_of_range]: 'Weight must be from 0 to 1500 lb.',
+    [E.weight_required]: 'I need weight and reps, e.g. 185/6.',
+    [E.weight_not_allowed]: 'No weight here, just reps.',
+    [E.empty]: 'Didn’t get that. Type reps (7) or weight and reps (185/6).',
+    [E.not_recognized]: 'Didn’t get that. Type reps (7) or weight and reps (185/6).',
+  },
+};
+
+export const MESSAGES: Record<Language, typeof ru> = { ru, en };

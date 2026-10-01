@@ -1,5 +1,7 @@
 import { assertEquals } from '@std/assert';
 import { dayExercises, parseProgram } from '../../../src/core/program/program.ts';
+import { LanguageSchema } from '../../../src/core/settings/settings.ts';
+import { issueText } from '../../../src/features/program/messages.ts';
 import { specProgramJson } from '../../support/spec.ts';
 
 /** Программа как произвольный JSON: тесты намеренно портят её в любом месте. */
@@ -12,8 +14,9 @@ async function variant(edit: (p: AnyJson) => void): Promise<unknown> {
   edit(p);
   return p;
 }
+/** Ошибки так, как их увидит пользователь с русским интерфейсом. */
 const messages = (r: ReturnType<typeof parseProgram>): string[] =>
-  r.ok ? [] : r.error.map((i) => `${i.path}: ${i.message}`);
+  r.ok ? [] : r.error.map((i) => issueText(i, LanguageSchema.enum.ru));
 
 Deno.test('программа владельца из спецификации валидна', async () => {
   const r = parseProgram(await specProgramJson());
@@ -33,6 +36,24 @@ Deno.test('ссылки ref раскрываются в описание упр�
 Deno.test('ошибка поля — с путём и по-русски', async () => {
   const r = parseProgram(await variant((p) => delete p.days[2].exercises[0].repRange.min));
   assertEquals(messages(r), ['days[2].exercises[0].repRange.min: обязательное поле']);
+});
+
+Deno.test('ошибки на языке пользователя: путь тот же, пояснение переведено', async () => {
+  const r = parseProgram(
+    await variant((p) => {
+      delete p.days[2].exercises[0].repRange.min;
+      p.days[0].exercises[0].repRang = 1;
+      p.days[1].exercises[0].loadType = 'kettlebell';
+    }),
+  );
+  const en = r.ok ? [] : r.error.map((i) => issueText(i, LanguageSchema.enum.en));
+  assertEquals(en, [
+    'days[0].exercises[0]: unknown field: repRang',
+    'days[1].exercises[0].loadType: allowed: "barbell", "weighted_bodyweight", "machine", ' +
+    '"reps_only", "light_load"',
+    'days[2].exercises[0].repRange.min: required field',
+  ]);
+  assertEquals(messages(r)[0], 'days[0].exercises[0]: неизвестное поле: repRang');
 });
 
 Deno.test('опечатка в ключе и неизвестный loadType', async () => {

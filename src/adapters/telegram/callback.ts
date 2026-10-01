@@ -50,6 +50,7 @@ const PARAM_CODES = {
   warmup: 'wu',
   reps_set: 'rp',
   cancel_answer: 'ca',
+  lang_set: 'lg',
 } as const;
 
 function encodeAction(a: Action): string {
@@ -92,6 +93,8 @@ function encodeAction(a: Action): string {
       return `${PARAM_CODES[a.type]}:${a.lb}`;
     case 'step_pick':
       return `${PARAM_CODES[a.type]}:${a.exerciseId}`;
+    case 'lang_set':
+      return `${PARAM_CODES[a.type]}:${a.language}`;
   }
 }
 
@@ -128,6 +131,8 @@ function rawAction(code: string): Record<string, unknown> | null {
       return { type, reps: Number(value) };
     case 'cancel_answer':
       return { type, confirm: value === '1' };
+    case 'lang_set':
+      return { type, language: value };
     default:
       return { type, lb: Number(value) };
   }

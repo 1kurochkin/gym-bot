@@ -63,10 +63,10 @@ Deno.test('время → кнопки зон с этим смещением →
   const pick = picked.views[1];
   assertEquals(pick?.type === 'pick_zone' && pick.offsetLabel, 'UTC−4');
   assertEquals(pick?.type === 'pick_zone' && pick.options.map((o) => o.label), [
-    'UTC−4 · New York',
-    'UTC−4 · Toronto',
-    'UTC−4 · Caracas',
-    'UTC−4 · без перехода на летнее время',
+    { offset: 'UTC−4', city: 'New York' },
+    { offset: 'UTC−4', city: 'Toronto' },
+    { offset: 'UTC−4', city: 'Caracas' },
+    { offset: 'UTC−4', city: null },
   ]);
   assertEquals(picked.state.step, 'onboarding_tz_pick');
 
@@ -79,7 +79,7 @@ Deno.test('время → кнопки зон с этим смещением →
   assertEquals(done.state.step, 'idle');
   assertEquals(done.views.at(-1), {
     type: 'home',
-    timezoneLabel: 'UTC−4 · New York',
+    zone: { offset: 'UTC−4', city: 'New York' },
     programName: null,
   });
 });

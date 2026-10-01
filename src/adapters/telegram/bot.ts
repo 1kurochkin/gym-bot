@@ -86,7 +86,7 @@ async function toIncoming(ctx: Context, download: Download): Promise<IncomingUpd
 
   const doc = ctx.message?.document;
   if (doc) {
-    const fileName = doc.file_name ?? 'файл';
+    const fileName = doc.file_name ?? 'file';
     const isJson = fileName.toLowerCase().endsWith('.json') || doc.mime_type === 'application/json';
     const tooLarge = (doc.file_size ?? 0) > MAX_FILE_BYTES;
     const text = isJson && !tooLarge ? await download(doc.file_id) : null;
@@ -120,9 +120,9 @@ export function createTelegramUi(bot: Bot): Ui {
         if (messageId !== null) {
           await bot.api.editMessageReplyMarkup(chatId, messageId).catch(() => {});
         }
-        const reply_markup = rendered.replyKeyboard === 'remove'
+        const reply_markup = rendered.replyKeyboard.kind === 'remove'
           ? { remove_keyboard: true as const }
-          : new Keyboard().requestLocation('📍 Отправить геопозицию').resized().oneTime();
+          : new Keyboard().requestLocation(rendered.replyKeyboard.label).resized().oneTime();
         await bot.api.sendMessage(chatId, rendered.text, { reply_markup });
         return;
       }

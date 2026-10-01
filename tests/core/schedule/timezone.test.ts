@@ -1,12 +1,12 @@
 import { assertEquals } from '@std/assert';
 import {
   candidateZones,
-  formatZoneLabel,
   offsetFromLocalTime,
   parseClockTime,
   parseTimeZone,
   type TimeZone,
   utcOffsetMinutes,
+  zoneLabel,
 } from '../../../src/core/schedule/timezone.ts';
 
 const zone = (name: string): TimeZone => {
@@ -19,8 +19,14 @@ const ny = zone('America/New_York');
 const now = new Date('2026-09-28T22:40:00Z');
 
 Deno.test('New York: летом UTC−4, зимой UTC−5 (IANA-зона, а не фиксированное смещение)', () => {
-  assertEquals(formatZoneLabel(ny, new Date('2026-07-01T12:00:00Z')), 'UTC−4 · New York');
-  assertEquals(formatZoneLabel(ny, new Date('2026-12-01T12:00:00Z')), 'UTC−5 · New York');
+  assertEquals(zoneLabel(ny, new Date('2026-07-01T12:00:00Z')), {
+    offset: 'UTC−4',
+    city: 'New York',
+  });
+  assertEquals(zoneLabel(ny, new Date('2026-12-01T12:00:00Z')), {
+    offset: 'UTC−5',
+    city: 'New York',
+  });
 });
 
 Deno.test('переход на зимнее время 1 ноября 2026: смещение меняется в 2:00 по местному', () => {
@@ -29,8 +35,8 @@ Deno.test('переход на зимнее время 1 ноября 2026: см
 });
 
 Deno.test('подписи: дробное смещение, UTC, фиксированное смещение Etc', () => {
-  assertEquals(formatZoneLabel(zone('Asia/Kolkata'), now), 'UTC+5:30 · Kolkata');
-  assertEquals(formatZoneLabel(zone('Etc/GMT+4'), now), 'UTC−4 · без перехода на летнее время');
+  assertEquals(zoneLabel(zone('Asia/Kolkata'), now), { offset: 'UTC+5:30', city: 'Kolkata' });
+  assertEquals(zoneLabel(zone('Etc/GMT+4'), now), { offset: 'UTC−4', city: null });
 });
 
 Deno.test('parseClockTime: форматы, которые пишут люди', () => {

@@ -6,10 +6,7 @@ import { LbSchema } from '../units/lb.ts';
  * так ловятся опечатки вроде «repRang». Перекрёстные ссылки проверяет parseProgram.
  */
 
-export const IdSchema = z.string().regex(
-  /^[a-z][a-z0-9_]*$/,
-  'id: латиница в нижнем регистре, цифры, _',
-);
+export const IdSchema = z.string().regex(/^[a-z][a-z0-9_]*$/);
 
 export const LoadTypeSchema = z.enum([
   'barbell',
@@ -23,11 +20,12 @@ export type LoadType = z.infer<typeof LoadTypeSchema>;
 export const IntensitySchema = z.enum(['high', 'low']);
 export type Intensity = z.infer<typeof IntensitySchema>;
 
-const PositiveLbSchema = LbSchema.refine((v) => v > 0, 'должно быть больше 0');
+/** Своя проверка: код проблемы в params, текст строит view (ProgramProblem). */
+const PositiveLbSchema = LbSchema.refine((v) => v > 0, { params: { problem: 'not_positive' } });
 const RepsSchema = z.number().int().min(1);
 
 export const RangeSchema = z.strictObject({ min: RepsSchema, max: RepsSchema })
-  .refine((r) => r.min <= r.max, { message: 'min больше max', path: ['min'] })
+  .refine((r) => r.min <= r.max, { params: { problem: 'min_gt_max' }, path: ['min'] })
   .readonly();
 
 /** Шаг разминки в процентах от рабочего веса. pct > 1 — перегрузочный сингл. */

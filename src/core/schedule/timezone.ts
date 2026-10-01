@@ -49,12 +49,16 @@ export function cityName(zone: TimeZone): string {
   return last.replaceAll('_', ' ');
 }
 
-/** «UTC−4 · New York»: смещение считается на текущий момент. */
-export function formatZoneLabel(zone: TimeZone, at: Date): string {
-  const offset = formatOffset(utcOffsetMinutes(zone, at));
-  return zone.startsWith('Etc/')
-    ? `${offset} · без перехода на летнее время`
-    : `${offset} · ${cityName(zone)}`;
+/** Подпись зоны: смещение на текущий момент и город; city = null — фиксированное смещение (Etc/). */
+export const ZoneLabelSchema = z.object({ offset: z.string(), city: z.string().nullable() })
+  .readonly();
+export type ZoneLabel = z.infer<typeof ZoneLabelSchema>;
+
+export function zoneLabel(zone: TimeZone, at: Date): ZoneLabel {
+  return {
+    offset: formatOffset(utcOffsetMinutes(zone, at)),
+    city: zone.startsWith('Etc/') ? null : cityName(zone),
+  };
 }
 
 /** Время суток, которое написал пользователь, в минутах от полуночи: «18:40», «6.40 pm», «1840», «7». */

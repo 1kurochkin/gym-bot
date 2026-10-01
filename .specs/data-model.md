@@ -2,7 +2,7 @@
 title: "Модель данных"
 brief_sections: [7]
 source: "бриф «Спецификация: Telegram-бот помощник для тренировок», rev 47"
-updated: 2026-09-28
+updated: 2026-10-01
 ---
 
 # Модель данных
@@ -29,6 +29,7 @@ updated: 2026-09-28
 { userId, timezone: 'America/New_York', barWeightLb: 45,
   platesLb: [5, 10, 25, 35, 45],        // после покупки: [2.5, 5, 10, 25, 35, 45]
   exerciseOverrides: { [exerciseId]: { stepLb?: number } },  // JSON-колонка
+  language: 'ru' | 'en' | null,         // null — по языку Telegram (product.md → «Язык интерфейса»)
   activeProgramId }
 ```
 

@@ -2,7 +2,7 @@ import { parseLbNumber } from '../input/set-input.ts';
 import { exerciseIndex } from '../program/program.ts';
 import { type Exercise, LoadTypeSchema } from '../program/schema.ts';
 import { barbellStep, weightStepWithSource } from '../program/weight-step.ts';
-import { formatZoneLabel } from '../schedule/timezone.ts';
+import { zoneLabel } from '../schedule/timezone.ts';
 import {
   BAR_RANGE_LB,
   PLATE_OPTIONS_LB,
@@ -11,7 +11,7 @@ import {
   STEP_RANGE_LB,
   type StepSource,
 } from '../settings/options.ts';
-import type { Settings } from '../settings/settings.ts';
+import { type Language, languageFor, type Settings } from '../settings/settings.ts';
 import { type Lb, lb } from '../units/lb.ts';
 import { home, moveTo, unchanged, withEffects } from './flow.ts';
 import { type Session, SessionStepSchema, type StepContext, type StepResult } from './types.ts';
@@ -30,13 +30,14 @@ export function settingsMenu(
 ): StepResult {
   return moveTo(state, S.settings, {
     type: 'settings_menu',
-    timezoneLabel: settings.timezone ? formatZoneLabel(settings.timezone, ctx.now) : null,
+    zone: settings.timezone ? zoneLabel(settings.timezone, ctx.now) : null,
     barLb: settings.barWeightLb,
     platesLb: settings.platesLb,
     barStepLb: barbellStep(settings),
     overrides: Object.values(settings.exerciseOverrides).filter((o) =>
       o.stepLb !== undefined
     ).length,
+    language: languageFor(settings.language, ctx.languageCode),
     saved,
   });
 }
@@ -65,6 +66,11 @@ export function openSection(
       return platesScreen(state, ctx.settings.platesLb, false);
     case SECTION.steps:
       return stepsScreen(state, ctx);
+    case SECTION.language:
+      return moveTo(state, S.settings_language, {
+        type: 'settings_language',
+        selected: languageFor(ctx.settings.language, ctx.languageCode),
+      });
   }
 }
 
@@ -117,6 +123,13 @@ export function savePlates(state: Session, ctx: StepContext): StepResult {
   if (state.step !== S.settings_plates || c.kind !== 'plates') return unchanged(state);
   if (c.selected.length === 0) return platesScreen(state, c.selected, true);
   return save(state, ctx, { ...ctx.settings, platesLb: c.selected });
+}
+
+// ---------------------------------------------------------------- язык
+
+export function chooseLanguage(state: Session, ctx: StepContext, language: Language): StepResult {
+  if (state.step !== S.settings_language) return unchanged(state);
+  return save(state, ctx, { ...ctx.settings, language });
 }
 
 // ---------------------------------------------------------------- шаг по упражнениям
@@ -201,5 +214,6 @@ const SETTINGS_STEPS: ReadonlySet<string> = new Set([
   S.settings_plates,
   S.settings_steps,
   S.settings_step_edit,
+  S.settings_language,
 ]);
 const isSettings = (state: Session): boolean => SETTINGS_STEPS.has(state.step);
