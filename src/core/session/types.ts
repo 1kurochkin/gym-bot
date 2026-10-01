@@ -14,6 +14,8 @@ import { WarmupLineSchema } from '../workout/plan.ts';
 import {
   ActiveWorkoutSchema,
   ExerciseLogPatchSchema,
+  HistoryDataSchema,
+  HistoryItemSchema,
   LastWorkoutSchema,
   NewExerciseLogSchema,
   NewSetSchema,
@@ -60,6 +62,13 @@ export const SessionStepSchema = z.enum([
   'workout_cancel_confirm',
   'users',
   'users_revoke_confirm',
+  'history_list',
+  'history_workout',
+  'history_exercise',
+  'history_set',
+  'history_add',
+  'history_delete_set',
+  'history_delete_workout',
 ]);
 export type SessionStep = z.infer<typeof SessionStepSchema>;
 
@@ -102,6 +111,14 @@ export const SessionContextSchema = z.discriminatedUnion('kind', [
       workLb: LbSchema.nullable(),
       workSets: z.number().int().nonnegative(),
     }).readonly().nullable(),
+  }).readonly(),
+  /** /history: страница списка и что выбрано — тренировка, запись упражнения, подход. */
+  z.object({
+    kind: z.literal('history'),
+    offset: z.number().int().nonnegative(),
+    workoutId: z.string().nullable(),
+    logId: z.string().nullable(),
+    setId: z.string().nullable(),
   }).readonly(),
   /** /users: кого отключаем — ждёт подтверждения. */
   z.object({
@@ -195,6 +212,15 @@ export const BotEventSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('workout_done') }).readonly(),
   z.object({ type: z.literal('cancel_requested') }).readonly(),
   z.object({ type: z.literal('cancel_answered'), confirm: z.boolean() }).readonly(),
+  z.object({ type: z.literal('history_requested') }).readonly(),
+  z.object({ type: z.literal('history_page'), offset: z.number().int().nonnegative() }).readonly(),
+  z.object({ type: z.literal('history_workout_picked'), workoutId: z.string() }).readonly(),
+  z.object({ type: z.literal('history_exercise_picked'), logId: z.string() }).readonly(),
+  z.object({ type: z.literal('history_set_picked'), setId: z.string() }).readonly(),
+  z.object({ type: z.literal('history_add_requested') }).readonly(),
+  /** [🗑]: на экране подхода — удалить подход, на экране тренировки — тренировку. */
+  z.object({ type: z.literal('history_delete_requested') }).readonly(),
+  z.object({ type: z.literal('history_delete_answered'), confirm: z.boolean() }).readonly(),
   z.object({ type: z.literal('invite_requested') }).readonly(),
   z.object({ type: z.literal('users_requested') }).readonly(),
   z.object({ type: z.literal('member_picked'), userId: z.number().int().positive() }).readonly(),
@@ -217,6 +243,23 @@ export const DayRefSchema = z.object({ id: z.string(), name: z.string() }).reado
 const RangeViewSchema = z.object({ min: z.number().int(), max: z.number().int() }).readonly();
 const SetViewSchema = z.object({ weightLb: LbSchema.nullable(), reps: z.number().int() })
   .readonly();
+
+/** Упражнение в сводке тренировки (US-5) и в /history (US-10). */
+const SummaryItemSchema = z.object({
+  name: z.string(),
+  /** Замена: название заменённого упражнения программы. */
+  replaces: z.string().nullable(),
+  skipped: z.boolean(),
+  addedWeight: z.boolean(),
+  sets: z.array(SetViewSchema).readonly(),
+  /** «Прошлый раз» — только в сводке только что завершённой тренировки. */
+  last: LastResultSchema.nullable(),
+}).readonly();
+export type SummaryItem = z.infer<typeof SummaryItemSchema>;
+
+/** Что сделано на экране упражнения в /history. */
+export const HistoryNoticeSchema = z.enum(['fixed', 'added', 'deleted']);
+export type HistoryNotice = z.infer<typeof HistoryNoticeSchema>;
 
 /** Что показать пользователю. Текст и кнопки строят views в features/. */
 export const ViewSchema = z.discriminatedUnion('type', [
@@ -417,17 +460,7 @@ export const ViewSchema = z.discriminatedUnion('type', [
     dayName: z.string(),
     localDate: LocalDateSchema,
     minutes: z.number().int().nonnegative(),
-    items: z.array(
-      z.object({
-        name: z.string(),
-        /** Замена: название заменённого упражнения программы. */
-        replaces: z.string().nullable(),
-        skipped: z.boolean(),
-        addedWeight: z.boolean(),
-        sets: z.array(SetViewSchema).readonly(),
-        last: LastResultSchema.nullable(),
-      }).readonly(),
-    ).readonly(),
+    items: z.array(SummaryItemSchema).readonly(),
     commentSaved: z.boolean(),
   }).readonly(),
   z.object({ type: z.literal('workout_cancel_confirm'), dayName: z.string() }).readonly(),
@@ -435,6 +468,58 @@ export const ViewSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('workout_cancelled') }).readonly(),
   z.object({ type: z.literal('workout_none') }).readonly(),
   z.object({ type: z.literal('workout_undo_nothing') }).readonly(),
+  z.object({
+    type: z.literal('history_list'),
+    items: z.array(HistoryItemSchema).readonly(),
+    offset: z.number().int().nonnegative(),
+    hasMore: z.boolean(),
+    deleted: z.boolean(),
+  }).readonly(),
+  z.object({
+    type: z.literal('history_workout'),
+    dayName: z.string(),
+    localDate: LocalDateSchema,
+    items: z.array(SummaryItemSchema).readonly(),
+    /** Упражнения, которые можно править: с записью и не пропущенные. */
+    exercises: z.array(z.object({ logId: z.string(), name: z.string() }).readonly()).readonly(),
+  }).readonly(),
+  z.object({
+    type: z.literal('history_exercise'),
+    name: z.string(),
+    localDate: LocalDateSchema,
+    addedWeight: z.boolean(),
+    sets: z.array(
+      z.object({
+        id: z.string(),
+        index: z.number().int(),
+        weightLb: LbSchema.nullable(),
+        reps: z.number().int(),
+      })
+        .readonly(),
+    ).readonly(),
+    notice: HistoryNoticeSchema.nullable(),
+  }).readonly(),
+  /** Ввод подхода: исправить (set) или добавить (set: null). */
+  z.object({
+    type: z.literal('history_set'),
+    name: z.string(),
+    index: z.number().int().positive(),
+    set: SetViewSchema.nullable(),
+    addedWeight: z.boolean(),
+    weightless: z.boolean(),
+    error: SetInputErrorSchema.nullable(),
+  }).readonly(),
+  z.object({
+    type: z.literal('history_delete_set'),
+    index: z.number().int().positive(),
+    set: SetViewSchema,
+    addedWeight: z.boolean(),
+  }).readonly(),
+  z.object({
+    type: z.literal('history_delete_workout'),
+    dayName: z.string(),
+    localDate: LocalDateSchema,
+  }).readonly(),
   /** Ссылку t.me/<бот>?start=<код> собирает экран: имя бота знает только оболочка. */
   z.object({
     type: z.literal('invite_created'),
@@ -477,6 +562,23 @@ export const EffectSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('record_set'), set: NewSetSchema }).readonly(),
   /** /undo и «Назад»: удалить подходы тренировки. */
   z.object({ type: z.literal('delete_sets'), ids: z.array(z.string()).readonly() }).readonly(),
+  /** /history: исправить вес и повторения рабочего подхода. */
+  z.object({
+    type: z.literal('update_set'),
+    id: z.string(),
+    weightLb: LbSchema.nullable(),
+    reps: z.number().int().positive(),
+  }).readonly(),
+  /** /history: добавить рабочий подход последним в запись упражнения. */
+  z.object({
+    type: z.literal('add_set'),
+    id: z.string(),
+    logId: z.string(),
+    weightLb: LbSchema.nullable(),
+    reps: z.number().int().positive(),
+  }).readonly(),
+  /** /history: удалить тренировку с записями и подходами. */
+  z.object({ type: z.literal('delete_workout'), id: z.string() }).readonly(),
   /** «Назад» к выбору веса и /undo пустой записи: удалить запись упражнения (вместе с подходами). */
   z.object({ type: z.literal('delete_exercise_log'), id: z.string() }).readonly(),
   z.object({ type: z.literal('create_invite'), code: InviteCodeSchema, expiresAt: z.date() })
@@ -503,6 +605,8 @@ export const StepContextSchema = z.object({
   lastHighLb: z.record(z.string(), LbSchema).readonly(),
   /** Владелец (из конфигурации): ему доступны /invite и /users. */
   isOwner: z.boolean(),
+  /** /history: подгружается, только когда пользователь в истории (historyQuery). */
+  history: HistoryDataSchema,
   /** Участники с доступом; загружаются только для владельца. */
   members: z.array(MemberSchema).readonly(),
   /** Свежие id для новых записей: автомат остаётся чистой функцией. */

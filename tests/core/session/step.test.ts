@@ -16,6 +16,7 @@ const noWorkout = {
   lastHighLb: {},
   isOwner: false,
   members: [],
+  history: { page: null, workout: null },
   newIds: [],
 };
 

@@ -2,6 +2,8 @@ import { parseTimeZone } from '../core/schedule/timezone.ts';
 import type { BotEvent, View } from '../core/session/types.ts';
 import type { Language } from '../core/settings/settings.ts';
 import { toEvent as accessEvent } from '../features/access/handlers.ts';
+import { toEvent as historyEvent } from '../features/history/handlers.ts';
+import { renderHistoryView } from '../features/history/views.ts';
 import { renderAccessView } from '../features/access/views.ts';
 import { toEvent as onboardingEvent } from '../features/onboarding/handlers.ts';
 import { renderView as renderOnboarding } from '../features/onboarding/views.ts';
@@ -33,7 +35,8 @@ export async function routeEvent(input: Incoming, zoneAt: ZoneLocator): Promise<
   if (input.kind === 'command' && !KNOWN_COMMANDS.has(input.name)) {
     return { type: 'unknown_command', name: input.name };
   }
-  return accessEvent(input) ?? programEvent(input) ?? seedEvent(input) ?? settingsEvent(input) ??
+  return accessEvent(input) ?? historyEvent(input) ?? programEvent(input) ?? seedEvent(input) ??
+    settingsEvent(input) ??
     workoutEvent(input) ??
     onboardingEvent(input);
 }
@@ -85,6 +88,13 @@ export function render(view: View, lang: Language, env: RenderEnv): Rendered {
     case 'workout_cancelled':
     case 'workout_none':
       return renderWorkoutView(view, lang);
+    case 'history_list':
+    case 'history_workout':
+    case 'history_exercise':
+    case 'history_set':
+    case 'history_delete_set':
+    case 'history_delete_workout':
+      return renderHistoryView(view, lang);
     case 'invite_created':
     case 'users_list':
     case 'users_revoke_confirm':

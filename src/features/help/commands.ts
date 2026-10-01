@@ -19,6 +19,10 @@ const COMMANDS: readonly {
     command: 'undo',
     description: { ru: 'Отменить последний подход', en: 'Undo the last set' },
   },
+  {
+    command: 'history',
+    description: { ru: 'Прошлые тренировки: исправить, удалить', en: 'Past workouts: fix, delete' },
+  },
   { command: 'start', description: { ru: 'Главный экран', en: 'Home screen' } },
   {
     command: 'program',

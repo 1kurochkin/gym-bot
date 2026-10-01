@@ -5,7 +5,12 @@ import { ProgramSchema } from '../core/program/schema.ts';
 import { IntensityLogSchema } from '../core/schedule/intensity.ts';
 import { type Effect, SessionSchema } from '../core/session/types.ts';
 import { LbSchema } from '../core/units/lb.ts';
-import { ActiveWorkoutSchema, LastWorkoutSchema } from '../core/workout/schema.ts';
+import {
+  ActiveWorkoutSchema,
+  type HistoryData,
+  type HistoryQuery,
+  LastWorkoutSchema,
+} from '../core/workout/schema.ts';
 import { SettingsSchema } from '../core/settings/settings.ts';
 
 export const UserStateSchema = z.object({
@@ -64,7 +69,10 @@ export type WorkoutWrite = Extract<
       | 'patch_exercise_log'
       | 'record_set'
       | 'delete_sets'
-      | 'delete_exercise_log';
+      | 'delete_exercise_log'
+      | 'update_set'
+      | 'add_set'
+      | 'delete_workout';
   }
 >;
 
@@ -77,6 +85,9 @@ const WORKOUT_WRITES: ReadonlySet<string> = new Set([
   'record_set',
   'delete_sets',
   'delete_exercise_log',
+  'update_set',
+  'add_set',
+  'delete_workout',
 ]);
 
 export const isWorkoutWrite = (e: Effect): e is WorkoutWrite => WORKOUT_WRITES.has(e.type);
@@ -85,6 +96,8 @@ export const isWorkoutWrite = (e: Effect): e is WorkoutWrite => WORKOUT_WRITES.h
 export type Store = {
   /** Сессия и настройки одним запросом; для нового пользователя — значения по умолчанию. */
   readonly load: (userId: number, opts?: { readonly withMembers: boolean }) => Promise<UserState>;
+  /** /history: страница завершённых и прерванных тренировок и, если выбрана, тренировка целиком. */
+  readonly loadHistory: (userId: number, query: HistoryQuery) => Promise<HistoryData>;
   /** Участник с действующим доступом (владельцы — в конфигурации, не здесь). */
   readonly isMember: (userId: number) => Promise<boolean>;
   /**
