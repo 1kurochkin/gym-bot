@@ -4,7 +4,7 @@ import { TimeZoneSchema } from '../../src/core/schedule/timezone.ts';
 import { defaultSettings } from '../../src/core/settings/settings.ts';
 import { lb } from '../../src/core/units/lb.ts';
 import type { Action, Incoming } from '../../src/ports/ui.ts';
-import { fakeUi, memoryStore } from '../support/fakes.ts';
+import { fakeUi, memoryStore, OWNERS, TESTER } from '../support/fakes.ts';
 import { specProgramJson } from '../support/spec.ts';
 
 /** US-8 (.specs/product.md): /settings через весь цикл апдейта. */
@@ -25,6 +25,8 @@ async function setup(): Promise<{
     clock: { now: () => new Date('2026-09-30T22:40:00Z') },
     zoneAt: () => Promise.resolve(null),
     newId: () => `00000000-0000-4000-8000-${String(++n).padStart(12, '0')}`,
+    owners: OWNERS,
+    botUsername: () => 'gym_test_bot',
   };
   const send = (input: Incoming): Promise<void> =>
     handleUpdate(deps, {
@@ -33,6 +35,7 @@ async function setup(): Promise<{
       chatId: 1,
       messageId: 5,
       languageCode: 'ru',
+      person: TESTER,
       input,
     });
   const press = (action: Action): Promise<void> =>

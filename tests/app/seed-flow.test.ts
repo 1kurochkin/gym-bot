@@ -3,7 +3,7 @@ import { handleUpdate, type UpdateDeps } from '../../src/app/handle-update.ts';
 import { TimeZoneSchema } from '../../src/core/schedule/timezone.ts';
 import { defaultSettings } from '../../src/core/settings/settings.ts';
 import type { Incoming } from '../../src/ports/ui.ts';
-import { fakeUi, memoryStore } from '../support/fakes.ts';
+import { fakeUi, memoryStore, OWNERS, TESTER } from '../support/fakes.ts';
 import { specProgramJson } from '../support/spec.ts';
 
 /** US-6 (.specs/product.md): /seed через весь цикл апдейта, на программе владельца из спеки. */
@@ -25,6 +25,8 @@ async function setup(opts: { program?: boolean; timezone?: boolean } = {}): Prom
     clock: { now: () => new Date('2026-09-30T22:40:00Z') },
     zoneAt: () => Promise.resolve(null),
     newId: () => `00000000-0000-4000-8000-${String(++n).padStart(12, '0')}`,
+    owners: OWNERS,
+    botUsername: () => 'gym_test_bot',
   };
   const send = (input: Incoming, messageId: number | null = null): Promise<void> =>
     handleUpdate(deps, {
@@ -33,6 +35,7 @@ async function setup(opts: { program?: boolean; timezone?: boolean } = {}): Prom
       chatId: 1,
       messageId,
       languageCode: 'ru',
+      person: TESTER,
       input,
     });
   if (opts.timezone !== false) {
@@ -159,7 +162,8 @@ Deno.test('неизвестная команда — подсказка со с�
     'Не знаю команду /stats. Доступно:\n/workout — Начать или продолжить тренировку\n' +
       '/cancel — Прервать тренировку\n/start — Главный экран\n' +
       '/program — Загрузить или показать программу\n/seed — Ввести последние рабочие результаты\n' +
-      '/settings — Часовой пояс, гриф, блины, шаг веса, язык',
+      '/settings — Часовой пояс, гриф, блины, шаг веса, язык\n' +
+      '/invite — Пригласить нового пользователя\n/users — Пользователи бота, отключить доступ',
   );
   assertEquals(store.sessions.get(1)?.step, 'seed');
   await send(text('185x8'));

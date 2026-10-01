@@ -18,7 +18,6 @@ export function buildDeps(
   let updateDeps: UpdateDeps | null = null;
   const bot = createBot({
     token: config.botToken,
-    allowedUserIds: config.allowedUserIds,
     botInfo: overrides.botInfo ?? toBotInfo(config.botInfo),
     onUpdate: (update) => {
       if (!updateDeps) throw new Error('deps not ready');
@@ -31,6 +30,8 @@ export function buildDeps(
     clock: { now: () => new Date() },
     zoneAt: tzLookup,
     newId: () => crypto.randomUUID(),
+    owners: config.ownerIds,
+    botUsername: () => bot.botInfo.username,
   };
   return { bot, store };
 }

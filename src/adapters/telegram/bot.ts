@@ -6,23 +6,25 @@ import { decodeCallback, encodeCallback } from './callback.ts';
 
 export type BotOptions = {
   readonly token: string;
-  readonly allowedUserIds: ReadonlySet<number>;
   readonly onUpdate: (update: IncomingUpdate) => Promise<void>;
   /** Для тестов: без него grammY при первом апдейте вызывает getMe. */
   readonly botInfo?: UserFromGetMe;
 };
 
-/** grammY-бот: whitelist, мгновенный answerCallbackQuery, перевод апдейта в IncomingUpdate. */
+/**
+ * grammY-бот: только личные чаты, мгновенный answerCallbackQuery, перевод апдейта в IncomingUpdate.
+ * Кому отвечать (владелец, участник, приглашение) решает приложение: app/access.ts.
+ */
 export function createBot(opts: BotOptions): Bot {
   const bot = new Bot(opts.token, opts.botInfo ? { botInfo: opts.botInfo } : {});
 
-  // Whitelist: чужим — тишина.
+  // Только личные чаты: группы и каналы бот не обслуживает.
   bot.use(async (ctx, next) => {
-    const id = ctx.from?.id;
-    if (id !== undefined && opts.allowedUserIds.has(id)) await next();
+    if (ctx.chat?.type === 'private' && ctx.from !== undefined) await next();
   });
 
   // Сразу убираем «часики» на кнопке, до записи в БД.
+  // Чужому нажатию это ничего не раскрывает: кнопки бывают только в сообщениях бота этому человеку.
   bot.on('callback_query', async (ctx, next) => {
     await ctx.answerCallbackQuery().catch(() => {});
     await next();
@@ -65,6 +67,10 @@ async function toIncoming(ctx: Context, download: Download): Promise<IncomingUpd
     userId,
     chatId,
     languageCode: ctx.from?.language_code ?? null,
+    person: {
+      name: [ctx.from?.first_name, ctx.from?.last_name].filter(Boolean).join(' ') || String(userId),
+      username: ctx.from?.username ?? null,
+    },
   };
 
   const data = ctx.callbackQuery?.data;

@@ -36,6 +36,13 @@
       "when": 1790889890407,
       "tag": "20261001212450_settings_language",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1790891029360,
+      "tag": "20261001214349_invites",
+      "breakpoints": true
     }
   ]
 }

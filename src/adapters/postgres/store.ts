@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, isNotNull, isNull, max, ne, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, inArray, isNotNull, isNull, max, ne, or, sql } from 'drizzle-orm';
 import { drizzle, type PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 import {
@@ -10,6 +10,7 @@ import {
   topSet,
   WarmupVariantSchema,
 } from '../../core/history/schema.ts';
+import { type Member, MemberSchema, type Person } from '../../core/access/schema.ts';
 import { exerciseIndex } from '../../core/program/program.ts';
 import { type Program, ProgramSchema } from '../../core/program/schema.ts';
 import { TimeZoneSchema } from '../../core/schedule/timezone.ts';
@@ -58,7 +59,7 @@ const { active, archived } = ProgramStatusSchema.enum;
 
 export function createPostgresStore(db: Db): Store {
   return {
-    async load(userId: number): Promise<UserState> {
+    async load(userId: number, opts = { withMembers: false }): Promise<UserState> {
       const [s, st] = await Promise.all([
         db.select().from(schema.session).where(eq(schema.session.userId, userId)),
         db.select().from(schema.settings).where(eq(schema.settings.userId, userId)),
@@ -73,10 +74,11 @@ export function createPostgresStore(db: Db): Store {
       const pairIds = activeProgram
         ? activeProgram.intensityPairs.flatMap((p) => [...p.exercises])
         : [];
-      const [lastResults, intensityLogs, lastHighLb] = await Promise.all([
+      const [lastResults, intensityLogs, lastHighLb, members] = await Promise.all([
         loadLastResults(db, userId, exerciseIds, activeWorkout?.id ?? null),
         loadIntensityLogs(db, userId, pairIds),
         loadLastHigh(db, userId, pairIds),
+        opts.withMembers ? loadMembers(db) : Promise.resolve([]),
       ]);
       return {
         session: s[0] ? toSession(s[0]) : initialSession(userId),
@@ -87,6 +89,7 @@ export function createPostgresStore(db: Db): Store {
         lastWorkout,
         intensityLogs,
         lastHighLb,
+        members,
       };
     },
 
@@ -96,6 +99,17 @@ export function createPostgresStore(db: Db): Store {
         for (const r of change.manualResults ?? []) await saveManualResult(tx, userId, r);
         for (const w of change.workout?.writes ?? []) {
           await saveWorkoutWrite(tx, userId, change.workout?.programId ?? '', w);
+        }
+        if (change.newInvite) {
+          await tx.insert(schema.invites).values({
+            code: change.newInvite.code,
+            createdBy: userId,
+            expiresAt: change.newInvite.expiresAt,
+          });
+        }
+        if (change.revokeMember !== undefined) {
+          await tx.update(schema.members).set({ revokedAt: sql`now()` })
+            .where(eq(schema.members.userId, change.revokeMember));
         }
         if (change.settings) {
           const row = fromSettings(change.settings);
@@ -122,7 +136,57 @@ export function createPostgresStore(db: Db): Store {
     async ping(): Promise<void> {
       await db.execute(sql`select 1`);
     },
+
+    async isMember(userId: number): Promise<boolean> {
+      const rows = await db.select({ userId: schema.members.userId }).from(schema.members)
+        .where(and(eq(schema.members.userId, userId), isNull(schema.members.revokedAt)));
+      return rows.length > 0;
+    },
+
+    redeemInvite(
+      code: string,
+      userId: number,
+      person: Person,
+      now: Date,
+    ): Promise<{ invitedBy: number } | null> {
+      return db.transaction(async (tx) => {
+        // Условие в UPDATE — гарантия одноразовости: второй вход тем же кодом ничего не обновит.
+        const [invite] = await tx.update(schema.invites).set({ usedBy: userId, usedAt: now })
+          .where(and(
+            eq(schema.invites.code, code),
+            isNull(schema.invites.usedBy),
+            gt(schema.invites.expiresAt, now),
+          ))
+          .returning({ createdBy: schema.invites.createdBy });
+        if (!invite) return null;
+        const row = {
+          userId,
+          name: person.name,
+          username: person.username,
+          invitedBy: invite.createdBy,
+          joinedAt: now,
+          revokedAt: null,
+        };
+        await tx.insert(schema.members).values(row).onConflictDoUpdate({
+          target: schema.members.userId,
+          set: row,
+        });
+        return { invitedBy: invite.createdBy };
+      });
+    },
   };
+}
+
+async function loadMembers(db: Db): Promise<Member[]> {
+  const rows = await db.select().from(schema.members).where(isNull(schema.members.revokedAt))
+    .orderBy(asc(schema.members.joinedAt));
+  return rows.map((r) =>
+    MemberSchema.parse({
+      userId: r.userId,
+      person: { name: r.name, username: r.username },
+      joinedAt: r.joinedAt,
+    })
+  );
 }
 
 async function loadProgram(db: Db, id: string | null): Promise<Program | null> {

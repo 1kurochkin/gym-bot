@@ -1,4 +1,12 @@
 import { z } from 'zod';
+import {
+  InviteCodeSchema,
+  MemberSchema,
+  MemberViewSchema,
+  PersonSchema,
+} from '../access/schema.ts';
+
+export type { Person } from '../access/schema.ts';
 import { LastResultSchema, ManualResultSchema, WarmupVariantSchema } from '../history/schema.ts';
 import { IntensityLogSchema } from '../schedule/intensity.ts';
 import { LocalDateSchema } from '../schedule/calendar.ts';
@@ -45,6 +53,8 @@ export const SessionStepSchema = z.enum([
   'workout_summary',
   'workout_final_comment',
   'workout_cancel_confirm',
+  'users',
+  'users_revoke_confirm',
 ]);
 export type SessionStep = z.infer<typeof SessionStepSchema>;
 
@@ -83,6 +93,12 @@ export const SessionContextSchema = z.discriminatedUnion('kind', [
       workLb: LbSchema.nullable(),
       workSets: z.number().int().nonnegative(),
     }).readonly().nullable(),
+  }).readonly(),
+  /** /users: кого отключаем — ждёт подтверждения. */
+  z.object({
+    kind: z.literal('member_revoke'),
+    userId: z.number().int().positive(),
+    person: PersonSchema,
   }).readonly(),
 ]);
 export type SessionContext = z.infer<typeof SessionContextSchema>;
@@ -155,6 +171,10 @@ export const BotEventSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('workout_done') }).readonly(),
   z.object({ type: z.literal('cancel_requested') }).readonly(),
   z.object({ type: z.literal('cancel_answered'), confirm: z.boolean() }).readonly(),
+  z.object({ type: z.literal('invite_requested') }).readonly(),
+  z.object({ type: z.literal('users_requested') }).readonly(),
+  z.object({ type: z.literal('member_picked'), userId: z.number().int().positive() }).readonly(),
+  z.object({ type: z.literal('revoke_answered'), confirm: z.boolean() }).readonly(),
 ]);
 export type BotEvent = z.infer<typeof BotEventSchema>;
 
@@ -219,7 +239,8 @@ export const ViewSchema = z.discriminatedUnion('type', [
     total: z.number().int().nonnegative(),
   }).readonly(),
   z.object({ type: z.literal('needs_program') }).readonly(),
-  z.object({ type: z.literal('unknown_command'), name: z.string() }).readonly(),
+  /** owner — показывать ли в списке команды владельца. */
+  z.object({ type: z.literal('unknown_command'), name: z.string(), owner: z.boolean() }).readonly(),
   z.object({
     type: z.literal('settings_menu'),
     zone: ZoneLabelSchema.nullable(),
@@ -342,6 +363,23 @@ export const ViewSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('workout_commented') }).readonly(),
   z.object({ type: z.literal('workout_cancelled') }).readonly(),
   z.object({ type: z.literal('workout_none') }).readonly(),
+  /** Ссылку t.me/<бот>?start=<код> собирает экран: имя бота знает только оболочка. */
+  z.object({
+    type: z.literal('invite_created'),
+    code: InviteCodeSchema,
+    expiresOn: LocalDateSchema.nullable(),
+  }).readonly(),
+  z.object({
+    type: z.literal('users_list'),
+    members: z.array(MemberViewSchema).readonly(),
+    /** Только что отключённый — для строки «Отключён …». */
+    revoked: PersonSchema.nullable(),
+  }).readonly(),
+  z.object({ type: z.literal('users_revoke_confirm'), person: PersonSchema }).readonly(),
+  /** Оболочка: владельцу — кто вошёл по его приглашению. */
+  z.object({ type: z.literal('member_joined'), person: PersonSchema }).readonly(),
+  /** Оболочка: /start с недействительным кодом. */
+  z.object({ type: z.literal('invite_invalid') }).readonly(),
 ]);
 export type View = z.infer<typeof ViewSchema>;
 
@@ -365,6 +403,9 @@ export const EffectSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('patch_exercise_log'), id: z.string(), patch: ExerciseLogPatchSchema })
     .readonly(),
   z.object({ type: z.literal('record_set'), set: NewSetSchema }).readonly(),
+  z.object({ type: z.literal('create_invite'), code: InviteCodeSchema, expiresAt: z.date() })
+    .readonly(),
+  z.object({ type: z.literal('revoke_member'), userId: z.number().int().positive() }).readonly(),
 ]);
 export type Effect = z.infer<typeof EffectSchema>;
 
@@ -384,6 +425,10 @@ export const StepContextSchema = z.object({
   intensityLogs: z.array(IntensityLogSchema).readonly(),
   /** Последний рабочий вес на 100% по упражнениям из пар — база для 70%. */
   lastHighLb: z.record(z.string(), LbSchema).readonly(),
+  /** Владелец (из конфигурации): ему доступны /invite и /users. */
+  isOwner: z.boolean(),
+  /** Участники с доступом; загружаются только для владельца. */
+  members: z.array(MemberSchema).readonly(),
   /** Свежие id для новых записей: автомат остаётся чистой функцией. */
   newIds: z.array(z.string()).readonly(),
 }).readonly();

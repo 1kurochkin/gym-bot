@@ -4,7 +4,7 @@ import { TimeZoneSchema } from '../../src/core/schedule/timezone.ts';
 import { defaultSettings } from '../../src/core/settings/settings.ts';
 import { lb } from '../../src/core/units/lb.ts';
 import type { Action, Incoming } from '../../src/ports/ui.ts';
-import { fakeUi, memoryStore } from '../support/fakes.ts';
+import { fakeUi, memoryStore, OWNERS, TESTER } from '../support/fakes.ts';
 import { specProgramJson } from '../support/spec.ts';
 
 /** US-2…US-5 (.specs/product.md): тренировка через весь цикл апдейта, программа владельца из спеки. */
@@ -32,6 +32,8 @@ async function world(): Promise<World> {
     clock: { now: () => now },
     zoneAt: () => Promise.resolve(null),
     newId: () => `00000000-0000-4000-8000-${String(++n).padStart(12, '0')}`,
+    owners: OWNERS,
+    botUsername: () => 'gym_test_bot',
   };
   const send = (input: Incoming): Promise<void> =>
     handleUpdate(deps, {
@@ -40,6 +42,7 @@ async function world(): Promise<World> {
       chatId: 1,
       messageId: 9,
       languageCode: 'ru',
+      person: TESTER,
       input,
     });
   store.settings.set(1, {

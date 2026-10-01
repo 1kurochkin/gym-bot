@@ -11,6 +11,8 @@ const UNKNOWN: Record<Language, (name: string) => string> = {
 };
 
 export function renderHelpView(view: HelpView, lang: Language): Rendered {
-  const list = commandsFor(lang).map((c) => `/${c.command} — ${c.description}`).join('\n');
+  const list = commandsFor(lang, view.owner).map((c) => `/${c.command} — ${c.description}`).join(
+    '\n',
+  );
   return { text: `${UNKNOWN[lang](view.name)}\n${list}`, keyboard: [], replyKeyboard: null };
 }

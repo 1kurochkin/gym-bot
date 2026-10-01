@@ -4,6 +4,7 @@ import type { Clock } from '../ports/clock.ts';
 import type { ZoneLocator } from '../ports/geo.ts';
 import { type Commit, isWorkoutWrite, type Store } from '../ports/store.ts';
 import type { IncomingUpdate, Ui } from '../ports/ui.ts';
+import { admit } from './access.ts';
 import { render, routeEvent } from './route.ts';
 
 /** Свежих id на апдейт: тренировка, запись упражнения, до ~10 подходов разминки и рабочий. */
@@ -16,14 +17,20 @@ export type UpdateDeps = {
   readonly zoneAt: ZoneLocator;
   /** Новый id для записи (программы и т. п.): в тестах — предсказуемый. */
   readonly newId: () => string;
+  /** Владельцы из конфигурации: всегда с доступом, им доступны /invite и /users. */
+  readonly owners: ReadonlySet<number>;
+  /** @username бота для ссылки-приглашения. */
+  readonly botUsername: () => string;
 };
 
 /**
- * Цикл обработки апдейта (docs/architecture.md §13.2). Whitelist и answerCallbackQuery
- * уже сделал адаптер telegram. Здесь: идемпотентность → событие → step() → одна транзакция → отрисовка.
+ * Цикл обработки апдейта (docs/architecture.md §13.2). answerCallbackQuery уже сделал адаптер telegram.
+ * Здесь: доступ → идемпотентность → событие → step() → одна транзакция → отрисовка.
  */
 export async function handleUpdate(deps: UpdateDeps, update: IncomingUpdate): Promise<void> {
-  const loaded = await deps.store.load(update.userId);
+  if (!(await admit(deps, update))) return;
+  const isOwner = deps.owners.has(update.userId);
+  const loaded = await deps.store.load(update.userId, { withMembers: isOwner });
   const { session, settings, activeProgram, lastResults } = loaded;
 
   // Telegram повторяет webhook при таймауте: уже обработанный update_id игнорируем.
@@ -54,12 +61,16 @@ export async function handleUpdate(deps: UpdateDeps, update: IncomingUpdate): Pr
     lastWorkout: loaded.lastWorkout,
     intensityLogs: loaded.intensityLogs,
     lastHighLb: loaded.lastHighLb,
+    isOwner,
+    members: loaded.members,
     newIds: Array.from({ length: IDS_PER_UPDATE }, () => deps.newId()),
   });
 
   // Все эффекты записи — одной транзакцией вместе с новым состоянием сессии.
   let newSettings: Settings | undefined;
   let newProgram: Commit['newProgram'];
+  let newInvite: Commit['newInvite'];
+  let revokeMember: Commit['revokeMember'];
   const manualResults: NonNullable<Commit['manualResults']>[number][] = [];
   for (const e of result.effects) {
     if (e.type === 'save_settings') newSettings = e.settings;
@@ -71,6 +82,8 @@ export async function handleUpdate(deps: UpdateDeps, update: IncomingUpdate): Pr
         result: e.result,
       });
     }
+    if (e.type === 'create_invite') newInvite = { code: e.code, expiresAt: e.expiresAt };
+    if (e.type === 'revoke_member') revokeMember = e.userId;
     if (e.type === 'save_program') {
       newProgram = { id: deps.newId(), program: e.program };
       newSettings = { ...(newSettings ?? settings), activeProgramId: newProgram.id };
@@ -81,6 +94,8 @@ export async function handleUpdate(deps: UpdateDeps, update: IncomingUpdate): Pr
     session: result.state,
     settings: newSettings,
     newProgram,
+    newInvite,
+    revokeMember,
     manualResults,
     workout: writes.length && settings.activeProgramId !== null
       ? { programId: settings.activeProgramId, writes }
@@ -89,9 +104,10 @@ export async function handleUpdate(deps: UpdateDeps, update: IncomingUpdate): Pr
 
   // Язык — по настройкам после шага: выбор языка в /settings сразу виден на ответе.
   const lang = languageFor((newSettings ?? settings).language, update.languageCode);
+  const env = { botUsername: deps.botUsername() };
   for (const e of result.effects) {
     if (e.type !== 'render') continue;
     const messageId = input.kind === 'callback' ? update.messageId : null;
-    await deps.ui.show(update.chatId, render(e.view, lang), result.state.stepNo, messageId);
+    await deps.ui.show(update.chatId, render(e.view, lang, env), result.state.stepNo, messageId);
   }
 }

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { PersonSchema } from '../core/access/schema.ts';
 import { TimeZoneSchema } from '../core/schedule/timezone.ts';
 import { IdSchema } from '../core/program/schema.ts';
 import { SettingsSectionSchema } from '../core/settings/options.ts';
@@ -42,6 +43,8 @@ export const ActionSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('comment') }).readonly(),
   z.object({ type: z.literal('workout_done') }).readonly(),
   z.object({ type: z.literal('cancel_answer'), confirm: z.boolean() }).readonly(),
+  z.object({ type: z.literal('member_pick'), userId: z.number().int().positive() }).readonly(),
+  z.object({ type: z.literal('revoke_answer'), confirm: z.boolean() }).readonly(),
 ]);
 export type Action = z.infer<typeof ActionSchema>;
 
@@ -76,6 +79,8 @@ export const IncomingUpdateSchema = z.object({
   messageId: z.number().int().nullable(),
   /** language_code пользователя из Telegram. */
   languageCode: z.string().nullable(),
+  /** Имя и @username из Telegram: запоминаются при входе по приглашению. */
+  person: PersonSchema,
   input: IncomingSchema,
 }).readonly();
 export type IncomingUpdate = z.infer<typeof IncomingUpdateSchema>;
@@ -101,6 +106,10 @@ export const RenderedSchema = z.object({
 export type Rendered = z.infer<typeof RenderedSchema>;
 
 /** Порт с поведением — обычный TS-тип: zod-схема функции ничего бы не проверяла. */
+/** Что знает только оболочка, но нужно экрану: имя бота для ссылки-приглашения. */
+export const RenderEnvSchema = z.object({ botUsername: z.string() }).readonly();
+export type RenderEnv = z.infer<typeof RenderEnvSchema>;
+
 export type Ui = {
   /** Показать экран: отредактировать messageId, если он есть, иначе отправить новое сообщение. */
   readonly show: (

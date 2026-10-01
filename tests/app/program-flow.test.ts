@@ -1,7 +1,7 @@
 import { assert, assertEquals } from '@std/assert';
 import { handleUpdate, type UpdateDeps } from '../../src/app/handle-update.ts';
 import type { Incoming, IncomingUpdate } from '../../src/ports/ui.ts';
-import { fakeUi, memoryStore } from '../support/fakes.ts';
+import { fakeUi, memoryStore, OWNERS, TESTER } from '../support/fakes.ts';
 import { specProgramJson } from '../support/spec.ts';
 
 /** US-1 (.specs/product.md): загрузка программы через весь цикл апдейта, без Telegram. */
@@ -20,6 +20,8 @@ function setup(): {
     clock: { now: () => new Date('2026-09-30T22:40:00Z') },
     zoneAt: () => Promise.resolve(null),
     newId: () => `00000000-0000-4000-8000-${String(++n).padStart(12, '0')}`,
+    owners: OWNERS,
+    botUsername: () => 'gym_test_bot',
   };
   return { deps, store, ui };
 }
@@ -34,6 +36,7 @@ const send = (deps: UpdateDeps, input: Incoming, messageId: number | null = null
       chatId: 1,
       messageId,
       languageCode: 'ru',
+      person: TESTER,
       input,
     } satisfies IncomingUpdate,
   );

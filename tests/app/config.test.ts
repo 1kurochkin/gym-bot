@@ -13,7 +13,7 @@ const read = (extra: Record<string, string> = {}): ReturnType<typeof readConfig>
 
 Deno.test('config: список id → Set, пустые необязательные переменные → null', () => {
   const c = read({ WEBHOOK_SECRET: '', CRON_SECRET: '', BOT_INFO: '' });
-  assertEquals([...c.allowedUserIds], [1, 22]);
+  assertEquals([...c.ownerIds], [1, 22]);
   assertEquals([c.webhookSecret, c.cronSecret, c.botInfo], [null, null, null]);
 });
 

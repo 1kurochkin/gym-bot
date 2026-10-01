@@ -22,7 +22,7 @@ const JsonStringSchema = z.string().transform((s, ctx) => {
 });
 
 /** «1, 2» → Set{1, 2}: Telegram user id через запятую. */
-const UserIdsSchema = z.string()
+export const UserIdsSchema = z.string()
   .transform((s) => s.split(',').map((part) => Number(part.trim())))
   .pipe(z.array(z.number().int().positive()).min(1))
   .transform((ids): ReadonlySet<number> => new Set(ids));
@@ -39,7 +39,8 @@ const EnvSchema = z.object({
 
 export const ConfigSchema = EnvSchema.transform((env) => ({
   botToken: env.BOT_TOKEN,
-  allowedUserIds: env.ALLOWED_USER_IDS,
+  /** Владельцы: всегда с доступом, приглашают остальных (.specs/product.md → US-9). */
+  ownerIds: env.ALLOWED_USER_IDS,
   databaseUrl: env.DATABASE_URL,
   webhookSecret: env.WEBHOOK_SECRET ?? null,
   cronSecret: env.CRON_SECRET ?? null,

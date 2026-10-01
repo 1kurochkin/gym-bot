@@ -51,6 +51,8 @@ const PARAM_CODES = {
   reps_set: 'rp',
   cancel_answer: 'ca',
   lang_set: 'lg',
+  member_pick: 'mp',
+  revoke_answer: 'ra',
 } as const;
 
 function encodeAction(a: Action): string {
@@ -84,7 +86,10 @@ function encodeAction(a: Action): string {
     case 'reps_set':
       return `${PARAM_CODES[a.type]}:${a.reps}`;
     case 'cancel_answer':
+    case 'revoke_answer':
       return `${PARAM_CODES[a.type]}:${a.confirm ? 1 : 0}`;
+    case 'member_pick':
+      return `${PARAM_CODES[a.type]}:${a.userId}`;
     case 'settings_section':
       return `${PARAM_CODES[a.type]}:${a.section}`;
     case 'bar_set':
@@ -130,7 +135,10 @@ function rawAction(code: string): Record<string, unknown> | null {
     case 'reps_set':
       return { type, reps: Number(value) };
     case 'cancel_answer':
+    case 'revoke_answer':
       return { type, confirm: value === '1' };
+    case 'member_pick':
+      return { type, userId: Number(value) };
     case 'lang_set':
       return { type, language: value };
     default:
