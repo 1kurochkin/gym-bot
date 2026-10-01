@@ -19,6 +19,7 @@ import type {
   WarmupVariant,
 } from '../../core/history/schema.ts';
 import type { Intensity } from '../../core/program/schema.ts';
+import type { WorkoutStatus } from '../../core/workout/schema.ts';
 import type { SessionStep } from '../../core/session/types.ts';
 import type { ProgramStatus } from './program-status.ts';
 
@@ -66,14 +67,30 @@ export const programs = pgTable('programs', {
   index('programs_user_status').on(t.userId, t.status),
 ]).enableRLS();
 
+/** Тренировка: день программы, локальная дата и ISO-неделя на момент старта (ADR-0004). */
+export const workouts = pgTable('workouts', {
+  id: uuid('id').primaryKey(),
+  userId: bigint('user_id', { mode: 'number' }).notNull(),
+  programId: uuid('program_id').notNull().references(() => programs.id),
+  dayId: text('day_id').notNull(),
+  dayName: text('day_name').notNull(),
+  status: text('status').$type<WorkoutStatus>().notNull(),
+  startedAt: timestamp('started_at', { withTimezone: true }).notNull(),
+  finishedAt: timestamp('finished_at', { withTimezone: true }),
+  localDate: date('local_date').notNull(),
+  isoWeek: text('iso_week').notNull(),
+  utcOffsetMin: integer('utc_offset_min').notNull(),
+  comment: text('comment'),
+}, (t) => [index('workouts_user_started').on(t.userId, t.startedAt.desc())]).enableRLS();
+
 /**
  * Запись упражнения: из тренировки или введённая вручную (/seed). workout_id пуст у записей
- * не из тренировки; внешний ключ на workouts появится вместе с таблицей тренировок.
+ * не из тренировки.
  */
 export const exerciseLogs = pgTable('exercise_logs', {
   id: uuid('id').primaryKey(),
   userId: bigint('user_id', { mode: 'number' }).notNull(),
-  workoutId: uuid('workout_id'),
+  workoutId: uuid('workout_id').references(() => workouts.id),
   programId: uuid('program_id').notNull().references(() => programs.id),
   exerciseId: text('exercise_id').notNull(),
   exerciseName: text('exercise_name').notNull(),

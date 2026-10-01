@@ -10,6 +10,23 @@ import {
 } from './program.ts';
 import { requestSeed, seedText, skipSeed, stopSeed } from './seed.ts';
 import {
+  answerCancel,
+  chooseDay,
+  chooseIntensity,
+  chooseReps,
+  chooseResume,
+  chooseWeight,
+  closeSummary,
+  finishWarmup,
+  moreSets,
+  nextExercise,
+  requestCancel,
+  requestComment,
+  requestWorkout,
+  skipExercise,
+  workoutText,
+} from './workout.ts';
+import {
   backToSettings,
   chooseBar,
   closeSettings,
@@ -93,6 +110,34 @@ function transition(state: Session, event: BotEvent, ctx: StepContext): StepResu
       return setStep(state, ctx, event.lb);
     case 'step_reset':
       return setStep(state, ctx, null);
+    case 'workout_requested':
+      return requestWorkout(state, ctx);
+    case 'day_chosen':
+      return chooseDay(state, ctx, event.dayId);
+    case 'resume_chosen':
+      return chooseResume(state, ctx, event.choice);
+    case 'intensity_chosen':
+      return chooseIntensity(state, ctx, event.intensity);
+    case 'weight_chosen':
+      return chooseWeight(state, ctx, event.lb);
+    case 'warmup_done':
+      return finishWarmup(state, ctx, event.variant);
+    case 'reps_chosen':
+      return chooseReps(state, ctx, event.reps);
+    case 'set_more':
+      return moreSets(state, ctx);
+    case 'exercise_next':
+      return nextExercise(state, ctx);
+    case 'exercise_skip':
+      return skipExercise(state, ctx);
+    case 'comment_requested':
+      return requestComment(state, ctx);
+    case 'workout_done':
+      return closeSummary(state, ctx);
+    case 'cancel_requested':
+      return requestCancel(state, ctx);
+    case 'cancel_answered':
+      return answerCancel(state, ctx, event.confirm);
     case 'unknown_command':
       // Подсказка поверх текущего шага: шаг и его данные не теряются.
       return {
@@ -120,6 +165,18 @@ function onText(state: Session, text: string, ctx: StepContext): StepResult {
     case S.settings_steps:
     case S.settings_step_edit:
       return settingsText(state, ctx, text);
+    case S.workout_day:
+    case S.workout_resume:
+    case S.workout_intensity:
+    case S.workout_card:
+    case S.workout_warmup:
+    case S.workout_reps:
+    case S.workout_after_set:
+    case S.workout_comment:
+    case S.workout_summary:
+    case S.workout_final_comment:
+    case S.workout_cancel_confirm:
+      return workoutText(state, ctx, text);
     case S.idle:
       return ctx.settings.timezone === null
         ? askTime(state, null)

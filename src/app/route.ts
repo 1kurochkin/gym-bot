@@ -10,6 +10,8 @@ import { toEvent as seedEvent } from '../features/seed/handlers.ts';
 import { renderSeedView } from '../features/seed/views.ts';
 import { toEvent as settingsEvent } from '../features/settings/handlers.ts';
 import { renderSettingsView } from '../features/settings/views.ts';
+import { toEvent as workoutEvent } from '../features/workout/handlers.ts';
+import { renderWorkoutView } from '../features/workout/views.ts';
 import { assertNever } from '../shared/result.ts';
 import type { ZoneLocator } from '../ports/geo.ts';
 import type { Incoming, Rendered } from '../ports/ui.ts';
@@ -28,7 +30,8 @@ export async function routeEvent(input: Incoming, zoneAt: ZoneLocator): Promise<
   if (input.kind === 'command' && !KNOWN_COMMANDS.has(input.name)) {
     return { type: 'unknown_command', name: input.name };
   }
-  return programEvent(input) ?? seedEvent(input) ?? settingsEvent(input) ?? onboardingEvent(input);
+  return programEvent(input) ?? seedEvent(input) ?? settingsEvent(input) ?? workoutEvent(input) ??
+    onboardingEvent(input);
 }
 
 /** Экран → текст и кнопки фичи, которой он принадлежит. */
@@ -58,6 +61,20 @@ export function render(view: View): Rendered {
     case 'settings_steps':
     case 'settings_step_edit':
       return renderSettingsView(view);
+    case 'workout_days':
+    case 'workout_resume':
+    case 'workout_intensity':
+    case 'workout_card':
+    case 'workout_warmup':
+    case 'workout_reps':
+    case 'workout_after_set':
+    case 'workout_comment_prompt':
+    case 'workout_summary':
+    case 'workout_cancel_confirm':
+    case 'workout_commented':
+    case 'workout_cancelled':
+    case 'workout_none':
+      return renderWorkoutView(view);
     default:
       return assertNever(view);
   }

@@ -9,6 +9,14 @@ import {
 import { defaultSettings, type Settings } from '../../../src/core/settings/settings.ts';
 import { parseTimeZone, type TimeZone } from '../../../src/core/schedule/timezone.ts';
 
+const noWorkout = {
+  activeWorkout: null,
+  lastWorkout: null,
+  intensityLogs: [],
+  lastHighLb: {},
+  newIds: [],
+};
+
 /** 22:40 UTC = 18:40 в Нью-Йорке. */
 const now = new Date('2026-09-28T22:40:00Z');
 const zone = (name: string): TimeZone => {
@@ -33,6 +41,7 @@ function run(
       languageCode,
       activeProgram: null,
       lastResults: {},
+      ...noWorkout,
     });
     state = r.state;
     for (const e of r.effects) {
@@ -117,6 +126,7 @@ Deno.test('stepNo растёт с каждым экраном; выбор зон
     languageCode: null,
     activeProgram: null,
     lastResults: {},
+    ...noWorkout,
   };
   assertEquals(step(initialSession(1), { type: 'start' }, ctx).state.stepNo, 1);
   const ignored = step(initialSession(1), { type: 'tz_chosen', zone: zone('Europe/Moscow') }, ctx);

@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, max, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNotNull, isNull, max, ne, or, sql } from 'drizzle-orm';
 import { drizzle, type PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 import {
@@ -23,7 +23,17 @@ import {
   SessionStepSchema,
 } from '../../core/session/types.ts';
 import { lb } from '../../core/units/lb.ts';
-import type { Commit, Store, UserState } from '../../ports/store.ts';
+import type { Commit, Store, UserState, WorkoutWrite } from '../../ports/store.ts';
+import { type IntensityLog, IntensityLogSchema } from '../../core/schedule/intensity.ts';
+import { IntensitySchema } from '../../core/program/schema.ts';
+import type { Lb } from '../../core/units/lb.ts';
+import {
+  type ActiveWorkout,
+  ActiveWorkoutSchema,
+  type LastWorkout,
+  LastWorkoutSchema,
+  WorkoutStatusSchema,
+} from '../../core/workout/schema.ts';
 import { ProgramStatusSchema } from './program-status.ts';
 import * as schema from './schema.ts';
 
@@ -54,14 +64,29 @@ export function createPostgresStore(db: Db): Store {
         db.select().from(schema.settings).where(eq(schema.settings.userId, userId)),
       ]);
       const settings = st[0] ? toSettings(st[0]) : defaultSettings(userId);
-      const activeProgram = await loadProgram(db, settings.activeProgramId);
+      const [activeProgram, activeWorkout, lastWorkout] = await Promise.all([
+        loadProgram(db, settings.activeProgramId),
+        loadActiveWorkout(db, userId),
+        loadLastWorkout(db, userId),
+      ]);
+      const exerciseIds = activeProgram ? [...exerciseIndex(activeProgram).keys()] : [];
+      const pairIds = activeProgram
+        ? activeProgram.intensityPairs.flatMap((p) => [...p.exercises])
+        : [];
+      const [lastResults, intensityLogs, lastHighLb] = await Promise.all([
+        loadLastResults(db, userId, exerciseIds, activeWorkout?.id ?? null),
+        loadIntensityLogs(db, userId, pairIds),
+        loadLastHigh(db, userId, pairIds),
+      ]);
       return {
         session: s[0] ? toSession(s[0]) : initialSession(userId),
         settings,
         activeProgram,
-        lastResults: activeProgram
-          ? await loadLastResults(db, userId, [...exerciseIndex(activeProgram).keys()])
-          : {},
+        lastResults,
+        activeWorkout,
+        lastWorkout,
+        intensityLogs,
+        lastHighLb,
       };
     },
 
@@ -69,6 +94,9 @@ export function createPostgresStore(db: Db): Store {
       await db.transaction(async (tx) => {
         if (change.newProgram) await saveProgram(tx, userId, change.newProgram);
         for (const r of change.manualResults ?? []) await saveManualResult(tx, userId, r);
+        for (const w of change.workout?.writes ?? []) {
+          await saveWorkoutWrite(tx, userId, change.workout?.programId ?? '', w);
+        }
         if (change.settings) {
           const row = fromSettings(change.settings);
           await tx.insert(schema.settings).values(row).onConflictDoUpdate({
@@ -115,6 +143,8 @@ async function loadLastResults(
   db: Db,
   userId: number,
   exerciseIds: readonly string[],
+  /** Текущая незавершённая тренировка: её подходы — не «прошлый раз». */
+  excludeWorkoutId: string | null,
 ): Promise<Record<string, LastResult>> {
   if (exerciseIds.length === 0) return {};
   const logs = await db.selectDistinctOn([schema.exerciseLogs.exerciseId], {
@@ -127,6 +157,10 @@ async function loadLastResults(
     eq(schema.exerciseLogs.userId, userId),
     eq(schema.exerciseLogs.status, done),
     inArray(schema.exerciseLogs.exerciseId, [...exerciseIds]),
+    excludeWorkoutId === null ? undefined : or(
+      isNull(schema.exerciseLogs.workoutId),
+      ne(schema.exerciseLogs.workoutId, excludeWorkoutId),
+    ),
   )).orderBy(
     schema.exerciseLogs.exerciseId,
     desc(schema.exerciseLogs.localDate),
@@ -155,6 +189,163 @@ async function loadLastResults(
     if (parsed.success) result[log.exerciseId] = parsed.data;
   }
   return result;
+}
+
+const { in_progress, completed } = WorkoutStatusSchema.enum;
+
+/** Незавершённая тренировка и всё, что в ней уже записано. */
+async function loadActiveWorkout(db: Db, userId: number): Promise<ActiveWorkout | null> {
+  const [w] = await db.select().from(schema.workouts).where(and(
+    eq(schema.workouts.userId, userId),
+    eq(schema.workouts.status, in_progress),
+  )).orderBy(desc(schema.workouts.startedAt)).limit(1);
+  if (!w) return null;
+  const logs = await db.select().from(schema.exerciseLogs)
+    .where(eq(schema.exerciseLogs.workoutId, w.id)).orderBy(asc(schema.exerciseLogs.createdAt));
+  const sets = logs.length === 0 ? [] : await db.select().from(schema.sets).where(and(
+    inArray(schema.sets.exerciseLogId, logs.map((l) => l.id)),
+    eq(schema.sets.skipped, false),
+  )).orderBy(asc(schema.sets.createdAt));
+  const parsed = ActiveWorkoutSchema.safeParse({
+    id: w.id,
+    dayId: w.dayId,
+    dayName: w.dayName,
+    startedAt: w.startedAt,
+    localDate: w.localDate,
+    logs: logs.map((l) => ({
+      id: l.id,
+      exerciseId: l.exerciseId,
+      exerciseName: l.exerciseName,
+      status: l.status,
+      plannedWorkWeightLb: l.plannedWorkWeightLb,
+      sets: sets.filter((st) => st.exerciseLogId === l.id).map((st) => ({
+        kind: st.kind,
+        weightLb: st.weightLb,
+        reps: st.reps,
+      })),
+    })),
+  });
+  return parsed.success ? parsed.data : null;
+}
+
+async function loadLastWorkout(db: Db, userId: number): Promise<LastWorkout | null> {
+  const [w] = await db.select({
+    dayId: schema.workouts.dayId,
+    dayName: schema.workouts.dayName,
+    localDate: schema.workouts.localDate,
+  }).from(schema.workouts).where(and(
+    eq(schema.workouts.userId, userId),
+    eq(schema.workouts.status, completed),
+  )).orderBy(desc(schema.workouts.startedAt)).limit(1);
+  const parsed = LastWorkoutSchema.safeParse(w);
+  return parsed.success ? parsed.data : null;
+}
+
+/** История 100/70: выполненные записи упражнений из пар с интенсивностью и ISO-неделей тренировки. */
+async function loadIntensityLogs(
+  db: Db,
+  userId: number,
+  pairIds: readonly string[],
+): Promise<IntensityLog[]> {
+  if (pairIds.length === 0) return [];
+  const rows = await db.select({
+    exerciseId: schema.exerciseLogs.exerciseId,
+    isoWeek: schema.workouts.isoWeek,
+    intensity: schema.exerciseLogs.intensity,
+  }).from(schema.exerciseLogs)
+    .innerJoin(schema.workouts, eq(schema.workouts.id, schema.exerciseLogs.workoutId))
+    .where(and(
+      eq(schema.exerciseLogs.userId, userId),
+      eq(schema.exerciseLogs.status, done),
+      inArray(schema.exerciseLogs.exerciseId, [...pairIds]),
+      isNotNull(schema.exerciseLogs.intensity),
+    )).orderBy(asc(schema.exerciseLogs.createdAt));
+  return rows.flatMap((r) => {
+    const parsed = IntensityLogSchema.safeParse(r);
+    return parsed.success ? [parsed.data] : [];
+  });
+}
+
+/** Последний рабочий вес на 100% — база для веса на 70% (§6.4, правило 5). */
+async function loadLastHigh(
+  db: Db,
+  userId: number,
+  pairIds: readonly string[],
+): Promise<Record<string, Lb>> {
+  if (pairIds.length === 0) return {};
+  const logs = await db.selectDistinctOn([schema.exerciseLogs.exerciseId], {
+    id: schema.exerciseLogs.id,
+    exerciseId: schema.exerciseLogs.exerciseId,
+  }).from(schema.exerciseLogs).where(and(
+    eq(schema.exerciseLogs.userId, userId),
+    eq(schema.exerciseLogs.status, done),
+    eq(schema.exerciseLogs.intensity, IntensitySchema.enum.high),
+    inArray(schema.exerciseLogs.exerciseId, [...pairIds]),
+  )).orderBy(schema.exerciseLogs.exerciseId, desc(schema.exerciseLogs.createdAt));
+  if (logs.length === 0) return {};
+  const sets = await db.select({
+    logId: schema.sets.exerciseLogId,
+    weightLb: schema.sets.weightLb,
+    reps: schema.sets.reps,
+  })
+    .from(schema.sets).where(and(
+      inArray(schema.sets.exerciseLogId, logs.map((l) => l.id)),
+      eq(schema.sets.kind, work),
+    ));
+  const result: Record<string, Lb> = {};
+  for (const log of logs) {
+    const best = topSet(
+      sets.filter((x) => x.logId === log.id).map((x) => ({
+        weightLb: x.weightLb === null ? null : lb(x.weightLb),
+        reps: x.reps,
+      })),
+    );
+    if (best && best.weightLb !== null) result[log.exerciseId] = best.weightLb;
+  }
+  return result;
+}
+
+/** Запись тренировки: эффекты автомата применяются в порядке, в каком он их выдал. */
+async function saveWorkoutWrite(
+  tx: Tx,
+  userId: number,
+  programId: string,
+  w: WorkoutWrite,
+): Promise<void> {
+  switch (w.type) {
+    case 'start_workout':
+      await tx.insert(schema.workouts).values({
+        ...w.workout,
+        userId,
+        programId,
+        status: in_progress,
+      });
+      return;
+    case 'finish_workout':
+      await tx.update(schema.workouts).set({ status: w.status, finishedAt: w.finishedAt })
+        .where(and(eq(schema.workouts.id, w.workoutId), eq(schema.workouts.userId, userId)));
+      return;
+    case 'comment_workout':
+      await tx.update(schema.workouts).set({ comment: w.comment })
+        .where(and(eq(schema.workouts.id, w.workoutId), eq(schema.workouts.userId, userId)));
+      return;
+    case 'open_exercise_log':
+      await tx.insert(schema.exerciseLogs).values({
+        ...w.log,
+        userId,
+        programId,
+        warmupVariant: WarmupVariantSchema.enum.none,
+        source: LogSourceSchema.enum.workout,
+      });
+      return;
+    case 'patch_exercise_log':
+      await tx.update(schema.exerciseLogs).set(w.patch)
+        .where(and(eq(schema.exerciseLogs.id, w.id), eq(schema.exerciseLogs.userId, userId)));
+      return;
+    case 'record_set':
+      await tx.insert(schema.sets).values({ ...w.set, userId, programId });
+      return;
+  }
 }
 
 /** Результат /seed: запись manual_import без тренировки и один рабочий подход. */

@@ -153,10 +153,11 @@ Deno.test('/seed без программы и без часового пояса
 Deno.test('неизвестная команда — подсказка со списком, шаг не сбрасывается', async () => {
   const { store, ui, send } = await setup();
   await send(command('seed'));
-  await send(command('workout'));
+  await send(command('stats'));
   assertEquals(
     lastText(ui),
-    'Не знаю команду /workout. Доступно:\n/start — Главный экран\n' +
+    'Не знаю команду /stats. Доступно:\n/workout — Начать или продолжить тренировку\n' +
+      '/cancel — Прервать тренировку\n/start — Главный экран\n' +
       '/program — Загрузить или показать программу\n/seed — Ввести последние рабочие результаты\n' +
       '/settings — Часовой пояс, гриф, блины, шаг веса',
   );

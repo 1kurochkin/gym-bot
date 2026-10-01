@@ -72,7 +72,7 @@ Deno.test('первая программа файлом сохраняется �
     'Программа сохранена: «6 базовых, 5 дней» — 5 дней, 10 упражнений. Дни: Фронтальный присед, ' +
       'Жим на наклонной, Мёртвая тяга, Брусья, Подтягивания + тяга.\n\nДальше — стартовые веса: /seed',
   );
-  assertEquals(store.settings.get(1)?.activeProgramId, '00000000-0000-4000-8000-000000000001');
+  assertEquals(store.settings.get(1)?.activeProgramId, [...store.programs.keys()][0]);
 });
 
 Deno.test('та же программа повторно — «не изменилась», новой версии нет', async () => {
@@ -173,5 +173,8 @@ Deno.test('главный экран показывает активную пр�
   await send(deps, { kind: 'command', name: 'start', args: '' });
   assert(lastText(ui).startsWith('Привет!'), 'без часового пояса — сначала онбординг');
   await send(deps, { kind: 'text', text: 'Europe/Moscow' });
-  assert(lastText(ui).endsWith('Программа: «6 базовых, 5 дней».'), lastText(ui));
+  assert(
+    lastText(ui).includes('Программа: «6 базовых, 5 дней».\n\nНачать тренировку — /workout'),
+    lastText(ui),
+  );
 });

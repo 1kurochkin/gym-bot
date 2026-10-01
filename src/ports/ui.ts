@@ -2,7 +2,9 @@ import { z } from 'zod';
 import { TimeZoneSchema } from '../core/schedule/timezone.ts';
 import { IdSchema } from '../core/program/schema.ts';
 import { SettingsSectionSchema } from '../core/settings/options.ts';
-import { FileProblemSchema } from '../core/session/types.ts';
+import { WarmupVariantSchema } from '../core/history/schema.ts';
+import { IntensitySchema } from '../core/program/schema.ts';
+import { FileProblemSchema, ResumeChoiceSchema } from '../core/session/types.ts';
 import { LbSchema } from '../core/units/lb.ts';
 
 /**
@@ -26,6 +28,18 @@ export const ActionSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('step_pick'), exerciseId: IdSchema }).readonly(),
   z.object({ type: z.literal('step_set'), lb: LbSchema }).readonly(),
   z.object({ type: z.literal('step_reset') }).readonly(),
+  z.object({ type: z.literal('day_pick'), dayId: IdSchema }).readonly(),
+  z.object({ type: z.literal('resume'), choice: ResumeChoiceSchema }).readonly(),
+  z.object({ type: z.literal('intensity_set'), intensity: IntensitySchema }).readonly(),
+  z.object({ type: z.literal('weight_set'), lb: LbSchema }).readonly(),
+  z.object({ type: z.literal('warmup'), variant: WarmupVariantSchema }).readonly(),
+  z.object({ type: z.literal('reps_set'), reps: z.number().int().min(1).max(100) }).readonly(),
+  z.object({ type: z.literal('set_more') }).readonly(),
+  z.object({ type: z.literal('exercise_next') }).readonly(),
+  z.object({ type: z.literal('exercise_skip') }).readonly(),
+  z.object({ type: z.literal('comment') }).readonly(),
+  z.object({ type: z.literal('workout_done') }).readonly(),
+  z.object({ type: z.literal('cancel_answer'), confirm: z.boolean() }).readonly(),
 ]);
 export type Action = z.infer<typeof ActionSchema>;
 

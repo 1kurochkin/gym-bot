@@ -28,7 +28,7 @@ export function renderView(view: OnboardingView): Rendered {
       return {
         text: `Часовой пояс: ${view.timezoneLabel}\n\n` +
           (view.programName
-            ? `Программа: «${view.programName}».`
+            ? `Программа: «${view.programName}».\n\nНачать тренировку — /workout`
             : 'Программа ещё не загружена — /program'),
         keyboard: [],
         replyKeyboard: remove,
