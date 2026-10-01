@@ -281,6 +281,7 @@ async function loadActiveWorkout(db: Db, userId: number): Promise<ActiveWorkout 
       id: l.id,
       exerciseId: l.exerciseId,
       exerciseName: l.exerciseName,
+      substitutedFor: l.substitutedFor,
       status: l.status,
       plannedWorkWeightLb: l.plannedWorkWeightLb,
       sets: sets.filter((st) => st.exerciseLogId === l.id).map((st) => ({

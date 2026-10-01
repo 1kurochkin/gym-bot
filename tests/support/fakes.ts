@@ -133,6 +133,7 @@ export function memoryStore(): MemoryStore {
           workoutId: null,
           exerciseId: r.result.exerciseId,
           exerciseName: r.result.exerciseName,
+          substitutedFor: null,
           order: 0,
           status: 'done',
           intensity: null,
@@ -279,6 +280,7 @@ function snapshot(store: MemoryStore, w: WorkoutRow): ActiveWorkout {
       id: l.id,
       exerciseId: l.exerciseId,
       exerciseName: l.exerciseName,
+      substitutedFor: l.substitutedFor,
       status: l.status,
       plannedWorkWeightLb: l.plannedWorkWeightLb,
       sets: store.sets.filter((s) => s.exerciseLogId === l.id).map((s) => ({

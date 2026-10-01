@@ -153,22 +153,22 @@ export function chooseDay(state: Session, ctx: StepContext, dayId: string): Step
  */
 function resumeAt(state: Session, ctx: StepContext, active: ActiveWorkout): StepResult {
   const exercises = ctx.activeProgram ? dayExercises(ctx.activeProgram, active.dayId) : [];
-  let lastIndex = -1;
-  exercises.forEach((e, i) => {
-    if (active.logs.some((l) => l.exerciseId === e.id)) lastIndex = i;
-  });
-  const ex = exercises[lastIndex];
-  const log = ex && active.logs.find((l) => l.exerciseId === ex.id);
-  if (!ex || !log || log.status !== done) {
-    return showExercise(state, ctx, contextFor(active, lastIndex + 1));
-  }
+  const next = (): StepResult =>
+    showExercise(state, ctx, contextFor(active, openSlots(ctx, active)[0] ?? exercises.length));
+  // Последняя начатая запись — по времени, а не по порядку дня: порядок мог быть другим.
+  const log = active.logs.at(-1);
+  if (!log) return next();
+  const index = exercises.findIndex((e) => e.id === slotId(log));
+  const at: WorkoutContext = {
+    ...contextFor(active, index),
+    exerciseId: log.substitutedFor === null ? null : log.exerciseId,
+  };
+  const ex = currentExercise(ctx, at);
+  if (index < 0 || !ex || log.status !== done) return next();
 
   const workSets = log.sets.filter((s) => s.kind === work);
   const workLb = workSets.at(-1)?.weightLb ?? log.plannedWorkWeightLb;
-  const c: WorkoutContext = {
-    ...contextFor(active, lastIndex),
-    log: { id: log.id, workLb, workSets: workSets.length },
-  };
+  const c: WorkoutContext = { ...at, log: { id: log.id, workLb, workSets: workSets.length } };
   const last = workSets.at(-1);
   if (workSets.length >= ex.workSets.min && last) return afterSet(state, ctx, c, ex, last, false);
   return repsPrompt(state, ctx, c, ex, null, null);
@@ -183,18 +183,49 @@ const contextFor = (
   dayId: active.dayId,
   localDate: active.localDate,
   index,
+  exerciseId: null,
   intensity: null,
   warmupStep: null,
   log: null,
 });
+
+/** Место дня, которое закрывает запись: заменённое упражнение или само упражнение. */
+export const slotId = (log: { exerciseId: string; substitutedFor: string | null }): string =>
+  log.substitutedFor ?? log.exerciseId;
+
+/** Номера невыполненных мест дня по порядку: у места нет ни своей записи, ни записи замены. */
+export function openSlots(
+  ctx: StepContext,
+  active: { dayId: string; logs: ActiveWorkout['logs'] } | null,
+): number[] {
+  if (!ctx.activeProgram || !active) return [];
+  const done = new Set(active.logs.map(slotId));
+  return dayExercises(ctx.activeProgram, active.dayId).flatMap((e, i) => done.has(e.id) ? [] : [i]);
+}
+
+/** Следующее место после текущего: первое невыполненное; за последним — сводка. */
+function nextSlot(ctx: StepContext, active: ActiveWorkout | null, current: number): number {
+  const total = ctx.activeProgram && active
+    ? dayExercises(ctx.activeProgram, active.dayId).length
+    : 0;
+  return openSlots(ctx, active).find((i) => i !== current) ?? total;
+}
+
+/** Упражнение программы на месте дня (без учёта замены). */
+export function slotExercise(ctx: StepContext, c: WorkoutContext): Exercise | undefined {
+  return ctx.activeProgram ? dayExercises(ctx.activeProgram, c.dayId)[c.index] : undefined;
+}
 
 // ---------------------------------------------------------------- карточка упражнения
 
 export const workoutContext = (state: Session): WorkoutContext | null =>
   state.context.kind === 'workout' ? state.context : null;
 
+/** Упражнение, которое делаем сейчас: замена, если выбрана, иначе — по программе. */
 export function currentExercise(ctx: StepContext, c: WorkoutContext): Exercise | undefined {
-  return ctx.activeProgram ? dayExercises(ctx.activeProgram, c.dayId)[c.index] : undefined;
+  if (!ctx.activeProgram) return undefined;
+  if (c.exerciseId !== null) return exerciseIndex(ctx.activeProgram).get(c.exerciseId);
+  return slotExercise(ctx, c);
 }
 
 /** Интенсивность упражнения: выбранная кнопкой или по правилам §6.4; null — не из пары. */
@@ -295,6 +326,8 @@ export function card(
     noWeight: false,
     options: grid && base !== null ? weightOptions(grid, base) : [],
     invalidWeight,
+    replaces: c.exerciseId === null ? null : slotExercise(ctx, c)?.name ?? null,
+    canReorder: openSlots(ctx, ctx.activeWorkout).some((i) => i !== c.index),
   }, { ...c, intensity: intensity?.value ?? c.intensity });
 }
 
@@ -437,6 +470,9 @@ export function repsPrompt(
     undone: extras.undone ?? null,
     canBack: setIndex === 1 && ex.loadType !== LoadTypeSchema.enum.reps_only,
     canCommentWarmup: setIndex === 1 && (extras.canCommentWarmup ?? false),
+    canReplace: setIndex === 1 && ex.loadType === LoadTypeSchema.enum.reps_only,
+    canReorder: setIndex === 1 && ex.loadType === LoadTypeSchema.enum.reps_only &&
+      openSlots(ctx, ctx.activeWorkout).some((i) => i !== c.index),
   }, { ...c, warmupStep: null });
 }
 
@@ -508,7 +544,6 @@ export function afterSet(
   commentSaved: boolean,
 ): StepResult {
   const setIndex = c.log?.workSets ?? 1;
-  const total = ctx.activeProgram ? dayExercises(ctx.activeProgram, c.dayId).length : 0;
   return moveTo(state, S.workout_after_set, {
     type: 'workout_after_set',
     exerciseName: ex.name,
@@ -516,7 +551,7 @@ export function afterSet(
     addedWeight: ex.loadType === LoadTypeSchema.enum.weighted_bodyweight,
     setIndex,
     nextOverMax: setIndex + 1 > ex.workSets.max,
-    lastExercise: c.index + 1 >= total,
+    lastExercise: !openSlots(ctx, ctx.activeWorkout).some((i) => i !== c.index),
     commentSaved,
   }, c);
 }
@@ -531,7 +566,7 @@ export function moreSets(state: Session, ctx: StepContext): StepResult {
 export function nextExercise(state: Session, ctx: StepContext): StepResult {
   const c = workoutContext(state);
   if (!c || state.step !== S.workout_after_set) return unchanged(state);
-  return showExercise(state, ctx, { ...c, index: c.index + 1, intensity: null, log: null });
+  return showExercise(state, ctx, atSlot(c, nextSlot(ctx, ctx.activeWorkout, c.index)));
 }
 
 /** Пропустить упражнение: запись со статусом skipped, дальше — следующее. */
@@ -544,27 +579,39 @@ export function skipExercise(state: Session, ctx: StepContext): StepResult {
   const effect: Effect = c.log
     ? { type: 'patch_exercise_log', id: c.log.id, patch: { status: skipped } }
     : openLog(ctx, c, ex, idsOf(ctx)(), skipped, null, c.intensity, null);
-  const nextCtx = {
-    ...ctx,
-    newIds: ctx.newIds.slice(1),
-    activeWorkout: withSkip(ctx.activeWorkout, ex),
-  };
+  const activeWorkout = withSkip(ctx.activeWorkout, ex, slotExercise(ctx, c)?.id ?? ex.id);
+  const nextCtx = { ...ctx, newIds: ctx.newIds.slice(1), activeWorkout };
   return withEffects(
-    showExercise(state, nextCtx, { ...c, index: c.index + 1, intensity: null, log: null }),
+    showExercise(state, nextCtx, atSlot(c, nextSlot(nextCtx, activeWorkout, c.index))),
     [effect],
   );
 }
 
+/** Новое место дня: упражнение по программе, интенсивность и запись — заново. */
+export const atSlot = (c: WorkoutContext, index: number): WorkoutContext => ({
+  ...c,
+  index,
+  exerciseId: null,
+  intensity: null,
+  warmupStep: null,
+  log: null,
+});
+
 /** Пропуск в этом же апдейте ещё не в БД — добавляем его в снимок для сводки. */
-const withSkip = (active: ActiveWorkout | null, ex: Exercise): ActiveWorkout | null =>
+const withSkip = (
+  active: ActiveWorkout | null,
+  ex: Exercise,
+  slot: string,
+): ActiveWorkout | null =>
   active && {
     ...active,
     logs: [
-      ...active.logs.filter((l) => l.exerciseId !== ex.id),
+      ...active.logs.filter((l) => slotId(l) !== slot),
       {
         id: '',
         exerciseId: ex.id,
         exerciseName: ex.name,
+        substitutedFor: slot === ex.id ? null : slot,
         status: skipped,
         plannedWorkWeightLb: null,
         sets: [],
@@ -704,11 +751,14 @@ function summary(
 ): StepResult {
   const program = ctx.activeProgram;
   const exercises = program ? dayExercises(program, active.dayId) : [];
-  const items = exercises.flatMap((ex) => {
-    const log = active.logs.find((l) => l.exerciseId === ex.id);
+  const index = program ? exerciseIndex(program) : new Map<string, Exercise>();
+  const items = exercises.flatMap((slot) => {
+    const log = active.logs.find((l) => slotId(l) === slot.id);
     if (!log) return [];
+    const ex = index.get(log.exerciseId) ?? slot;
     return [{
       name: ex.name,
+      replaces: log.substitutedFor === null ? null : slot.name,
       skipped: log.status === skipped,
       addedWeight: ex.loadType === LoadTypeSchema.enum.weighted_bodyweight,
       sets: log.sets.filter((s) => s.kind === work).map((s) => ({
@@ -782,6 +832,8 @@ export const WORKOUT_STEPS: ReadonlySet<string> = new Set([
   S.workout_warmup_mark,
   S.workout_warmup_edit,
   S.workout_warmup_comment,
+  S.workout_replace,
+  S.workout_reorder,
   S.workout_reps,
   S.workout_after_set,
   S.workout_comment,
@@ -814,6 +866,7 @@ export function openLog(
       workoutId: c.workoutId,
       exerciseId: ex.id,
       exerciseName: ex.name,
+      substitutedFor: c.exerciseId === null ? null : slotExercise(ctx, c)?.id ?? null,
       order: c.index + 1,
       status,
       intensity,

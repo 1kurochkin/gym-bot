@@ -39,6 +39,11 @@ export const ActionSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('warmup_diff') }).readonly(),
   z.object({ type: z.literal('warmup_mark'), mark: WarmupMarkSchema }).readonly(),
   z.object({ type: z.literal('warmup_comment') }).readonly(),
+  z.object({ type: z.literal('replace') }).readonly(),
+  z.object({ type: z.literal('replace_pick'), exerciseId: IdSchema }).readonly(),
+  z.object({ type: z.literal('reorder') }).readonly(),
+  z.object({ type: z.literal('reorder_pick'), index: z.number().int().nonnegative().max(99) })
+    .readonly(),
   z.object({ type: z.literal('back') }).readonly(),
   z.object({ type: z.literal('undo') }).readonly(),
   z.object({ type: z.literal('reps_set'), reps: z.number().int().min(1).max(100) }).readonly(),

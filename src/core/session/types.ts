@@ -50,6 +50,8 @@ export const SessionStepSchema = z.enum([
   'workout_warmup_mark',
   'workout_warmup_edit',
   'workout_warmup_comment',
+  'workout_replace',
+  'workout_reorder',
   'workout_reps',
   'workout_after_set',
   'workout_comment',
@@ -91,6 +93,8 @@ export const SessionContextSchema = z.discriminatedUnion('kind', [
     index: z.number().int().nonnegative(),
     /** Интенсивность, выбранная пользователем для текущего упражнения (иначе — по правилам §6.4). */
     intensity: IntensitySchema.nullable(),
+    /** Замена на этом месте дня: id упражнения программы; null — упражнение по программе. */
+    exerciseId: z.string().nullable().default(null),
     /** «Отметить отличия»: номер подхода разминки (с 0), который отмечаем сейчас. */
     warmupStep: z.number().int().nonnegative().nullable().default(null),
     log: z.object({
@@ -175,6 +179,10 @@ export const BotEventSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('warmup_diff_started') }).readonly(),
   z.object({ type: z.literal('warmup_marked'), mark: WarmupMarkSchema }).readonly(),
   z.object({ type: z.literal('warmup_comment_requested') }).readonly(),
+  z.object({ type: z.literal('replace_requested') }).readonly(),
+  z.object({ type: z.literal('replace_chosen'), exerciseId: z.string() }).readonly(),
+  z.object({ type: z.literal('reorder_requested') }).readonly(),
+  z.object({ type: z.literal('reorder_chosen'), index: z.number().int().nonnegative() }).readonly(),
   /** [← Назад] до первого рабочего подхода. */
   z.object({ type: z.literal('back_pressed') }).readonly(),
   /** /undo и [✏️ Исправить]: удалить последний записанный подход. */
@@ -326,6 +334,24 @@ export const ViewSchema = z.discriminatedUnion('type', [
     noWeight: z.boolean(),
     options: z.array(LbSchema).readonly(),
     invalidWeight: z.boolean(),
+    /** Замена: название заменённого упражнения программы. */
+    replaces: z.string().nullable(),
+    /** [🔀 Другое упражнение]: есть другие невыполненные упражнения дня. */
+    canReorder: z.boolean(),
+  }).readonly(),
+  /** [🔄 Заменить]: упражнения программы, кроме текущего. */
+  z.object({
+    type: z.literal('workout_replace'),
+    exerciseName: z.string(),
+    options: z.array(DayRefSchema).readonly(),
+  }).readonly(),
+  /** [🔀 Другое упражнение]: невыполненные места дня (id — номер места). */
+  z.object({
+    type: z.literal('workout_reorder'),
+    options: z.array(
+      z.object({ index: z.number().int().nonnegative(), name: z.string() }).readonly(),
+    )
+      .readonly(),
   }).readonly(),
   z.object({
     type: z.literal('workout_warmup'),
@@ -370,6 +396,9 @@ export const ViewSchema = z.discriminatedUnion('type', [
     canBack: z.boolean(),
     /** [💬 К разминке]: первый подход сразу после отмеченной разминки. */
     canCommentWarmup: z.boolean(),
+    /** [🔄 Заменить] и [🔀 Другое упражнение] — у упражнений без карточки (reps_only) до первого подхода. */
+    canReplace: z.boolean(),
+    canReorder: z.boolean(),
   }).readonly(),
   z.object({
     type: z.literal('workout_after_set'),
@@ -391,6 +420,8 @@ export const ViewSchema = z.discriminatedUnion('type', [
     items: z.array(
       z.object({
         name: z.string(),
+        /** Замена: название заменённого упражнения программы. */
+        replaces: z.string().nullable(),
         skipped: z.boolean(),
         addedWeight: z.boolean(),
         sets: z.array(SetViewSchema).readonly(),

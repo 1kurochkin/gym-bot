@@ -44,6 +44,14 @@ export function toEvent(input: Incoming): BotEvent | null {
       return { type: 'warmup_comment_requested' };
     case 'back':
       return { type: 'back_pressed' };
+    case 'replace':
+      return { type: 'replace_requested' };
+    case 'replace_pick':
+      return { type: 'replace_chosen', exerciseId: a.exerciseId };
+    case 'reorder':
+      return { type: 'reorder_requested' };
+    case 'reorder_pick':
+      return { type: 'reorder_chosen', index: a.index };
     case 'undo':
       return { type: 'undo_requested' };
     default:

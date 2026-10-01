@@ -1,6 +1,6 @@
 import { ExerciseLogStatusSchema, SetKindSchema, WarmupVariantSchema } from '../history/schema.ts';
 import { parseSetInput, type SetInputError } from '../input/set-input.ts';
-import { dayExercises } from '../program/program.ts';
+import { dayExercises, exerciseIndex } from '../program/program.ts';
 import { type Exercise, LoadTypeSchema } from '../program/schema.ts';
 import type { Lb } from '../units/lb.ts';
 import type { WarmupLine } from '../workout/plan.ts';
@@ -16,11 +16,16 @@ import {
   WarmupMarkSchema,
 } from './types.ts';
 import {
+  atSlot,
   card,
   cardIntensity,
   currentExercise,
   idsOf,
+  openSlots,
   repsPrompt,
+  showExercise,
+  slotExercise,
+  slotId,
   warmupLines,
   warmupScreen,
   type WorkoutContext,
@@ -29,7 +34,8 @@ import {
 
 /**
  * Исправления по ходу тренировки (.specs/product.md → US-3, US-4): «Отметить отличия» в разминке,
- * комментарий к разминке, [← Назад] до первого рабочего подхода, /undo и [✏️ Исправить].
+ * комментарий к разминке, [← Назад] до первого рабочего подхода, /undo и [✏️ Исправить],
+ * замена упражнения и другой порядок.
  */
 
 const S = SessionStepSchema.enum;
@@ -188,6 +194,9 @@ export function warmupCommentText(state: Session, ctx: StepContext, text: string
 export function goBack(state: Session, ctx: StepContext): StepResult {
   const c = workoutContext(state);
   const ex = c && currentExercise(ctx, c);
+  if (c && (state.step === S.workout_replace || state.step === S.workout_reorder)) {
+    return showExercise(state, ctx, c);
+  }
   if (!c?.log || !ex) return unchanged(state);
   const log = currentLog(ctx, c);
   const warmupSets = (log?.sets ?? []).filter((s) => s.kind === warmup);
@@ -265,15 +274,17 @@ export function undo(state: Session, ctx: StepContext): StepResult {
   ).at(-1);
   if (!log) return nothing;
   const dropCurrent: Effect[] = current ? [{ type: 'delete_exercise_log', id: current.id }] : [];
-  const exercises = dayExercises(program, active.dayId);
-  const index = exercises.findIndex((e) => e.id === log.exerciseId);
-  const ex = exercises[index];
-  if (!ex) return nothing;
+  const index = dayExercises(program, active.dayId).findIndex((e) => e.id === slotId(log));
+  const base: WorkoutContext = {
+    ...atSlot(c, index),
+    exerciseId: log.substitutedFor === null ? null : log.exerciseId,
+  };
+  const ex = currentExercise(ctx, base);
+  if (index < 0 || !ex) return nothing;
 
   const works = log.sets.filter((s) => s.kind === work);
   const warmups = log.sets.filter((s) => s.kind === warmup);
   const lastWork = works.at(-1);
-  const base: WorkoutContext = { ...c, index, intensity: null, warmupStep: null, log: null };
 
   if (lastWork) {
     const workLb = lastWork.weightLb ?? log.plannedWorkWeightLb;
@@ -307,4 +318,82 @@ export function undo(state: Session, ctx: StepContext): StepResult {
     ...dropCurrent,
     { type: 'delete_exercise_log', id: log.id },
   ]);
+}
+
+// ---------------------------------------------------------------- замена и порядок
+
+/**
+ * Откуда можно уйти к другому упражнению: карточка или первый подход упражнения без карточки
+ * (reps_only), пока ничего не записано. Пустая запись такого упражнения удаляется.
+ */
+function leaving(
+  state: Session,
+  ctx: StepContext,
+): { c: WorkoutContext; ex: Exercise; drop: Effect[] } | null {
+  const c = workoutContext(state);
+  const ex = c && currentExercise(ctx, c);
+  if (!c || !ex) return null;
+  if (state.step === S.workout_card) return { c: { ...c, log: null }, ex, drop: [] };
+  const empty = ex.loadType === LoadTypeSchema.enum.reps_only && c.log?.workSets === 0;
+  if (state.step !== S.workout_reps || !empty || !c.log) return null;
+  return {
+    c: { ...c, log: null },
+    ex,
+    drop: [{ type: 'delete_exercise_log', id: c.log.id }],
+  };
+}
+
+/** [🔄 Заменить]: упражнения программы, кроме текущего (заменённое — тоже, чтобы вернуть). */
+export function requestReplace(state: Session, ctx: StepContext): StepResult {
+  const from = leaving(state, ctx);
+  if (!from || !ctx.activeProgram) return unchanged(state);
+  const options = [...exerciseIndex(ctx.activeProgram).values()]
+    .filter((e) => e.id !== from.ex.id)
+    .map((e) => ({ id: e.id, name: e.name }));
+  return withEffects(
+    moveTo(state, S.workout_replace, {
+      type: 'workout_replace',
+      exerciseName: from.ex.name,
+      options,
+    }, from.c),
+    from.drop,
+  );
+}
+
+export function chooseReplace(state: Session, ctx: StepContext, exerciseId: string): StepResult {
+  const c = workoutContext(state);
+  const program = ctx.activeProgram;
+  if (!c || !program || state.step !== S.workout_replace) return unchanged(state);
+  if (!exerciseIndex(program).has(exerciseId)) return unchanged(state);
+  const slot = slotExercise(ctx, c);
+  return showExercise(state, ctx, {
+    ...atSlot(c, c.index),
+    exerciseId: exerciseId === slot?.id ? null : exerciseId,
+  });
+}
+
+/** [🔀 Другое упражнение]: невыполненные места дня, кроме текущего. */
+export function requestReorder(state: Session, ctx: StepContext): StepResult {
+  const from = leaving(state, ctx);
+  const program = ctx.activeProgram;
+  if (!from || !program) return unchanged(state);
+  const exercises = dayExercises(program, from.c.dayId);
+  const options = openSlots(ctx, ctx.activeWorkout)
+    .filter((i) => i !== from.c.index)
+    .flatMap((index) => {
+      const e = exercises[index];
+      return e ? [{ index, name: e.name }] : [];
+    });
+  if (options.length === 0) return unchanged(state);
+  return withEffects(
+    moveTo(state, S.workout_reorder, { type: 'workout_reorder', options }, from.c),
+    from.drop,
+  );
+}
+
+export function chooseReorder(state: Session, ctx: StepContext, index: number): StepResult {
+  const c = workoutContext(state);
+  if (!c || state.step !== S.workout_reorder) return unchanged(state);
+  if (!openSlots(ctx, ctx.activeWorkout).includes(index)) return unchanged(state);
+  return showExercise(state, ctx, atSlot(c, index));
 }
