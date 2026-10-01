@@ -1,4 +1,5 @@
 import { languageFor, type Settings } from '../core/settings/settings.ts';
+import { historyQuery } from '../core/session/history.ts';
 import { step } from '../core/session/step.ts';
 import type { Clock } from '../ports/clock.ts';
 import type { ZoneLocator } from '../ports/geo.ts';
@@ -82,6 +83,12 @@ async function processUpdate(deps: UpdateDeps, update: IncomingUpdate, mark: Mar
     return;
   }
 
+  // История — отдельным запросом и только в /history: обычные апдейты её не читают.
+  const query = historyQuery(seen, event);
+  const history = query
+    ? await deps.store.loadHistory(update.userId, query)
+    : { page: null, workout: null };
+
   const result = step(seen, event, {
     now: deps.clock.now(),
     settings,
@@ -94,6 +101,7 @@ async function processUpdate(deps: UpdateDeps, update: IncomingUpdate, mark: Mar
     lastHighLb: loaded.lastHighLb,
     isOwner,
     members: loaded.members,
+    history,
     newIds: Array.from({ length: IDS_PER_UPDATE }, () => deps.newId()),
   });
 
@@ -129,9 +137,9 @@ async function processUpdate(deps: UpdateDeps, update: IncomingUpdate, mark: Mar
     newInvite,
     revokeMember,
     manualResults,
-    workout: writes.length && settings.activeProgramId !== null
-      ? { programId: settings.activeProgramId, writes }
-      : undefined,
+    // programId нужен только новым записям тренировки (они бывают лишь при активной программе);
+    // правки истории (/history) его не используют.
+    workout: writes.length ? { programId: settings.activeProgramId ?? '', writes } : undefined,
   });
 
   mark('commit');

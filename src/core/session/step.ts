@@ -28,6 +28,19 @@ import {
 } from './workout.ts';
 import { answerRevoke, pickMember, requestInvite, requestUsers, unknownCommand } from './access.ts';
 import {
+  answerDelete,
+  historyBack,
+  historyText,
+  isHistory,
+  openHistory,
+  pickExercise,
+  pickSet,
+  pickWorkout,
+  requestAddSet,
+  requestDelete,
+  turnPage,
+} from './history.ts';
+import {
   chooseReorder,
   chooseReplace,
   goBack,
@@ -154,7 +167,23 @@ function transition(state: Session, event: BotEvent, ctx: StepContext): StepResu
     case 'reorder_chosen':
       return chooseReorder(state, ctx, event.index);
     case 'back_pressed':
-      return goBack(state, ctx);
+      return isHistory(state) ? historyBack(state, ctx) : goBack(state, ctx);
+    case 'history_requested':
+      return openHistory(state, ctx);
+    case 'history_page':
+      return turnPage(state, ctx, event.offset);
+    case 'history_workout_picked':
+      return pickWorkout(state, ctx, event.workoutId);
+    case 'history_exercise_picked':
+      return pickExercise(state, ctx, event.logId);
+    case 'history_set_picked':
+      return pickSet(state, ctx, event.setId);
+    case 'history_add_requested':
+      return requestAddSet(state, ctx);
+    case 'history_delete_requested':
+      return requestDelete(state, ctx);
+    case 'history_delete_answered':
+      return answerDelete(state, ctx, event.confirm);
     case 'undo_requested':
       return undo(state, ctx);
     case 'reps_chosen':
@@ -228,6 +257,15 @@ function onText(state: Session, text: string, ctx: StepContext): StepResult {
     case S.users:
     case S.users_revoke_confirm:
       return requestUsers(state, ctx);
+    case S.history_set:
+    case S.history_add:
+      return historyText(state, ctx, text);
+    case S.history_list:
+    case S.history_workout:
+    case S.history_exercise:
+    case S.history_delete_set:
+    case S.history_delete_workout:
+      return unchanged(state);
     case S.idle:
       return ctx.settings.timezone === null
         ? askTime(state, null)

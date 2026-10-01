@@ -39,6 +39,8 @@ const SIMPLE_CODES = {
   back: 'bk',
   replace: 'rx',
   reorder: 'ro',
+  history_add: 'ha',
+  history_delete: 'hd',
   undo: 'un',
 } as const;
 
@@ -62,6 +64,11 @@ const PARAM_CODES = {
   warmup_mark: 'wm',
   replace_pick: 'rq',
   reorder_pick: 'rr',
+  history_page: 'hp',
+  history_workout: 'hw',
+  history_log: 'hl',
+  history_set: 'hs',
+  history_confirm: 'hc',
 } as const;
 
 function encodeAction(a: Action): string {
@@ -87,6 +94,8 @@ function encodeAction(a: Action): string {
     case 'undo':
     case 'replace':
     case 'reorder':
+    case 'history_add':
+    case 'history_delete':
       return SIMPLE_CODES[a.type];
     case 'day_pick':
       return `${PARAM_CODES[a.type]}:${a.dayId}`;
@@ -121,6 +130,14 @@ function encodeAction(a: Action): string {
       return `${PARAM_CODES[a.type]}:${a.exerciseId}`;
     case 'reorder_pick':
       return `${PARAM_CODES[a.type]}:${a.index}`;
+    case 'history_page':
+      return `${PARAM_CODES[a.type]}:${a.offset}`;
+    case 'history_workout':
+    case 'history_log':
+    case 'history_set':
+      return `${PARAM_CODES[a.type]}:${a.id}`;
+    case 'history_confirm':
+      return `${PARAM_CODES[a.type]}:${a.confirm ? 1 : 0}`;
   }
 }
 
@@ -136,7 +153,7 @@ function rawAction(code: string): Record<string, unknown> | null {
   if (tz) return { type: 'tz', zone: tz[1] };
   const simple = Object.entries(SIMPLE_CODES).find(([, c]) => c === code)?.[0];
   if (simple) return { type: simple };
-  const m = /^([a-z]{2}):([A-Za-z0-9_.]+)$/.exec(code);
+  const m = /^([a-z]{2}):([A-Za-z0-9_.-]+)$/.exec(code);
   const type = m && Object.entries(PARAM_CODES).find(([, c]) => c === m[1])?.[0];
   if (!m || !type) return null;
   const value = m[2] ?? '';
@@ -168,6 +185,14 @@ function rawAction(code: string): Record<string, unknown> | null {
       return { type, exerciseId: value };
     case 'reorder_pick':
       return { type, index: Number(value) };
+    case 'history_page':
+      return { type, offset: Number(value) };
+    case 'history_workout':
+    case 'history_log':
+    case 'history_set':
+      return { type, id: value };
+    case 'history_confirm':
+      return { type, confirm: value === '1' };
     default:
       return { type, lb: Number(value) };
   }

@@ -105,3 +105,43 @@ export const NewSetSchema = z.object({
   skipped: z.boolean(),
 }).readonly();
 export type NewSet = z.infer<typeof NewSetSchema>;
+
+/** /history (.specs/product.md → US-10): тренировка в списке. */
+export const HistoryItemSchema = z.object({
+  id: z.string(),
+  dayName: z.string(),
+  localDate: LocalDateSchema,
+}).readonly();
+export type HistoryItem = z.infer<typeof HistoryItemSchema>;
+
+/** Страница истории: новые сверху; hasMore — есть тренировки раньше. */
+export const HistoryPageSchema = z.object({
+  offset: z.number().int().nonnegative(),
+  items: z.array(HistoryItemSchema).readonly(),
+  hasMore: z.boolean(),
+}).readonly();
+export type HistoryPage = z.infer<typeof HistoryPageSchema>;
+
+/** Завершённая или прерванная тренировка с записями и подходами — для просмотра и правки. */
+export const PastWorkoutSchema = z.object({
+  id: z.string(),
+  dayName: z.string(),
+  localDate: LocalDateSchema,
+  logs: z.array(WorkoutLogSchema).readonly(),
+}).readonly();
+export type PastWorkout = z.infer<typeof PastWorkoutSchema>;
+
+/** Что подгрузить для /history: страницу списка и, если выбрана, тренировку. */
+export const HistoryQuerySchema = z.object({
+  offset: z.number().int().nonnegative(),
+  workoutId: z.string().nullable(),
+}).readonly();
+export type HistoryQuery = z.infer<typeof HistoryQuerySchema>;
+
+export const HistoryDataSchema = z.object({
+  page: HistoryPageSchema.nullable(),
+  workout: PastWorkoutSchema.nullable(),
+}).readonly();
+export type HistoryData = z.infer<typeof HistoryDataSchema>;
+
+export const HISTORY_PAGE_SIZE = 8;

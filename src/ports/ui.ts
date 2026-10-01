@@ -53,6 +53,14 @@ export const ActionSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('comment') }).readonly(),
   z.object({ type: z.literal('workout_done') }).readonly(),
   z.object({ type: z.literal('cancel_answer'), confirm: z.boolean() }).readonly(),
+  z.object({ type: z.literal('history_page'), offset: z.number().int().nonnegative().max(9999) })
+    .readonly(),
+  z.object({ type: z.literal('history_workout'), id: z.uuid() }).readonly(),
+  z.object({ type: z.literal('history_log'), id: z.uuid() }).readonly(),
+  z.object({ type: z.literal('history_set'), id: z.uuid() }).readonly(),
+  z.object({ type: z.literal('history_add') }).readonly(),
+  z.object({ type: z.literal('history_delete') }).readonly(),
+  z.object({ type: z.literal('history_confirm'), confirm: z.boolean() }).readonly(),
   z.object({ type: z.literal('member_pick'), userId: z.number().int().positive() }).readonly(),
   z.object({ type: z.literal('revoke_answer'), confirm: z.boolean() }).readonly(),
 ]);

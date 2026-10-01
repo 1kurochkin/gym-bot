@@ -31,8 +31,14 @@ import type { Lb } from '../../core/units/lb.ts';
 import {
   type ActiveWorkout,
   ActiveWorkoutSchema,
+  HISTORY_PAGE_SIZE,
+  type HistoryData,
+  HistoryPageSchema,
+  type HistoryQuery,
   type LastWorkout,
   LastWorkoutSchema,
+  type PastWorkout,
+  PastWorkoutSchema,
   WorkoutStatusSchema,
 } from '../../core/workout/schema.ts';
 import { ProgramStatusSchema } from './program-status.ts';
@@ -136,6 +142,9 @@ export function createPostgresStore(db: Db): Store {
     async ping(): Promise<void> {
       await db.execute(sql`select 1`);
     },
+
+    loadHistory: (userId: number, query: HistoryQuery): Promise<HistoryData> =>
+      loadHistory(db, userId, query),
 
     async isMember(userId: number): Promise<boolean> {
       const rows = await db.select({ userId: schema.members.userId }).from(schema.members)
@@ -265,36 +274,84 @@ async function loadActiveWorkout(db: Db, userId: number): Promise<ActiveWorkout 
     eq(schema.workouts.status, in_progress),
   )).orderBy(desc(schema.workouts.startedAt)).limit(1);
   if (!w) return null;
-  const logs = await db.select().from(schema.exerciseLogs)
-    .where(eq(schema.exerciseLogs.workoutId, w.id)).orderBy(asc(schema.exerciseLogs.createdAt));
-  // Пропущенные подходы разминки тоже: «Назад» и /undo снимают и их отметку.
-  const sets = logs.length === 0 ? [] : await db.select().from(schema.sets).where(
-    inArray(schema.sets.exerciseLogId, logs.map((l) => l.id)),
-  ).orderBy(asc(schema.sets.createdAt), asc(schema.sets.index));
   const parsed = ActiveWorkoutSchema.safeParse({
     id: w.id,
     dayId: w.dayId,
     dayName: w.dayName,
     startedAt: w.startedAt,
     localDate: w.localDate,
-    logs: logs.map((l) => ({
-      id: l.id,
-      exerciseId: l.exerciseId,
-      exerciseName: l.exerciseName,
-      substitutedFor: l.substitutedFor,
-      status: l.status,
-      plannedWorkWeightLb: l.plannedWorkWeightLb,
-      sets: sets.filter((st) => st.exerciseLogId === l.id).map((st) => ({
-        id: st.id,
-        kind: st.kind,
-        index: st.index,
-        weightLb: st.weightLb,
-        reps: st.reps,
-        skipped: st.skipped,
-      })),
-    })),
+    logs: await loadWorkoutLogs(db, w.id, false),
   });
   return parsed.success ? parsed.data : null;
+}
+
+/**
+ * Записи тренировки с подходами (и пропущенными подходами разминки: «Назад» и /undo снимают
+ * и их отметку). Порядок: как записывались (продолжение, /undo) или, byDay, по месту в дне.
+ */
+async function loadWorkoutLogs(
+  db: Db,
+  workoutId: string,
+  byDay: boolean,
+): Promise<unknown[]> {
+  const logs = await db.select().from(schema.exerciseLogs)
+    .where(eq(schema.exerciseLogs.workoutId, workoutId))
+    .orderBy(
+      ...(byDay ? [asc(schema.exerciseLogs.order)] : []),
+      asc(schema.exerciseLogs.createdAt),
+    );
+  const sets = logs.length === 0 ? [] : await db.select().from(schema.sets).where(
+    inArray(schema.sets.exerciseLogId, logs.map((l) => l.id)),
+  ).orderBy(asc(schema.sets.createdAt), asc(schema.sets.index));
+  return logs.map((l) => ({
+    id: l.id,
+    exerciseId: l.exerciseId,
+    exerciseName: l.exerciseName,
+    substitutedFor: l.substitutedFor,
+    status: l.status,
+    plannedWorkWeightLb: l.plannedWorkWeightLb,
+    sets: sets.filter((st) => st.exerciseLogId === l.id).map((st) => ({
+      id: st.id,
+      kind: st.kind,
+      index: st.index,
+      weightLb: st.weightLb,
+      reps: st.reps,
+      skipped: st.skipped,
+    })),
+  }));
+}
+
+/** /history: страница завершённых и прерванных тренировок, новые сверху, и выбранная тренировка. */
+async function loadHistory(db: Db, userId: number, query: HistoryQuery): Promise<HistoryData> {
+  const finished = and(
+    eq(schema.workouts.userId, userId),
+    ne(schema.workouts.status, in_progress),
+  );
+  const rows = await db.select({
+    id: schema.workouts.id,
+    dayName: schema.workouts.dayName,
+    localDate: schema.workouts.localDate,
+  }).from(schema.workouts).where(finished)
+    .orderBy(desc(schema.workouts.startedAt))
+    .limit(HISTORY_PAGE_SIZE + 1).offset(query.offset);
+  const page = HistoryPageSchema.safeParse({
+    offset: query.offset,
+    items: rows.slice(0, HISTORY_PAGE_SIZE),
+    hasMore: rows.length > HISTORY_PAGE_SIZE,
+  });
+  let workout: PastWorkout | null = null;
+  if (query.workoutId !== null) {
+    const [w] = await db.select().from(schema.workouts)
+      .where(and(finished, eq(schema.workouts.id, query.workoutId)));
+    const parsed = w && PastWorkoutSchema.safeParse({
+      id: w.id,
+      dayName: w.dayName,
+      localDate: w.localDate,
+      logs: await loadWorkoutLogs(db, w.id, true),
+    });
+    workout = parsed && parsed.success ? parsed.data : null;
+  }
+  return { page: page.success ? page.data : null, workout };
 }
 
 async function loadLastWorkout(db: Db, userId: number): Promise<LastWorkout | null> {
@@ -418,6 +475,42 @@ async function saveWorkoutWrite(
       if (w.ids.length === 0) return;
       await tx.delete(schema.sets)
         .where(and(inArray(schema.sets.id, [...w.ids]), eq(schema.sets.userId, userId)));
+      return;
+    case 'update_set':
+      await tx.update(schema.sets).set({ weightLb: w.weightLb, reps: w.reps })
+        .where(and(eq(schema.sets.id, w.id), eq(schema.sets.userId, userId)));
+      return;
+    case 'add_set': {
+      const [log] = await tx.select().from(schema.exerciseLogs)
+        .where(and(eq(schema.exerciseLogs.id, w.logId), eq(schema.exerciseLogs.userId, userId)));
+      if (!log) return;
+      const [top] = await tx.select({ index: max(schema.sets.index) }).from(schema.sets)
+        .where(and(eq(schema.sets.exerciseLogId, log.id), eq(schema.sets.kind, work)));
+      await tx.insert(schema.sets).values({
+        id: w.id,
+        userId,
+        exerciseLogId: log.id,
+        workoutId: log.workoutId,
+        programId: log.programId,
+        exerciseId: log.exerciseId,
+        kind: work,
+        index: (top?.index ?? 0) + 1,
+        plannedWeightLb: null,
+        plannedReps: null,
+        weightLb: w.weightLb,
+        reps: w.reps,
+        skipped: false,
+      });
+      return;
+    }
+    case 'delete_workout':
+      // Подходы удаляются каскадом вместе с записями упражнений.
+      await tx.delete(schema.exerciseLogs).where(and(
+        eq(schema.exerciseLogs.workoutId, w.id),
+        eq(schema.exerciseLogs.userId, userId),
+      ));
+      await tx.delete(schema.workouts)
+        .where(and(eq(schema.workouts.id, w.id), eq(schema.workouts.userId, userId)));
       return;
     case 'delete_exercise_log':
       // Подходы удаляются каскадом (sets.exercise_log_id → on delete cascade).

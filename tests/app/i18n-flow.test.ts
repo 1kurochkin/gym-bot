@@ -186,6 +186,21 @@ Deno.test('английский: ни одного русского слова �
   await w.command('cancel');
   await w.command('stats');
   await w.command('undo');
+  // история: список, тренировка, упражнение, правка, добавление, удаление
+  await w.command('history');
+  const done = [...w.store.workouts.values()].find((x) => x.status !== 'in_progress');
+  await w.press({ type: 'history_workout', id: done?.id ?? '' });
+  const log = w.store.logs.find((l) => l.workoutId === done?.id && l.status === 'done');
+  await w.press({ type: 'history_log', id: log?.id ?? '' });
+  const first = w.store.sets.find((x) => x.exerciseLogId === log?.id && x.kind === 'work');
+  await w.press({ type: 'history_set', id: first?.id ?? '' });
+  await w.type('?');
+  await w.type('5');
+  await w.press({ type: 'history_add' });
+  await w.press({ type: 'back' });
+  await w.press({ type: 'back' });
+  await w.press({ type: 'history_delete' });
+  await w.press({ type: 'history_confirm', confirm: true });
 
   // Название языка — на нём самом (кнопка «Русский»), это не утечка.
   const known = [...(await programStrings()), 'Русский'];

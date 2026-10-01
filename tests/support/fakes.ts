@@ -20,6 +20,11 @@ import type {
   WorkoutStatus,
 } from '../../src/core/workout/schema.ts';
 import type { Commit, Store, UserState, WorkoutWrite } from '../../src/ports/store.ts';
+import {
+  HISTORY_PAGE_SIZE,
+  type HistoryData,
+  type HistoryQuery,
+} from '../../src/core/workout/schema.ts';
 import type { Rendered, Ui } from '../../src/ports/ui.ts';
 
 /** Пользователь 1 в тестах — владелец (ALLOWED_USER_IDS). */
@@ -96,6 +101,35 @@ export function memoryStore(): MemoryStore {
             joinedAt: m.joinedAt,
           }))
           : [],
+      });
+    },
+    loadHistory(_userId: number, query: HistoryQuery): Promise<HistoryData> {
+      const finished = [...store.workouts.values()]
+        .filter((w) => w.status !== 'in_progress')
+        .sort((a, b) => b.startedAt.getTime() - a.startedAt.getTime());
+      const rows = finished.slice(query.offset, query.offset + HISTORY_PAGE_SIZE + 1);
+      const picked = finished.find((w) => w.id === query.workoutId);
+      return Promise.resolve({
+        page: {
+          offset: query.offset,
+          items: rows.slice(0, HISTORY_PAGE_SIZE).map((w) => ({
+            id: w.id,
+            dayName: w.dayName,
+            localDate: w.localDate,
+          })),
+          hasMore: rows.length > HISTORY_PAGE_SIZE,
+        },
+        workout: picked
+          ? {
+            id: picked.id,
+            dayName: picked.dayName,
+            localDate: picked.localDate,
+            logs: [...snapshot(store, picked).logs].sort((a, b) =>
+              (store.logs.find((l) => l.id === a.id)?.order ?? 0) -
+              (store.logs.find((l) => l.id === b.id)?.order ?? 0)
+            ),
+          }
+          : null,
       });
     },
     isMember: (userId) => Promise.resolve(store.members.get(userId)?.revoked === false),
@@ -222,6 +256,43 @@ function apply(store: MemoryStore, w: WorkoutWrite, next: () => number): void {
     case 'delete_sets':
       remove(store.sets, (s) => w.ids.includes(s.id));
       return;
+    case 'update_set': {
+      const row = store.sets.find((s) => s.id === w.id);
+      if (row) Object.assign(row, { weightLb: w.weightLb, reps: w.reps });
+      return;
+    }
+    case 'add_set': {
+      const log = store.logs.find((l) => l.id === w.logId);
+      if (!log) return;
+      const top = Math.max(
+        0,
+        ...store.sets.filter((s) => s.exerciseLogId === log.id && s.kind === 'work').map((s) =>
+          s.index
+        ),
+      );
+      store.sets.push({
+        id: w.id,
+        exerciseLogId: log.id,
+        workoutId: log.workoutId ?? '',
+        exerciseId: log.exerciseId,
+        kind: 'work',
+        index: top + 1,
+        plannedWeightLb: null,
+        plannedReps: null,
+        weightLb: w.weightLb,
+        reps: w.reps,
+        skipped: false,
+        seq: next(),
+      });
+      return;
+    }
+    case 'delete_workout': {
+      const logIds = store.logs.filter((l) => l.workoutId === w.id).map((l) => l.id);
+      remove(store.sets, (s) => logIds.includes(s.exerciseLogId));
+      remove(store.logs, (l) => l.workoutId === w.id);
+      store.workouts.delete(w.id);
+      return;
+    }
     case 'delete_exercise_log':
       remove(store.logs, (l) => l.id === w.id);
       remove(store.sets, (s) => s.exerciseLogId === w.id);

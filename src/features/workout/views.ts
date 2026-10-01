@@ -1,7 +1,12 @@
 import { assertNever } from '../../shared/result.ts';
 import type { LastResult } from '../../core/history/schema.ts';
 import { IntensitySchema } from '../../core/program/schema.ts';
-import { ResumeChoiceSchema, type View, WarmupMarkSchema } from '../../core/session/types.ts';
+import {
+  ResumeChoiceSchema,
+  type SummaryItem,
+  type View,
+  WarmupMarkSchema,
+} from '../../core/session/types.ts';
 import type { Language } from '../../core/settings/settings.ts';
 import type { WarmupLine } from '../../core/workout/plan.ts';
 import type { Button, Rendered } from '../../ports/ui.ts';
@@ -26,7 +31,7 @@ const weightIn = (lang: Language, w: number | null, added: boolean): string =>
     : added
     ? (w === 0 ? MESSAGES[lang].bodyweight : `+${num(w, lang)}`)
     : num(w, lang);
-const setIn = (lang: Language, w: number | null, reps: number, added: boolean): string =>
+export const setIn = (lang: Language, w: number | null, reps: number, added: boolean): string =>
   w === null ? `× ${reps}` : `${weightIn(lang, w, added)} × ${reps}`;
 
 export function renderWorkoutView(view: WorkoutView, lang: Language): Rendered {
@@ -237,17 +242,7 @@ export function renderWorkoutView(view: WorkoutView, lang: Language): Rendered {
         view.exerciseName === null ? t.workoutCommentAsk : t.exerciseCommentAsk(view.exerciseName),
       );
     case 'workout_summary': {
-      const items = view.items.map((i) => {
-        const name = i.replaces ? `${i.name} (${t.insteadOf(i.replaces)})` : i.name;
-        if (i.skipped) return `${name}: ${t.skipped}`;
-        const sets = i.sets.every((s) => s.weightLb === null)
-          ? i.sets.map((s) => s.reps).join(' / ')
-          : i.sets.map((s) => set(s.weightLb, s.reps, i.addedWeight)).join(', ');
-        const last = i.last
-          ? ` (${t.previous} ${set(i.last.weightLb, i.last.reps, i.addedWeight)})`
-          : '';
-        return `${name}: ${sets || '—'}${last}`;
-      });
+      const items = view.items.map((i) => summaryLine(i, lang));
       return text(
         [
           t.finished(view.dayName, date(view.localDate, lang), view.minutes),
@@ -276,6 +271,20 @@ export function renderWorkoutView(view: WorkoutView, lang: Language): Rendered {
     default:
       return assertNever(view);
   }
+}
+
+/** «Жим на наклонной: 195 × 7, 195 × 6 (прошлый 185 × 9)», пресс — «20 / 18 / 15». */
+export function summaryLine(i: SummaryItem, lang: Language): string {
+  const t = MESSAGES[lang];
+  const name = i.replaces ? `${i.name} (${t.insteadOf(i.replaces)})` : i.name;
+  if (i.skipped) return `${name}: ${t.skipped}`;
+  const sets = i.sets.every((s) => s.weightLb === null)
+    ? i.sets.map((s) => s.reps).join(' / ')
+    : i.sets.map((s) => setIn(lang, s.weightLb, s.reps, i.addedWeight)).join(', ');
+  const last = i.last
+    ? ` (${t.previous} ${setIn(lang, i.last.weightLb, i.last.reps, i.addedWeight)})`
+    : '';
+  return `${name}: ${sets || '—'}${last}`;
 }
 
 /** [🔄 Заменить] [🔀 Другое упражнение] — второе, если есть невыполненные. */
