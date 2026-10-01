@@ -10,6 +10,18 @@ import {
 } from './program.ts';
 import { requestSeed, seedText, skipSeed, stopSeed } from './seed.ts';
 import {
+  backToSettings,
+  chooseBar,
+  closeSettings,
+  openSection,
+  openSettings,
+  pickStepExercise,
+  savePlates,
+  setStep,
+  settingsText,
+  togglePlate,
+} from './settings.ts';
+import {
   AskTimeErrorSchema,
   type BotEvent,
   type Session,
@@ -18,8 +30,7 @@ import {
   type StepResult,
 } from './types.ts';
 
-const { idle, onboarding_tz, onboarding_tz_pick, program_upload, program_confirm, seed } =
-  SessionStepSchema.enum;
+const S = SessionStepSchema.enum;
 const { location_unknown } = AskTimeErrorSchema.enum;
 
 /**
@@ -55,13 +66,33 @@ function transition(state: Session, event: BotEvent, ctx: StepContext): StepResu
     case 'program_confirmed':
       return confirmProgram(state);
     case 'program_cancelled':
-      return state.step === program_confirm ? cancelProgram(state) : unchanged(state);
+      return state.step === S.program_confirm ? cancelProgram(state) : unchanged(state);
     case 'seed_requested':
       return requestSeed(state, ctx);
     case 'seed_next':
       return skipSeed(state, ctx);
     case 'seed_stopped':
       return stopSeed(state, ctx);
+    case 'settings_requested':
+      return openSettings(state, ctx);
+    case 'settings_section':
+      return openSection(state, ctx, event.section);
+    case 'settings_back':
+      return backToSettings(state, ctx);
+    case 'settings_closed':
+      return closeSettings(state, ctx);
+    case 'bar_chosen':
+      return chooseBar(state, ctx, event.lb);
+    case 'plate_toggled':
+      return togglePlate(state, event.lb);
+    case 'plates_saved':
+      return savePlates(state, ctx);
+    case 'step_exercise_picked':
+      return pickStepExercise(state, ctx, event.exerciseId);
+    case 'step_chosen':
+      return setStep(state, ctx, event.lb);
+    case 'step_reset':
+      return setStep(state, ctx, null);
     case 'unknown_command':
       // Подсказка поверх текущего шага: шаг и его данные не теряются.
       return {
@@ -75,15 +106,21 @@ function transition(state: Session, event: BotEvent, ctx: StepContext): StepResu
 
 function onText(state: Session, text: string, ctx: StepContext): StepResult {
   switch (state.step) {
-    case onboarding_tz:
-    case onboarding_tz_pick:
+    case S.onboarding_tz:
+    case S.onboarding_tz_pick:
       return onTimeEntered(state, text, ctx);
-    case program_upload:
-    case program_confirm:
+    case S.program_upload:
+    case S.program_confirm:
       return receiveProgram(state, text, ctx);
-    case seed:
+    case S.seed:
       return seedText(state, text, ctx);
-    case idle:
+    case S.settings:
+    case S.settings_bar:
+    case S.settings_plates:
+    case S.settings_steps:
+    case S.settings_step_edit:
+      return settingsText(state, ctx, text);
+    case S.idle:
       return ctx.settings.timezone === null
         ? askTime(state, null)
         : home(state, ctx.settings.timezone, ctx);

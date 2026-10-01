@@ -12,7 +12,7 @@ import { type Session, SessionStepSchema, type StepContext, type StepResult } fr
 const { idle, seed } = SessionStepSchema.enum;
 
 export function requestSeed(state: Session, ctx: StepContext): StepResult {
-  if (ctx.activeProgram === null) return moveTo(state, idle, { type: 'seed_needs_program' });
+  if (ctx.activeProgram === null) return moveTo(state, idle, { type: 'needs_program' });
   if (ctx.settings.timezone === null) return askTime(state, null);
   return prompt(state, ctx, 0, 0, null);
 }

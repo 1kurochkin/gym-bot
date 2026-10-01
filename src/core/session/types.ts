@@ -3,7 +3,9 @@ import { LastResultSchema, ManualResultSchema } from '../history/schema.ts';
 import { SetInputErrorSchema } from '../input/set-input.ts';
 import { ProgramIssueSchema, ProgramSummarySchema } from '../program/program.ts';
 import { ProgramSchema } from '../program/schema.ts';
+import { SettingsSectionSchema, StepSourceSchema } from '../settings/options.ts';
 import { SettingsSchema } from '../settings/settings.ts';
+import { LbSchema } from '../units/lb.ts';
 import { TimeInputErrorSchema, TimeZoneSchema } from '../schedule/timezone.ts';
 
 /** Шаг диалога. Новые ветки диалога добавляются сюда и в step(). */
@@ -14,6 +16,11 @@ export const SessionStepSchema = z.enum([
   'program_upload',
   'program_confirm',
   'seed',
+  'settings',
+  'settings_bar',
+  'settings_plates',
+  'settings_steps',
+  'settings_step_edit',
 ]);
 export type SessionStep = z.infer<typeof SessionStepSchema>;
 
@@ -32,6 +39,11 @@ export const SessionContextSchema = z.discriminatedUnion('kind', [
     index: z.number().int().nonnegative(),
     filled: z.number().int().nonnegative(),
   }).readonly(),
+  /** Смена часового пояса из /settings: после сохранения — снова настройки. */
+  z.object({ kind: z.literal('settings_return') }).readonly(),
+  /** Блины в процессе выбора, до [Сохранить]. */
+  z.object({ kind: z.literal('plates'), selected: z.array(LbSchema).readonly() }).readonly(),
+  z.object({ kind: z.literal('step_edit'), exerciseId: z.string() }).readonly(),
 ]);
 export type SessionContext = z.infer<typeof SessionContextSchema>;
 
@@ -74,6 +86,16 @@ export const BotEventSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('seed_next') }).readonly(),
   z.object({ type: z.literal('seed_stopped') }).readonly(),
   z.object({ type: z.literal('unknown_command'), name: z.string() }).readonly(),
+  z.object({ type: z.literal('settings_requested') }).readonly(),
+  z.object({ type: z.literal('settings_section'), section: SettingsSectionSchema }).readonly(),
+  z.object({ type: z.literal('settings_back') }).readonly(),
+  z.object({ type: z.literal('settings_closed') }).readonly(),
+  z.object({ type: z.literal('bar_chosen'), lb: LbSchema }).readonly(),
+  z.object({ type: z.literal('plate_toggled'), lb: LbSchema }).readonly(),
+  z.object({ type: z.literal('plates_saved') }).readonly(),
+  z.object({ type: z.literal('step_exercise_picked'), exerciseId: z.string() }).readonly(),
+  z.object({ type: z.literal('step_chosen'), lb: LbSchema }).readonly(),
+  z.object({ type: z.literal('step_reset') }).readonly(),
 ]);
 export type BotEvent = z.infer<typeof BotEventSchema>;
 
@@ -132,8 +154,43 @@ export const ViewSchema = z.discriminatedUnion('type', [
     filled: z.number().int().nonnegative(),
     total: z.number().int().nonnegative(),
   }).readonly(),
-  z.object({ type: z.literal('seed_needs_program') }).readonly(),
+  z.object({ type: z.literal('needs_program') }).readonly(),
   z.object({ type: z.literal('unknown_command'), name: z.string() }).readonly(),
+  z.object({
+    type: z.literal('settings_menu'),
+    timezoneLabel: z.string().nullable(),
+    barLb: LbSchema,
+    platesLb: z.array(LbSchema).readonly(),
+    barStepLb: LbSchema,
+    overrides: z.number().int().nonnegative(),
+    saved: z.boolean(),
+  }).readonly(),
+  z.object({ type: z.literal('settings_bar'), currentLb: LbSchema, invalid: z.boolean() })
+    .readonly(),
+  z.object({
+    type: z.literal('settings_plates'),
+    options: z.array(LbSchema).readonly(),
+    selected: z.array(LbSchema).readonly(),
+    empty: z.boolean(),
+  }).readonly(),
+  z.object({
+    type: z.literal('settings_steps'),
+    items: z.array(
+      z.object({
+        exerciseId: z.string(),
+        name: z.string(),
+        stepLb: LbSchema,
+        source: StepSourceSchema,
+      }).readonly(),
+    ).readonly(),
+  }).readonly(),
+  z.object({
+    type: z.literal('settings_step_edit'),
+    name: z.string(),
+    stepLb: LbSchema,
+    source: StepSourceSchema,
+    invalid: z.boolean(),
+  }).readonly(),
 ]);
 export type View = z.infer<typeof ViewSchema>;
 

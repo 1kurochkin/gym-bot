@@ -8,6 +8,7 @@ import {
   type TimeZone,
 } from '../schedule/timezone.ts';
 import { home, moveTo, withEffects } from './flow.ts';
+import { settingsMenu } from './settings.ts';
 import {
   type AskTimeError,
   AskTimeErrorSchema,
@@ -26,13 +27,22 @@ const ONBOARDING: ReadonlySet<SessionStep> = new Set([onboarding_tz, onboarding_
 
 export const isOnboarding = (s: SessionStep): boolean => ONBOARDING.has(s);
 
+/** Смену пояса начали из /settings: контекст возврата сохраняется на всех шагах онбординга. */
+const keepReturn = (state: Session): Session['context'] =>
+  state.context.kind === 'settings_return' ? state.context : { kind: 'none' };
+
 export const askTime = (state: Session, error: AskTimeError | null): StepResult =>
-  moveTo(state, onboarding_tz, { type: 'ask_time', error });
+  moveTo(state, onboarding_tz, { type: 'ask_time', error }, keepReturn(state));
 
 export function saveTimezone(state: Session, zone: TimeZone, ctx: StepContext): StepResult {
-  return withEffects(home(state, zone, ctx), [
-    { type: 'save_settings', settings: { ...ctx.settings, timezone: zone } },
-  ]);
+  const settings = { ...ctx.settings, timezone: zone };
+  if (state.context.kind === 'settings_return') {
+    return withEffects(settingsMenu(state, ctx, settings, true), [{
+      type: 'save_settings',
+      settings,
+    }]);
+  }
+  return withEffects(home(state, zone, ctx), [{ type: 'save_settings', settings }]);
 }
 
 /**
@@ -58,5 +68,5 @@ export function onTimeEntered(state: Session, text: string, ctx: StepContext): S
     type: 'pick_zone',
     offsetLabel: formatOffset(offset),
     options: zones.map((zone) => ({ zone, label: formatZoneLabel(zone, ctx.now) })),
-  });
+  }, keepReturn(state));
 }
