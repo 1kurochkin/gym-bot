@@ -42,17 +42,13 @@ type Db = PostgresJsDatabase<typeof schema>;
 type Tx = Parameters<Parameters<Db['transaction']>[0]>[0];
 
 /**
- * Подключение через пулер Supavisor в режиме transaction: prepared statements не поддерживаются,
- * и запросы нельзя слать пачкой по одному соединению (pipelining): на параллельных запросах
- * загрузки (Promise.all) пулер терял ответ, и апдейт висел до таймаута (docs/architecture.md §3).
- * max_pipeline: 0 — следующий запрос уходит только после ответа на предыдущий (при 1 в полёте
- * остаются два: активный запрос в счётчик не входит).
+ * Подключение через пулер Supavisor в режиме transaction: prepared statements не поддерживаются.
+ * Запросы — строго по одному (без Promise.all): параллельные запросы postgres.js шлёт пачкой
+ * по одному соединению (pipelining), и пулер терял ответ — апдейт висел до таймаута.
+ * Опция max_pipeline: 0 не подходит — с ней ломаются транзакции (docs/architecture.md §3).
  */
 export function connect(databaseUrl: string): Db {
-  // max_pipeline есть в рантайме postgres.js (по умолчанию 100), но не в его типах:
-  // объект через переменную, чтобы TS не отверг неизвестное поле.
-  const options = { prepare: false, max: 1, max_pipeline: 0 };
-  return drizzle(postgres(databaseUrl, options), { schema });
+  return drizzle(postgres(databaseUrl, { prepare: false, max: 1 }), { schema });
 }
 
 /** Шаг, которого больше нет в автомате (после рефакторинга), сбрасывается в idle. */
@@ -69,26 +65,21 @@ const { active, archived } = ProgramStatusSchema.enum;
 export function createPostgresStore(db: Db): Store {
   return {
     async load(userId: number, opts = { withMembers: false }): Promise<UserState> {
-      const [s, st] = await Promise.all([
-        db.select().from(schema.session).where(eq(schema.session.userId, userId)),
-        db.select().from(schema.settings).where(eq(schema.settings.userId, userId)),
-      ]);
+      // Последовательно, не Promise.all: см. connect().
+      const s = await db.select().from(schema.session).where(eq(schema.session.userId, userId));
+      const st = await db.select().from(schema.settings).where(eq(schema.settings.userId, userId));
       const settings = st[0] ? toSettings(st[0]) : defaultSettings(userId);
-      const [activeProgram, activeWorkout, lastWorkout] = await Promise.all([
-        loadProgram(db, settings.activeProgramId),
-        loadActiveWorkout(db, userId),
-        loadLastWorkout(db, userId),
-      ]);
+      const activeProgram = await loadProgram(db, settings.activeProgramId);
+      const activeWorkout = await loadActiveWorkout(db, userId);
+      const lastWorkout = await loadLastWorkout(db, userId);
       const exerciseIds = activeProgram ? [...exerciseIndex(activeProgram).keys()] : [];
       const pairIds = activeProgram
         ? activeProgram.intensityPairs.flatMap((p) => [...p.exercises])
         : [];
-      const [lastResults, intensityLogs, lastHighLb, members] = await Promise.all([
-        loadLastResults(db, userId, exerciseIds, activeWorkout?.id ?? null),
-        loadIntensityLogs(db, userId, pairIds),
-        loadLastHigh(db, userId, pairIds),
-        opts.withMembers ? loadMembers(db) : Promise.resolve([]),
-      ]);
+      const lastResults = await loadLastResults(db, userId, exerciseIds, activeWorkout?.id ?? null);
+      const intensityLogs = await loadIntensityLogs(db, userId, pairIds);
+      const lastHighLb = await loadLastHigh(db, userId, pairIds);
+      const members = opts.withMembers ? await loadMembers(db) : [];
       return {
         session: s[0] ? toSession(s[0]) : initialSession(userId),
         settings,

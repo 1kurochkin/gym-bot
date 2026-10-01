@@ -16,7 +16,14 @@ export function createHttpHandler(deps: Deps, config: Config): (req: Request) =>
 
     if (path.endsWith('/webhook') && req.method === 'POST') {
       if (!webhook) return new Response('webhook secret not configured', { status: 500 });
-      return await webhook(req);
+      try {
+        return await webhook(req);
+      } catch (e) {
+        // BotError grammY несёт весь контекст, включая api.token: в лог — только текст причины.
+        // 500 — чтобы Telegram повторил апдейт.
+        console.error(JSON.stringify({ error: errorText(e) }));
+        return new Response('update failed', { status: 500 });
+      }
     }
 
     if (path.endsWith('/health')) {
@@ -29,4 +36,10 @@ export function createHttpHandler(deps: Deps, config: Config): (req: Request) =>
 
     return new Response('not found', { status: 404 });
   };
+}
+
+/** Текст ошибки без контекста: у BotError причина — в поле error. */
+function errorText(e: unknown): string {
+  const cause = e instanceof Error && 'error' in e ? e.error : e;
+  return cause instanceof Error ? `${cause.name}: ${cause.message}` : String(cause);
 }
