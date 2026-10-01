@@ -24,6 +24,15 @@ export function buildDeps(
       return handleUpdate(updateDeps, update);
     },
   });
+  // Время каждого вызова Telegram API — в лог (метод и мс, без содержимого).
+  bot.api.config.use(async (prev, method, payload, signal) => {
+    const start = performance.now();
+    try {
+      return await prev(method, payload, signal);
+    } finally {
+      console.log(JSON.stringify({ telegram: method, ms: Math.round(performance.now() - start) }));
+    }
+  });
   updateDeps = {
     store,
     ui: createTelegramUi(bot),

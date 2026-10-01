@@ -28,9 +28,39 @@ export type UpdateDeps = {
  * Здесь: доступ → идемпотентность → событие → step() → одна транзакция → отрисовка.
  */
 export async function handleUpdate(deps: UpdateDeps, update: IncomingUpdate): Promise<void> {
-  if (!(await admit(deps, update))) return;
+  const timing = phaseTimer();
+  try {
+    await processUpdate(deps, update, timing.mark);
+  } finally {
+    // Только номер апдейта и миллисекунды по этапам: никаких данных пользователя.
+    console.log(JSON.stringify({ update: update.updateId, ms: timing.result() }));
+  }
+}
+
+type Mark = (phase: string) => void;
+
+/** Время этапов обработки: этап → мс от предыдущей отметки. */
+function phaseTimer(): { mark: Mark; result: () => Record<string, number> } {
+  const start = performance.now();
+  let last = start;
+  const phases: Record<string, number> = {};
+  return {
+    mark: (phase) => {
+      const now = performance.now();
+      phases[phase] = Math.round(now - last);
+      last = now;
+    },
+    result: () => ({ ...phases, total: Math.round(performance.now() - start) }),
+  };
+}
+
+async function processUpdate(deps: UpdateDeps, update: IncomingUpdate, mark: Mark): Promise<void> {
+  const admitted = await admit(deps, update);
+  mark('admit');
+  if (!admitted) return;
   const isOwner = deps.owners.has(update.userId);
   const loaded = await deps.store.load(update.userId, { withMembers: isOwner });
+  mark('load');
   const { session, settings, activeProgram, lastResults } = loaded;
 
   // Telegram повторяет webhook при таймауте: уже обработанный update_id игнорируем.
@@ -46,6 +76,7 @@ export async function handleUpdate(deps: UpdateDeps, update: IncomingUpdate): Pr
   }
 
   const event = await routeEvent(input, deps.zoneAt);
+  mark('route');
   if (!event) {
     await deps.store.commit(update.userId, { session: seen });
     return;
@@ -66,6 +97,7 @@ export async function handleUpdate(deps: UpdateDeps, update: IncomingUpdate): Pr
     newIds: Array.from({ length: IDS_PER_UPDATE }, () => deps.newId()),
   });
 
+  mark('step');
   // Все эффекты записи — одной транзакцией вместе с новым состоянием сессии.
   let newSettings: Settings | undefined;
   let newProgram: Commit['newProgram'];
@@ -102,6 +134,7 @@ export async function handleUpdate(deps: UpdateDeps, update: IncomingUpdate): Pr
       : undefined,
   });
 
+  mark('commit');
   // Язык — по настройкам после шага: выбор языка в /settings сразу виден на ответе.
   const lang = languageFor((newSettings ?? settings).language, update.languageCode);
   const env = { botUsername: deps.botUsername() };
@@ -110,4 +143,5 @@ export async function handleUpdate(deps: UpdateDeps, update: IncomingUpdate): Pr
     const messageId = input.kind === 'callback' ? update.messageId : null;
     await deps.ui.show(update.chatId, render(e.view, lang, env), result.state.stepNo, messageId);
   }
+  mark('show');
 }
