@@ -3,13 +3,14 @@
 # наружу выходят только имена переменных, статусы и коды ответа.
 #
 #   prod.sh check              — какие обязательные переменные пусты (имена)
-#   prod.sh fill               — сгенерировать WEBHOOK_SECRET, CRON_SECRET, BOT_INFO, если пусты
+#   prod.sh fill               — сгенерировать WEBHOOK_SECRET, CRON_SECRET, BOT_INFO, FUNCTION_REGION, если пусты
 #   prod.sh set-ref <ref>      — записать FUNCTION_URL для проекта
 #   prod.sh ref                — project ref из FUNCTION_URL
 #   prod.sh secrets            — загрузить секреты функции в Supabase
 #   prod.sh db-push            — применить миграции (MIGRATION_DB_URL, session pooler)
 #   prod.sh webhook-status     — совпадает ли webhook с FUNCTION_URL, ошибки доставки
 #   prod.sh health             — HTTP-код /health с CRON_SECRET
+#   prod.sh inspect <cmd>      — supabase inspect db <cmd> (только чтение: locks, blocking, …)
 set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
 ENV_FILE=.env.prod
@@ -43,6 +44,15 @@ ref() {
   echo "${BASH_REMATCH[1]}"
 }
 
+# Webhook с регионом БД: иначе Telegram (Европа) запускает функцию далеко от базы,
+# и каждый запрос к БД идёт через океан (docs/architecture.md §3).
+webhook_url() {
+  local base region
+  base="$(get FUNCTION_URL | sed 's#/$##')/webhook"
+  region=$(get FUNCTION_REGION)
+  [[ -z $region ]] && echo "$base" || echo "$base?forceFunctionRegion=$region"
+}
+
 case "${1:-}" in
   check)
     [[ -f $ENV_FILE ]] || { echo "NO_FILE: нет $ENV_FILE (шаблон .env.prod.example)"; exit 2; }
@@ -65,6 +75,12 @@ case "${1:-}" in
       info=$(curl -fsS "https://api.telegram.org/bot$(get BOT_TOKEN)/getMe" | jq -c .result) &&
         { set_var BOT_INFO "$info"; echo "FILLED: BOT_INFO (@$(jq -r .username <<<"$info"))"; } ||
         echo "WARN: getMe не ответил — проверь BOT_TOKEN"
+    fi
+    if [[ -z $(get FUNCTION_REGION) && -n $(get FUNCTION_URL) ]]; then
+      region=$(supabase projects list -o json 2>/dev/null |
+        jq -r --arg ref "$(ref)" '.[] | select(.ref == $ref) | .region') &&
+        [[ -n $region ]] && { set_var FUNCTION_REGION "$region"; echo "FILLED: FUNCTION_REGION ($region)"; } ||
+        echo "WARN: регион проекта не определился — supabase login?"
     fi
     ;;
   set-ref)
@@ -90,11 +106,16 @@ case "${1:-}" in
     ;;
   webhook-status)
     info=$(curl -fsS "https://api.telegram.org/bot$(get BOT_TOKEN)/getWebhookInfo")
-    want="$(get FUNCTION_URL | sed 's#/$##')/webhook"
+    want=$(webhook_url)
     jq -r --arg want "$want" '.result |
       "url: \(if .url == $want then "OK" elif .url == "" then "NOT_SET" else "MISMATCH (\(.url))" end)",
       "pending: \(.pending_update_count)",
       "last_error: \(.last_error_message // "none")"' <<<"$info"
+    ;;
+  inspect)
+    # Только чтение: supabase inspect db <locks|blocking|long-running-queries|…> по MIGRATION_DB_URL.
+    [[ ${2:-} =~ ^[a-z-]+$ ]] || { echo "inspect <команда supabase inspect db>" >&2; exit 1; }
+    supabase inspect db "$2" --db-url "$(get MIGRATION_DB_URL)" 2>&1 | mask
     ;;
   health)
     curl -s -o /dev/null -w 'health: %{http_code}\n' \

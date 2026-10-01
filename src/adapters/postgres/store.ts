@@ -43,7 +43,21 @@ type Tx = Parameters<Parameters<Db['transaction']>[0]>[0];
 
 /** Подключение через пулер Supavisor в режиме transaction: prepared statements не поддерживаются. */
 export function connect(databaseUrl: string): Db {
-  return drizzle(postgres(databaseUrl, { prepare: false, max: 1 }), { schema });
+  const t0 = performance.now();
+  return drizzle(
+    postgres(databaseUrl, {
+      prepare: false,
+      max: 1,
+      // Диагностика зависаний в проде: какой запрос ушёл в БД (начало SQL, без параметров) и когда.
+      debug: (connection, query) =>
+        console.log(JSON.stringify({
+          db: query.replace(/\s+/g, ' ').slice(0, 60),
+          conn: connection,
+          at: Math.round(performance.now() - t0),
+        })),
+    }),
+    { schema },
+  );
 }
 
 /** Шаг, которого больше нет в автомате (после рефакторинга), сбрасывается в idle. */

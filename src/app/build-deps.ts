@@ -27,6 +27,7 @@ export function buildDeps(
   // Время каждого вызова Telegram API — в лог (метод и мс, без содержимого).
   bot.api.config.use(async (prev, method, payload, signal) => {
     const start = performance.now();
+    console.log(JSON.stringify({ telegram: method, start: true }));
     try {
       return await prev(method, payload, signal);
     } finally {

@@ -28,19 +28,19 @@ export type UpdateDeps = {
  * Здесь: доступ → идемпотентность → событие → step() → одна транзакция → отрисовка.
  */
 export async function handleUpdate(deps: UpdateDeps, update: IncomingUpdate): Promise<void> {
-  const timing = phaseTimer();
+  const timing = phaseTimer(update.updateId);
   try {
     await processUpdate(deps, update, timing.mark);
   } finally {
     // Только номер апдейта и миллисекунды по этапам: никаких данных пользователя.
-    console.log(JSON.stringify({ update: update.updateId, ms: timing.result() }));
+    console.log(JSON.stringify({ update: update.updateId, done: timing.result() }));
   }
 }
 
 type Mark = (phase: string) => void;
 
 /** Время этапов обработки: этап → мс от предыдущей отметки. */
-function phaseTimer(): { mark: Mark; result: () => Record<string, number> } {
+function phaseTimer(updateId: number): { mark: Mark; result: () => Record<string, number> } {
   const start = performance.now();
   let last = start;
   const phases: Record<string, number> = {};
@@ -49,6 +49,8 @@ function phaseTimer(): { mark: Mark; result: () => Record<string, number> } {
       const now = performance.now();
       phases[phase] = Math.round(now - last);
       last = now;
+      // Сразу, а не в конце: при зависании видно, какой этап закончился последним.
+      console.log(JSON.stringify({ update: updateId, phase, ms: phases[phase] }));
     },
     result: () => ({ ...phases, total: Math.round(performance.now() - start) }),
   };
