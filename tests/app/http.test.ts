@@ -52,3 +52,38 @@ Deno.test('/webhook с неверным секретом отклоняется'
 Deno.test('неизвестный путь — 404', async () => {
   assertEquals((await handler(new Request(`${url}/anything`))).status, 404);
 });
+
+Deno.test('ошибка обработки апдейта: 500 для повтора Telegram, в логе нет токена бота', async () => {
+  const store = memoryStore();
+  const broken = { ...store, commit: () => Promise.reject(new Error('db is down')) };
+  const h = createHttpHandler(buildDeps(config, { store: broken, botInfo }), config);
+  const logged: string[] = [];
+  const original = console.error;
+  console.error = (...args: unknown[]) => logged.push(args.map(String).join(' '));
+  try {
+    const res = await h(
+      new Request(`${url}/webhook`, {
+        method: 'POST',
+        headers: {
+          'x-telegram-bot-api-secret-token': env.WEBHOOK_SECRET ?? '',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          update_id: 1,
+          message: {
+            message_id: 1,
+            date: 0,
+            chat: { id: 1, type: 'private' },
+            from: { id: 1, is_bot: false, first_name: 'T' },
+            text: 'hi',
+          },
+        }),
+      }),
+    );
+    assertEquals(res.status, 500);
+  } finally {
+    console.error = original;
+  }
+  assertEquals(logged, ['{"error":"Error: db is down"}']);
+  assertEquals(logged.some((l) => l.includes(env.BOT_TOKEN ?? '?')), false);
+});

@@ -16,13 +16,28 @@ export function buildDeps(
 ): Deps {
   const store = overrides.store ?? createPostgresStore(connect(config.databaseUrl));
   let updateDeps: UpdateDeps | null = null;
+  let queue: Promise<void> = Promise.resolve();
   const bot = createBot({
     token: config.botToken,
     botInfo: overrides.botInfo ?? toBotInfo(config.botInfo),
+    // Апдейты воркера — по очереди: одно соединение с БД, и запросы двух апдейтов не должны
+    // уйти пачкой (docs/architecture.md §3).
     onUpdate: (update) => {
-      if (!updateDeps) throw new Error('deps not ready');
-      return handleUpdate(updateDeps, update);
+      const deps = updateDeps;
+      if (!deps) throw new Error('deps not ready');
+      const run = queue.then(() => handleUpdate(deps, update));
+      queue = run.catch(() => {});
+      return run;
     },
+  });
+  // Время каждого вызова Telegram API — в лог (метод и мс, без содержимого).
+  bot.api.config.use(async (prev, method, payload, signal) => {
+    const start = performance.now();
+    try {
+      return await prev(method, payload, signal);
+    } finally {
+      console.log(JSON.stringify({ telegram: method, ms: Math.round(performance.now() - start) }));
+    }
   });
   updateDeps = {
     store,
