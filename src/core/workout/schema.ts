@@ -24,6 +24,8 @@ export const WorkoutLogSchema = z.object({
   id: z.string(),
   exerciseId: z.string(),
   exerciseName: z.string(),
+  /** Замена: id упражнения программы, вместо которого сделано это (US-4). */
+  substitutedFor: z.string().nullable(),
   status: ExerciseLogStatusSchema,
   plannedWorkWeightLb: LbSchema.nullable(),
   sets: z.array(LoggedSetSchema).readonly(),
@@ -67,6 +69,8 @@ export const NewExerciseLogSchema = z.object({
   workoutId: z.string(),
   exerciseId: z.string(),
   exerciseName: z.string(),
+  /** Замена: id заменённого упражнения программы; null — упражнение по программе. */
+  substitutedFor: z.string().nullable(),
   order: z.number().int().nonnegative(),
   status: ExerciseLogStatusSchema,
   intensity: IntensitySchema.nullable(),

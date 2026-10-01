@@ -37,6 +37,8 @@ const SIMPLE_CODES = {
   warmup_diff: 'wf',
   warmup_comment: 'wc',
   back: 'bk',
+  replace: 'rx',
+  reorder: 'ro',
   undo: 'un',
 } as const;
 
@@ -58,6 +60,8 @@ const PARAM_CODES = {
   member_pick: 'mp',
   revoke_answer: 'ra',
   warmup_mark: 'wm',
+  replace_pick: 'rq',
+  reorder_pick: 'rr',
 } as const;
 
 function encodeAction(a: Action): string {
@@ -81,6 +85,8 @@ function encodeAction(a: Action): string {
     case 'warmup_comment':
     case 'back':
     case 'undo':
+    case 'replace':
+    case 'reorder':
       return SIMPLE_CODES[a.type];
     case 'day_pick':
       return `${PARAM_CODES[a.type]}:${a.dayId}`;
@@ -111,6 +117,10 @@ function encodeAction(a: Action): string {
       return `${PARAM_CODES[a.type]}:${a.language}`;
     case 'warmup_mark':
       return `${PARAM_CODES[a.type]}:${a.mark}`;
+    case 'replace_pick':
+      return `${PARAM_CODES[a.type]}:${a.exerciseId}`;
+    case 'reorder_pick':
+      return `${PARAM_CODES[a.type]}:${a.index}`;
   }
 }
 
@@ -154,6 +164,10 @@ function rawAction(code: string): Record<string, unknown> | null {
       return { type, language: value };
     case 'warmup_mark':
       return { type, mark: value };
+    case 'replace_pick':
+      return { type, exerciseId: value };
+    case 'reorder_pick':
+      return { type, index: Number(value) };
     default:
       return { type, lb: Number(value) };
   }

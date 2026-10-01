@@ -145,6 +145,12 @@ Deno.test('английский: ни одного русского слова �
   // тренировка: карточка, разминка, подходы, комментарии, сводка, прерывание
   await w.command('workout');
   await w.press({ type: 'day_pick', dayId: 'tue' });
+  await w.press({ type: 'replace' });
+  await w.press({ type: 'replace_pick', exerciseId: 'dips' });
+  await w.press({ type: 'replace' });
+  await w.press({ type: 'replace_pick', exerciseId: 'incline_press' });
+  await w.press({ type: 'reorder' });
+  await w.press({ type: 'back' });
   await w.type('abc');
   await w.type('195');
   await w.press({ type: 'warmup_diff' });

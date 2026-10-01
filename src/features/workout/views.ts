@@ -77,7 +77,9 @@ export function renderWorkoutView(view: WorkoutView, lang: Language): Rendered {
     case 'workout_card': {
       const reps = view.repRange ? ` × ${view.repRange.min}–${view.repRange.max}` : '';
       const lines = [
-        `🏋️ ${view.exerciseName} (${view.position}/${view.total})`,
+        `🏋️ ${view.exerciseName} (${view.position}/${view.total})${
+          view.replaces ? ` — ${t.insteadOf(view.replaces)}` : ''
+        }`,
         `${t.goal}: ${t.workSets(view.workSets.min, view.workSets.max)}${reps}`,
         view.intensity ? `${t.thisWeek}: ${view.intensity.summary}` : null,
         '',
@@ -105,8 +107,31 @@ export function renderWorkoutView(view: WorkoutView, lang: Language): Rendered {
           action: { type: 'intensity_set', intensity: view.intensity.value === high ? low : high },
         }]
         : [];
-      return text(lines.join('\n'), [...(options.length ? [options] : []), [...toggle, skip]]);
+      return text(lines.join('\n'), [
+        ...(options.length ? [options] : []),
+        [...toggle, skip],
+        switchRow(view.canReorder, lang),
+      ]);
     }
+    case 'workout_replace':
+      return text(t.replaceAsk(view.exerciseName), [
+        ...chunk(
+          view.options.map((o): Button => ({
+            label: o.name,
+            action: { type: 'replace_pick', exerciseId: o.id },
+          })),
+          2,
+        ),
+        [{ label: t.back, action: { type: 'back' } }],
+      ]);
+    case 'workout_reorder':
+      return text(t.reorderAsk, [
+        ...view.options.map((o): Button[] => [{
+          label: o.name,
+          action: { type: 'reorder_pick', index: o.index },
+        }]),
+        [{ label: t.back, action: { type: 'back' } }],
+      ]);
     case 'workout_warmup': {
       const reps = view.repRange ? ` × ${view.repRange.min}–${view.repRange.max}` : '';
       const lines = view.lines.map((l, i) => `${i + 1}. ${warmupLine(l, view.addedWeight, lang)}`);
@@ -177,7 +202,11 @@ export function renderWorkoutView(view: WorkoutView, lang: Language): Rendered {
         ...(view.canBack ? [{ label: t.back, action: { type: 'back' } } satisfies Button] : []),
         ...(view.setIndex === 1 ? [skip] : []),
       ];
-      return text(lines.join('\n'), [...chunk(reps, 4), ...(extra.length ? chunk(extra, 2) : [])]);
+      return text(lines.join('\n'), [
+        ...chunk(reps, 4),
+        ...(extra.length ? chunk(extra, 2) : []),
+        ...(view.canReplace ? [switchRow(view.canReorder, lang)] : []),
+      ]);
     }
     case 'workout_after_set':
       return text(
@@ -209,14 +238,15 @@ export function renderWorkoutView(view: WorkoutView, lang: Language): Rendered {
       );
     case 'workout_summary': {
       const items = view.items.map((i) => {
-        if (i.skipped) return `${i.name}: ${t.skipped}`;
+        const name = i.replaces ? `${i.name} (${t.insteadOf(i.replaces)})` : i.name;
+        if (i.skipped) return `${name}: ${t.skipped}`;
         const sets = i.sets.every((s) => s.weightLb === null)
           ? i.sets.map((s) => s.reps).join(' / ')
           : i.sets.map((s) => set(s.weightLb, s.reps, i.addedWeight)).join(', ');
         const last = i.last
           ? ` (${t.previous} ${set(i.last.weightLb, i.last.reps, i.addedWeight)})`
           : '';
-        return `${i.name}: ${sets || '—'}${last}`;
+        return `${name}: ${sets || '—'}${last}`;
       });
       return text(
         [
@@ -246,6 +276,15 @@ export function renderWorkoutView(view: WorkoutView, lang: Language): Rendered {
     default:
       return assertNever(view);
   }
+}
+
+/** [🔄 Заменить] [🔀 Другое упражнение] — второе, если есть невыполненные. */
+function switchRow(canReorder: boolean, lang: Language): Button[] {
+  const t = MESSAGES[lang];
+  return [
+    { label: t.replace, action: { type: 'replace' } },
+    ...(canReorder ? [{ label: t.reorder, action: { type: 'reorder' } } satisfies Button] : []),
+  ];
 }
 
 /** «Прошлый раз (15.09): 185 × 9 — выше диапазона». */

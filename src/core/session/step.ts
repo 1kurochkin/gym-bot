@@ -28,8 +28,12 @@ import {
 } from './workout.ts';
 import { answerRevoke, pickMember, requestInvite, requestUsers, unknownCommand } from './access.ts';
 import {
+  chooseReorder,
+  chooseReplace,
   goBack,
   markWarmup,
+  requestReorder,
+  requestReplace,
   requestWarmupComment,
   startWarmupDiff,
   undo,
@@ -141,6 +145,14 @@ function transition(state: Session, event: BotEvent, ctx: StepContext): StepResu
       return markWarmup(state, ctx, event.mark);
     case 'warmup_comment_requested':
       return requestWarmupComment(state, ctx);
+    case 'replace_requested':
+      return requestReplace(state, ctx);
+    case 'replace_chosen':
+      return chooseReplace(state, ctx, event.exerciseId);
+    case 'reorder_requested':
+      return requestReorder(state, ctx);
+    case 'reorder_chosen':
+      return chooseReorder(state, ctx, event.index);
     case 'back_pressed':
       return goBack(state, ctx);
     case 'undo_requested':
@@ -198,6 +210,9 @@ function onText(state: Session, text: string, ctx: StepContext): StepResult {
       return warmupMarkText(state, ctx, text);
     case S.workout_warmup_comment:
       return warmupCommentText(state, ctx, text);
+    case S.workout_replace:
+    case S.workout_reorder:
+      return goBack(state, ctx);
     case S.workout_day:
     case S.workout_resume:
     case S.workout_intensity:
