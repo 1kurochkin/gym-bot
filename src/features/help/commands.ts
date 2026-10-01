@@ -7,6 +7,8 @@ import type { Language } from '../../core/settings/settings.ts';
 const COMMANDS: readonly {
   readonly command: string;
   readonly description: Readonly<Record<Language, string>>;
+  /** Только для владельца (US-9): участникам не показывается. */
+  readonly ownerOnly?: true;
 }[] = [
   {
     command: 'workout',
@@ -32,10 +34,26 @@ const COMMANDS: readonly {
       en: 'Time zone, bar, plates, weight step, language',
     },
   },
+  {
+    command: 'invite',
+    description: { ru: 'Пригласить нового пользователя', en: 'Invite a new user' },
+    ownerOnly: true,
+  },
+  {
+    command: 'users',
+    description: { ru: 'Пользователи бота, отключить доступ', en: 'Bot users, revoke access' },
+    ownerOnly: true,
+  },
 ];
 
-/** Меню команд на языке: для setMyCommands и ответа на неизвестную команду. */
-export const commandsFor = (lang: Language): readonly { command: string; description: string }[] =>
-  COMMANDS.map((c) => ({ command: c.command, description: c.description[lang] }));
+/** Меню команд на языке: для setMyCommands и ответа на неизвестную команду; owner — с командами владельца. */
+export const commandsFor = (
+  lang: Language,
+  owner: boolean,
+): readonly { command: string; description: string }[] =>
+  COMMANDS.filter((c) => owner || !c.ownerOnly).map((c) => ({
+    command: c.command,
+    description: c.description[lang],
+  }));
 
 export const KNOWN_COMMANDS: ReadonlySet<string> = new Set(COMMANDS.map((c) => c.command));

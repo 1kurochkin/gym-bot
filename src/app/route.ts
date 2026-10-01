@@ -1,6 +1,8 @@
 import { parseTimeZone } from '../core/schedule/timezone.ts';
 import type { BotEvent, View } from '../core/session/types.ts';
 import type { Language } from '../core/settings/settings.ts';
+import { toEvent as accessEvent } from '../features/access/handlers.ts';
+import { renderAccessView } from '../features/access/views.ts';
 import { toEvent as onboardingEvent } from '../features/onboarding/handlers.ts';
 import { renderView as renderOnboarding } from '../features/onboarding/views.ts';
 import { KNOWN_COMMANDS } from '../features/help/commands.ts';
@@ -15,7 +17,7 @@ import { toEvent as workoutEvent } from '../features/workout/handlers.ts';
 import { renderWorkoutView } from '../features/workout/views.ts';
 import { assertNever } from '../shared/result.ts';
 import type { ZoneLocator } from '../ports/geo.ts';
-import type { Incoming, Rendered } from '../ports/ui.ts';
+import type { Incoming, Rendered, RenderEnv } from '../ports/ui.ts';
 
 /**
  * Роутинг апдейта по фичам. Фичи с командами, файлами и кнопками — первыми;
@@ -31,12 +33,13 @@ export async function routeEvent(input: Incoming, zoneAt: ZoneLocator): Promise<
   if (input.kind === 'command' && !KNOWN_COMMANDS.has(input.name)) {
     return { type: 'unknown_command', name: input.name };
   }
-  return programEvent(input) ?? seedEvent(input) ?? settingsEvent(input) ?? workoutEvent(input) ??
+  return accessEvent(input) ?? programEvent(input) ?? seedEvent(input) ?? settingsEvent(input) ??
+    workoutEvent(input) ??
     onboardingEvent(input);
 }
 
 /** Экран → текст и кнопки фичи, которой он принадлежит, на языке пользователя. */
-export function render(view: View, lang: Language): Rendered {
+export function render(view: View, lang: Language, env: RenderEnv): Rendered {
   switch (view.type) {
     case 'ask_time':
     case 'pick_zone':
@@ -77,6 +80,12 @@ export function render(view: View, lang: Language): Rendered {
     case 'workout_cancelled':
     case 'workout_none':
       return renderWorkoutView(view, lang);
+    case 'invite_created':
+    case 'users_list':
+    case 'users_revoke_confirm':
+    case 'member_joined':
+    case 'invite_invalid':
+      return renderAccessView(view, lang, env);
     default:
       return assertNever(view);
   }

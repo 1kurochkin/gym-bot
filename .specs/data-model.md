@@ -76,6 +76,18 @@ updated: 2026-10-01
   reps, skipped: boolean, createdAt }
 ```
 
+**`members`** (приглашённые пользователи; владельцы — в конфигурации, здесь их нет)
+
+```ts
+{ userId, name, username?, invitedBy, joinedAt, revokedAt? }  // revokedAt — доступ отключён, данные остаются
+```
+
+**`invites`**
+
+```ts
+{ code, createdBy, createdAt, expiresAt, usedBy?, usedAt? }  // одноразовое: usedBy заполняется при входе
+```
+
 **`session`** (одна строка, состояние диалога)
 
 ```ts

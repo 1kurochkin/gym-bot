@@ -2,7 +2,7 @@ import { assertEquals } from '@std/assert';
 import { handleUpdate, type UpdateDeps } from '../../src/app/handle-update.ts';
 import { TimeZoneSchema } from '../../src/core/schedule/timezone.ts';
 import type { Incoming, IncomingUpdate } from '../../src/ports/ui.ts';
-import { fakeUi, memoryStore } from '../support/fakes.ts';
+import { fakeUi, memoryStore, OWNERS, TESTER } from '../support/fakes.ts';
 
 function setup(): {
   deps: UpdateDeps;
@@ -17,6 +17,8 @@ function setup(): {
     clock: { now: () => new Date('2026-09-28T22:40:00Z') },
     zoneAt: (lat) => Promise.resolve(lat > 50 ? 'Europe/Moscow' : null),
     newId: () => crypto.randomUUID(),
+    owners: OWNERS,
+    botUsername: () => 'gym_test_bot',
   };
   return { deps, store, ui };
 }
@@ -28,6 +30,7 @@ const upd = (input: Incoming, messageId: number | null = null): IncomingUpdate =
   chatId: 1,
   messageId,
   languageCode: 'ru',
+  person: TESTER,
   input,
 });
 const start: Incoming = { kind: 'command', name: 'start', args: '' };

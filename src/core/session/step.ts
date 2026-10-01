@@ -26,6 +26,7 @@ import {
   skipExercise,
   workoutText,
 } from './workout.ts';
+import { answerRevoke, pickMember, requestInvite, requestUsers, unknownCommand } from './access.ts';
 import {
   backToSettings,
   chooseBar,
@@ -142,11 +143,15 @@ function transition(state: Session, event: BotEvent, ctx: StepContext): StepResu
     case 'cancel_answered':
       return answerCancel(state, ctx, event.confirm);
     case 'unknown_command':
-      // Подсказка поверх текущего шага: шаг и его данные не теряются.
-      return {
-        state,
-        effects: [{ type: 'render', view: { type: 'unknown_command', name: event.name } }],
-      };
+      return unknownCommand(state, ctx, event.name);
+    case 'invite_requested':
+      return requestInvite(state, ctx);
+    case 'users_requested':
+      return requestUsers(state, ctx);
+    case 'member_picked':
+      return pickMember(state, ctx, event.userId);
+    case 'revoke_answered':
+      return answerRevoke(state, ctx, event.confirm);
     default:
       return assertNever(event);
   }
@@ -181,6 +186,9 @@ function onText(state: Session, text: string, ctx: StepContext): StepResult {
     case S.workout_final_comment:
     case S.workout_cancel_confirm:
       return workoutText(state, ctx, text);
+    case S.users:
+    case S.users_revoke_confirm:
+      return requestUsers(state, ctx);
     case S.idle:
       return ctx.settings.timezone === null
         ? askTime(state, null)

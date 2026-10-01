@@ -135,3 +135,24 @@ export const sets = pgTable('sets', {
   index('sets_exercise_log').on(t.exerciseLogId),
   index('sets_program').on(t.programId),
 ]).enableRLS();
+
+/** Участники по приглашению (.specs/product.md → US-9). Владельцы — в конфигурации, здесь их нет. */
+export const members = pgTable('members', {
+  userId: bigint('user_id', { mode: 'number' }).primaryKey(),
+  name: text('name').notNull(),
+  username: text('username'),
+  invitedBy: bigint('invited_by', { mode: 'number' }).notNull(),
+  joinedAt: timestamp('joined_at', { withTimezone: true }).notNull(),
+  /** Доступ отключён в /users; данные пользователя остаются. Новое приглашение возвращает доступ. */
+  revokedAt: timestamp('revoked_at', { withTimezone: true }),
+}).enableRLS();
+
+/** Одноразовые приглашения: used_by заполняется при входе. */
+export const invites = pgTable('invites', {
+  code: text('code').primaryKey(),
+  createdBy: bigint('created_by', { mode: 'number' }).notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  usedBy: bigint('used_by', { mode: 'number' }),
+  usedAt: timestamp('used_at', { withTimezone: true }),
+}).enableRLS();

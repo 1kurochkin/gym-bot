@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { InviteCodeSchema, MemberSchema, type Person } from '../core/access/schema.ts';
 import { LastResultSchema, ManualResultSchema } from '../core/history/schema.ts';
 import { ProgramSchema } from '../core/program/schema.ts';
 import { IntensityLogSchema } from '../core/schedule/intensity.ts';
@@ -18,6 +19,8 @@ export const UserStateSchema = z.object({
   lastWorkout: LastWorkoutSchema.nullable(),
   intensityLogs: z.array(IntensityLogSchema).readonly(),
   lastHighLb: z.record(z.string(), LbSchema).readonly(),
+  /** Участники с доступом; заполняется только для владельца (load с withMembers). */
+  members: z.array(MemberSchema).readonly(),
 }).readonly();
 export type UserState = z.infer<typeof UserStateSchema>;
 
@@ -36,6 +39,10 @@ export const CommitSchema = z.object({
       result: ManualResultSchema,
     }).readonly(),
   ).readonly().optional(),
+  /** /invite: новое одноразовое приглашение от этого пользователя. */
+  newInvite: z.object({ code: InviteCodeSchema, expiresAt: z.date() }).readonly().optional(),
+  /** /users: отключить участника (данные остаются). */
+  revokeMember: z.number().int().positive().optional(),
 }).readonly();
 export type Commit = z.infer<typeof CommitSchema> & {
   /**
@@ -73,7 +80,20 @@ export const isWorkoutWrite = (e: Effect): e is WorkoutWrite => WORKOUT_WRITES.h
 /** Хранилище. Один load и один commit (транзакция) на апдейт — docs/architecture.md §13.2. */
 export type Store = {
   /** Сессия и настройки одним запросом; для нового пользователя — значения по умолчанию. */
-  readonly load: (userId: number) => Promise<UserState>;
+  readonly load: (userId: number, opts?: { readonly withMembers: boolean }) => Promise<UserState>;
+  /** Участник с действующим доступом (владельцы — в конфигурации, не здесь). */
+  readonly isMember: (userId: number) => Promise<boolean>;
+  /**
+   * Войти по приглашению одной транзакцией: код существует, не использован и не истёк к `now` →
+   * код помечается использованным, пользователь становится участником. Возвращает, кто пригласил;
+   * null — код недействителен.
+   */
+  readonly redeemInvite: (
+    code: string,
+    userId: number,
+    person: Person,
+    now: Date,
+  ) => Promise<{ readonly invitedBy: number } | null>;
   readonly commit: (userId: number, change: Commit) => Promise<void>;
   /** Лёгкий запрос в БД для /health (защита бесплатного проекта от паузы). */
   readonly ping: () => Promise<void>;

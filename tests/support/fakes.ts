@@ -5,6 +5,7 @@ import {
   type ManualResult,
   topSet,
 } from '../../src/core/history/schema.ts';
+import type { Member, Person } from '../../src/core/access/schema.ts';
 import { exerciseIndex } from '../../src/core/program/program.ts';
 import type { Program } from '../../src/core/program/schema.ts';
 import type { IntensityLog } from '../../src/core/schedule/intensity.ts';
@@ -20,6 +21,10 @@ import type {
 } from '../../src/core/workout/schema.ts';
 import type { Commit, Store, UserState, WorkoutWrite } from '../../src/ports/store.ts';
 import type { Rendered, Ui } from '../../src/ports/ui.ts';
+
+/** Пользователь 1 в тестах — владелец (ALLOWED_USER_IDS). */
+export const OWNERS: ReadonlySet<number> = new Set([1]);
+export const TESTER: Person = { name: 'Tester', username: null };
 
 /** Хранилище в памяти с теми же таблицами и выборками, что адаптер Postgres. */
 
@@ -46,6 +51,8 @@ export type MemoryStore = Store & {
   readonly workouts: Map<string, WorkoutRow>;
   readonly logs: LogRow[];
   readonly sets: SetRow[];
+  readonly members: Map<number, Member & { invitedBy: number; revoked: boolean }>;
+  readonly invites: Map<string, { createdBy: number; expiresAt: Date; usedBy: number | null }>;
   commits: number;
 };
 
@@ -59,8 +66,10 @@ export function memoryStore(): MemoryStore {
     workouts: new Map(),
     logs: [],
     sets: [],
+    members: new Map(),
+    invites: new Map(),
     commits: 0,
-    load(userId: number): Promise<UserState> {
+    load(userId: number, opts = { withMembers: false }): Promise<UserState> {
       const settings = store.settings.get(userId) ?? defaultSettings(userId);
       const program = settings.activeProgramId
         ? store.programs.get(settings.activeProgramId)?.program ?? null
@@ -79,7 +88,30 @@ export function memoryStore(): MemoryStore {
         lastWorkout: lastWorkout(store),
         intensityLogs: intensityLogs(store, pairIds),
         lastHighLb: lastHigh(store, pairIds),
+        members: opts.withMembers
+          ? [...store.members.values()].filter((m) => !m.revoked).map((m) => ({
+            userId: m.userId,
+            person: m.person,
+            joinedAt: m.joinedAt,
+          }))
+          : [],
       });
+    },
+    isMember: (userId) => Promise.resolve(store.members.get(userId)?.revoked === false),
+    redeemInvite(code, userId, person, now): Promise<{ invitedBy: number } | null> {
+      const invite = store.invites.get(code);
+      if (!invite || invite.usedBy !== null || invite.expiresAt <= now) {
+        return Promise.resolve(null);
+      }
+      invite.usedBy = userId;
+      store.members.set(userId, {
+        userId,
+        person,
+        joinedAt: now,
+        invitedBy: invite.createdBy,
+        revoked: false,
+      });
+      return Promise.resolve({ invitedBy: invite.createdBy });
     },
     commit(userId: number, change: Commit): Promise<void> {
       store.commits++;
@@ -127,6 +159,17 @@ export function memoryStore(): MemoryStore {
         });
       }
       for (const w of change.workout?.writes ?? []) apply(store, w, () => ++seq);
+      if (change.newInvite) {
+        store.invites.set(change.newInvite.code, {
+          createdBy: userId,
+          expiresAt: change.newInvite.expiresAt,
+          usedBy: null,
+        });
+      }
+      const revoked = change.revokeMember === undefined
+        ? undefined
+        : store.members.get(change.revokeMember);
+      if (revoked) revoked.revoked = true;
       store.sessions.set(userId, change.session);
       if (change.settings) store.settings.set(userId, change.settings);
       return Promise.resolve();

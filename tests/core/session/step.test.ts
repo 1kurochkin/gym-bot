@@ -14,6 +14,8 @@ const noWorkout = {
   lastWorkout: null,
   intensityLogs: [],
   lastHighLb: {},
+  isOwner: false,
+  members: [],
   newIds: [],
 };
 
