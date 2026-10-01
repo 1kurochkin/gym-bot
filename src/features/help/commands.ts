@@ -15,6 +15,10 @@ const COMMANDS: readonly {
     description: { ru: 'Начать или продолжить тренировку', en: 'Start or resume a workout' },
   },
   { command: 'cancel', description: { ru: 'Прервать тренировку', en: 'Stop the workout' } },
+  {
+    command: 'undo',
+    description: { ru: 'Отменить последний подход', en: 'Undo the last set' },
+  },
   { command: 'start', description: { ru: 'Главный экран', en: 'Home screen' } },
   {
     command: 'program',

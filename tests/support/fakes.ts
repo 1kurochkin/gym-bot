@@ -37,6 +37,7 @@ type LogRow = Omit<NewExerciseLog, 'workoutId'> & {
   workoutId: string | null;
   source: LogSource;
   warmupVariant: string;
+  warmupComment?: string;
   comment: string | null;
   seq: number;
 };
@@ -155,6 +156,7 @@ export function memoryStore(): MemoryStore {
           plannedReps: null,
           weightLb: r.result.weightLb,
           reps: r.result.reps,
+          skipped: false,
           seq: ++seq,
         });
       }
@@ -216,11 +218,25 @@ function apply(store: MemoryStore, w: WorkoutWrite, next: () => number): void {
     case 'record_set':
       store.sets.push({ ...w.set, seq: next() });
       return;
+    case 'delete_sets':
+      remove(store.sets, (s) => w.ids.includes(s.id));
+      return;
+    case 'delete_exercise_log':
+      remove(store.logs, (l) => l.id === w.id);
+      remove(store.sets, (s) => s.exerciseLogId === w.id);
+      return;
+  }
+}
+
+function remove<T>(rows: T[], match: (row: T) => boolean): void {
+  for (let i = rows.length - 1; i >= 0; i--) {
+    const row = rows[i];
+    if (row !== undefined && match(row)) rows.splice(i, 1);
   }
 }
 
 const workSets = (store: MemoryStore, logId: string): { weightLb: Lb | null; reps: number }[] =>
-  store.sets.filter((s) => s.exerciseLogId === logId && s.kind === 'work');
+  store.sets.filter((s) => s.exerciseLogId === logId && s.kind === 'work' && !s.skipped);
 
 function lastResults(
   store: MemoryStore,
@@ -245,6 +261,7 @@ function lastResults(
         reps: best.reps,
         source: log.source,
         comment: log.comment,
+        warmupComment: log.warmupComment ?? null,
       };
     }
   }
@@ -265,9 +282,12 @@ function snapshot(store: MemoryStore, w: WorkoutRow): ActiveWorkout {
       status: l.status,
       plannedWorkWeightLb: l.plannedWorkWeightLb,
       sets: store.sets.filter((s) => s.exerciseLogId === l.id).map((s) => ({
+        id: s.id,
         kind: s.kind,
+        index: s.index,
         weightLb: s.weightLb,
         reps: s.reps,
+        skipped: s.skipped,
       })),
     })),
   };

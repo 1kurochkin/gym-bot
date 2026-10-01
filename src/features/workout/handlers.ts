@@ -6,6 +6,7 @@ export function toEvent(input: Incoming): BotEvent | null {
   if (input.kind === 'command') {
     if (input.name === 'workout') return { type: 'workout_requested' };
     if (input.name === 'cancel') return { type: 'cancel_requested' };
+    if (input.name === 'undo') return { type: 'undo_requested' };
     return null;
   }
   if (input.kind !== 'callback') return null;
@@ -35,6 +36,16 @@ export function toEvent(input: Incoming): BotEvent | null {
       return { type: 'workout_done' };
     case 'cancel_answer':
       return { type: 'cancel_answered', confirm: a.confirm };
+    case 'warmup_diff':
+      return { type: 'warmup_diff_started' };
+    case 'warmup_mark':
+      return { type: 'warmup_marked', mark: a.mark };
+    case 'warmup_comment':
+      return { type: 'warmup_comment_requested' };
+    case 'back':
+      return { type: 'back_pressed' };
+    case 'undo':
+      return { type: 'undo_requested' };
     default:
       return null;
   }

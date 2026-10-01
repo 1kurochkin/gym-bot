@@ -47,6 +47,9 @@ export const SessionStepSchema = z.enum([
   'workout_intensity',
   'workout_card',
   'workout_warmup',
+  'workout_warmup_mark',
+  'workout_warmup_edit',
+  'workout_warmup_comment',
   'workout_reps',
   'workout_after_set',
   'workout_comment',
@@ -88,6 +91,8 @@ export const SessionContextSchema = z.discriminatedUnion('kind', [
     index: z.number().int().nonnegative(),
     /** Интенсивность, выбранная пользователем для текущего упражнения (иначе — по правилам §6.4). */
     intensity: IntensitySchema.nullable(),
+    /** «Отметить отличия»: номер подхода разминки (с 0), который отмечаем сейчас. */
+    warmupStep: z.number().int().nonnegative().nullable().default(null),
     log: z.object({
       id: z.string(),
       workLb: LbSchema.nullable(),
@@ -129,6 +134,10 @@ export const initialSession = (userId: number): Session => ({
 export const ResumeChoiceSchema = z.enum(['continue', 'finish', 'new']);
 export type ResumeChoice = z.infer<typeof ResumeChoiceSchema>;
 
+/** Отметка подхода разминки в «Отметить отличия». */
+export const WarmupMarkSchema = z.enum(['done', 'edit', 'skip']);
+export type WarmupMark = z.infer<typeof WarmupMarkSchema>;
+
 export const BotEventSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('start') }).readonly(),
   z.object({ type: z.literal('text_entered'), text: z.string() }).readonly(),
@@ -163,6 +172,13 @@ export const BotEventSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('intensity_chosen'), intensity: IntensitySchema }).readonly(),
   z.object({ type: z.literal('weight_chosen'), lb: LbSchema }).readonly(),
   z.object({ type: z.literal('warmup_done'), variant: WarmupVariantSchema }).readonly(),
+  z.object({ type: z.literal('warmup_diff_started') }).readonly(),
+  z.object({ type: z.literal('warmup_marked'), mark: WarmupMarkSchema }).readonly(),
+  z.object({ type: z.literal('warmup_comment_requested') }).readonly(),
+  /** [← Назад] до первого рабочего подхода. */
+  z.object({ type: z.literal('back_pressed') }).readonly(),
+  /** /undo и [✏️ Исправить]: удалить последний записанный подход. */
+  z.object({ type: z.literal('undo_requested') }).readonly(),
   z.object({ type: z.literal('reps_chosen'), reps: z.number().int().positive() }).readonly(),
   z.object({ type: z.literal('set_more') }).readonly(),
   z.object({ type: z.literal('exercise_next') }).readonly(),
@@ -318,7 +334,23 @@ export const ViewSchema = z.discriminatedUnion('type', [
     addedWeight: z.boolean(),
     repRange: RangeViewSchema.nullable(),
     lines: z.array(WarmupLineSchema).readonly(),
+    /** Комментарий к разминке с прошлого раза (§6.5). */
+    lastComment: z.string().nullable(),
   }).readonly(),
+  z.object({
+    type: z.literal('workout_warmup_mark'),
+    exerciseName: z.string(),
+    /** Номер подхода с 1 и сколько всего. */
+    step: z.number().int().positive(),
+    total: z.number().int().positive(),
+    line: WarmupLineSchema,
+    addedWeight: z.boolean(),
+    /** Нажато [✏️ Изменить]: ждём текст. */
+    editing: z.boolean(),
+    error: SetInputErrorSchema.nullable(),
+  }).readonly(),
+  z.object({ type: z.literal('workout_warmup_comment_prompt'), exerciseName: z.string() })
+    .readonly(),
   z.object({
     type: z.literal('workout_reps'),
     exerciseName: z.string(),
@@ -330,6 +362,14 @@ export const ViewSchema = z.discriminatedUnion('type', [
     justRecorded: SetViewSchema.nullable(),
     overMax: z.boolean(),
     error: SetInputErrorSchema.nullable(),
+    /** Вес на сторону для штанги: «195 × ? (по 75)». */
+    perSideLb: LbSchema.nullable(),
+    /** /undo или [✏️ Исправить]: что удалено перед этим вводом. */
+    undone: SetViewSchema.nullable(),
+    /** [← Назад]: до первого рабочего подхода. */
+    canBack: z.boolean(),
+    /** [💬 К разминке]: первый подход сразу после отмеченной разминки. */
+    canCommentWarmup: z.boolean(),
   }).readonly(),
   z.object({
     type: z.literal('workout_after_set'),
@@ -363,6 +403,7 @@ export const ViewSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('workout_commented') }).readonly(),
   z.object({ type: z.literal('workout_cancelled') }).readonly(),
   z.object({ type: z.literal('workout_none') }).readonly(),
+  z.object({ type: z.literal('workout_undo_nothing') }).readonly(),
   /** Ссылку t.me/<бот>?start=<код> собирает экран: имя бота знает только оболочка. */
   z.object({
     type: z.literal('invite_created'),
@@ -403,6 +444,10 @@ export const EffectSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('patch_exercise_log'), id: z.string(), patch: ExerciseLogPatchSchema })
     .readonly(),
   z.object({ type: z.literal('record_set'), set: NewSetSchema }).readonly(),
+  /** /undo и «Назад»: удалить подходы тренировки. */
+  z.object({ type: z.literal('delete_sets'), ids: z.array(z.string()).readonly() }).readonly(),
+  /** «Назад» к выбору веса и /undo пустой записи: удалить запись упражнения (вместе с подходами). */
+  z.object({ type: z.literal('delete_exercise_log'), id: z.string() }).readonly(),
   z.object({ type: z.literal('create_invite'), code: InviteCodeSchema, expiresAt: z.date() })
     .readonly(),
   z.object({ type: z.literal('revoke_member'), userId: z.number().int().positive() }).readonly(),

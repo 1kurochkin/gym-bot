@@ -12,7 +12,7 @@ export type BotOptions = {
 };
 
 /**
- * grammY-бот: только личные чаты, мгновенный answerCallbackQuery, перевод апдейта в IncomingUpdate.
+ * grammY-бот: только личные чаты, answerCallbackQuery после обработки, перевод апдейта в IncomingUpdate.
  * Кому отвечать (владелец, участник, приглашение) решает приложение: app/access.ts.
  */
 export function createBot(opts: BotOptions): Bot {
@@ -23,11 +23,14 @@ export function createBot(opts: BotOptions): Bot {
     if (ctx.chat?.type === 'private' && ctx.from !== undefined) await next();
   });
 
-  // Сразу убираем «часики» на кнопке, до записи в БД.
-  // Чужому нажатию это ничего не раскрывает: кнопки бывают только в сообщениях бота этому человеку.
+  // Ответ на нажатие — после обработки: пока бот работает, Telegram крутит индикатор на кнопке
+  // (.specs/decisions.md, 01.10). Двойное нажатие отсекает номер шага в кнопке, а не этот ответ.
   bot.on('callback_query', async (ctx, next) => {
-    await ctx.answerCallbackQuery().catch(() => {});
-    await next();
+    try {
+      await next();
+    } finally {
+      await ctx.answerCallbackQuery().catch(() => {});
+    }
   });
 
   bot.use(async (ctx) => {

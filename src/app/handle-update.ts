@@ -24,7 +24,7 @@ export type UpdateDeps = {
 };
 
 /**
- * Цикл обработки апдейта (docs/architecture.md §13.2). answerCallbackQuery уже сделал адаптер telegram.
+ * Цикл обработки апдейта (docs/architecture.md §13.2). На нажатие кнопки адаптер telegram ответит после.
  * Здесь: доступ → идемпотентность → событие → step() → одна транзакция → отрисовка.
  */
 export async function handleUpdate(deps: UpdateDeps, update: IncomingUpdate): Promise<void> {

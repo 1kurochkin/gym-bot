@@ -14,12 +14,20 @@ import {
   LoadTypeSchema,
 } from '../program/schema.ts';
 import { weightGrid, weightStep } from '../program/weight-step.ts';
+import { perSide } from '../units/weight-grid.ts';
 import { isoWeekOf, localDateOf } from '../schedule/calendar.ts';
 import { activeNotes, pairIntensity, weekIntensities } from '../schedule/intensity.ts';
 import { nextDay } from '../schedule/rotation.ts';
 import { utcOffsetMinutes } from '../schedule/timezone.ts';
 import { type Lb, lb } from '../units/lb.ts';
-import { pairOf, repOptions, suggestedWeight, warmupFor, weightOptions } from '../workout/plan.ts';
+import {
+  pairOf,
+  repOptions,
+  suggestedWeight,
+  warmupFor,
+  type WarmupLine,
+  weightOptions,
+} from '../workout/plan.ts';
 import { type ActiveWorkout, type WorkoutStatus, WorkoutStatusSchema } from '../workout/schema.ts';
 import { home, moveTo, unchanged, withEffects } from './flow.ts';
 import { askTime } from './onboarding.ts';
@@ -47,12 +55,12 @@ const { completed, aborted } = WorkoutStatusSchema.enum;
 const RESUME_WINDOW_MS = 12 * 60 * 60 * 1000;
 const MAX_WEIGHT_LB = 1500;
 
-type WorkoutContext = Extract<SessionContext, { kind: 'workout' }>;
+export type WorkoutContext = Extract<SessionContext, { kind: 'workout' }>;
 /** Интенсивность упражнения и всей недели с учётом выбора пользователя. */
 type IntensityInfo = { value: Intensity; byExercise: Readonly<Record<string, Intensity>> };
 type Ids = () => string;
 
-const idsOf = (ctx: StepContext): Ids => {
+export const idsOf = (ctx: StepContext): Ids => {
   let i = 0;
   return () => ctx.newIds[i++] ?? `missing-id-${i}`;
 };
@@ -176,15 +184,16 @@ const contextFor = (
   localDate: active.localDate,
   index,
   intensity: null,
+  warmupStep: null,
   log: null,
 });
 
 // ---------------------------------------------------------------- карточка упражнения
 
-const workoutContext = (state: Session): WorkoutContext | null =>
+export const workoutContext = (state: Session): WorkoutContext | null =>
   state.context.kind === 'workout' ? state.context : null;
 
-function currentExercise(ctx: StepContext, c: WorkoutContext): Exercise | undefined {
+export function currentExercise(ctx: StepContext, c: WorkoutContext): Exercise | undefined {
   return ctx.activeProgram ? dayExercises(ctx.activeProgram, c.dayId)[c.index] : undefined;
 }
 
@@ -240,7 +249,7 @@ export function showExercise(state: Session, ctx: StepContext, c: WorkoutContext
   return card(state, ctx, c, ex, intensity, false);
 }
 
-function card(
+export function card(
   state: Session,
   ctx: StepContext,
   c: WorkoutContext,
@@ -313,20 +322,40 @@ export function chooseWeight(state: Session, ctx: StepContext, weightLb: Lb): St
   const logId = ids();
   const open: Effect = openLog(ctx, c, ex, logId, done, weightLb, intensity, plan?.tier ?? null);
   const next: WorkoutContext = { ...c, log: { id: logId, workLb: weightLb, workSets: 0 } };
-  if (plan && plan.lines.length > 0) {
-    return withEffects(
-      moveTo(state, S.workout_warmup, {
-        type: 'workout_warmup',
-        exerciseName: ex.name,
-        workLb: weightLb,
-        addedWeight: ex.loadType === LoadTypeSchema.enum.weighted_bodyweight,
-        repRange: 'repRange' in ex ? ex.repRange : null,
-        lines: plan.lines,
-      }, next),
-      [open],
-    );
-  }
-  return withEffects(repsPrompt(state, ctx, next, ex, null, null), [open]);
+  const shown = warmupScreen(state, ctx, next, ex);
+  return withEffects(shown ?? repsPrompt(state, ctx, next, ex, null, null), [open]);
+}
+
+/** План разминки текущего упражнения под выбранный рабочий вес; [] — разминки нет. */
+export function warmupLines(
+  ctx: StepContext,
+  c: WorkoutContext,
+  ex: Exercise,
+): readonly WarmupLine[] {
+  const workLb = c.log?.workLb ?? null;
+  if (!ctx.activeProgram || workLb === null) return [];
+  return warmupFor(ex, ctx.activeProgram, ctx.settings, workLb, c.intensity)?.lines ?? [];
+}
+
+/** Экран разминки; null — у упражнения разминки нет. */
+export function warmupScreen(
+  state: Session,
+  ctx: StepContext,
+  c: WorkoutContext,
+  ex: Exercise,
+): StepResult | null {
+  const lines = warmupLines(ctx, c, ex);
+  const workLb = c.log?.workLb ?? null;
+  if (lines.length === 0 || workLb === null) return null;
+  return moveTo(state, S.workout_warmup, {
+    type: 'workout_warmup',
+    exerciseName: ex.name,
+    workLb,
+    addedWeight: ex.loadType === LoadTypeSchema.enum.weighted_bodyweight,
+    repRange: 'repRange' in ex ? ex.repRange : null,
+    lines,
+    lastComment: ctx.lastResults[ex.id]?.warmupComment ?? null,
+  }, { ...c, warmupStep: null });
 }
 
 /** [✅ Всё по плану] — записать разминку как по плану; [⏭ Без разминки] — ничего не писать. */
@@ -362,24 +391,35 @@ export function finishWarmup(state: Session, ctx: StepContext, variant: WarmupVa
           plannedReps: line.reps,
           weightLb: line.weightLb,
           reps: line.reps,
+          skipped: false,
         },
       })
     );
   }
-  return withEffects(repsPrompt(state, ctx, c, ex, null, null), effects);
+  const afterWarmup = variant === full ? { canCommentWarmup: true } : {};
+  return withEffects(repsPrompt(state, ctx, c, ex, null, null, afterWarmup), effects);
 }
 
 // ---------------------------------------------------------------- рабочие подходы
 
-function repsPrompt(
+type RepsExtras = {
+  /** Что удалено /undo или [✏️ Исправить] перед этим вводом. */
+  readonly undone?: { weightLb: Lb | null; reps: number } | null;
+  readonly canCommentWarmup?: boolean;
+};
+
+export function repsPrompt(
   state: Session,
-  _ctx: StepContext,
+  ctx: StepContext,
   c: WorkoutContext,
   ex: Exercise,
   justRecorded: { weightLb: Lb | null; reps: number } | null,
   error: SetInputError | null,
+  extras: RepsExtras = {},
 ): StepResult {
   const setIndex = (c.log?.workSets ?? 0) + 1;
+  const workLb = c.log?.workLb ?? null;
+  const grid = weightGrid(ex, ctx.settings);
   return moveTo(state, S.workout_reps, {
     type: 'workout_reps',
     exerciseName: ex.name,
@@ -393,7 +433,11 @@ function repsPrompt(
     justRecorded,
     overMax: setIndex > ex.workSets.max,
     error,
-  }, c);
+    perSideLb: grid && workLb !== null ? perSide(grid, workLb) : null,
+    undone: extras.undone ?? null,
+    canBack: setIndex === 1 && ex.loadType !== LoadTypeSchema.enum.reps_only,
+    canCommentWarmup: setIndex === 1 && (extras.canCommentWarmup ?? false),
+  }, { ...c, warmupStep: null });
 }
 
 /** Пресс и другие reps_only: без веса и разминки — сразу к подходам. */
@@ -418,7 +462,7 @@ export function chooseReps(state: Session, ctx: StepContext, reps: number): Step
   return recordWork(state, ctx, c, ex, c.log.workLb, reps, null);
 }
 
-function recordWork(
+export function recordWork(
   state: Session,
   ctx: StepContext,
   c: WorkoutContext,
@@ -443,6 +487,7 @@ function recordWork(
       plannedReps: null,
       weightLb,
       reps,
+      skipped: false,
     },
   }];
   if (comment) effects.push({ type: 'patch_exercise_log', id: log.id, patch: { comment } });
@@ -454,7 +499,7 @@ function recordWork(
   return withEffects(result, effects);
 }
 
-function afterSet(
+export function afterSet(
   state: Session,
   ctx: StepContext,
   c: WorkoutContext,
@@ -626,7 +671,11 @@ function cardText(
   return withEffects(recorded, logEffects);
 }
 
-function cardIntensity(ctx: StepContext, c: WorkoutContext, ex: Exercise): IntensityInfo | null {
+export function cardIntensity(
+  ctx: StepContext,
+  c: WorkoutContext,
+  ex: Exercise,
+): IntensityInfo | null {
   const i = intensityOf(ctx, c, ex);
   return i === 'unknown' ? null : i;
 }
@@ -730,6 +779,9 @@ export const WORKOUT_STEPS: ReadonlySet<string> = new Set([
   S.workout_intensity,
   S.workout_card,
   S.workout_warmup,
+  S.workout_warmup_mark,
+  S.workout_warmup_edit,
+  S.workout_warmup_comment,
   S.workout_reps,
   S.workout_after_set,
   S.workout_comment,
@@ -745,7 +797,7 @@ const finish = (workoutId: string, status: WorkoutStatus, ctx: StepContext): Eff
   finishedAt: ctx.now,
 });
 
-function openLog(
+export function openLog(
   ctx: StepContext,
   c: WorkoutContext,
   ex: Exercise,
