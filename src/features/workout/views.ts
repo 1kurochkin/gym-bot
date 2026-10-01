@@ -1,7 +1,7 @@
 import { assertNever } from '../../shared/result.ts';
 import type { LastResult } from '../../core/history/schema.ts';
 import { IntensitySchema } from '../../core/program/schema.ts';
-import { ResumeChoiceSchema, type View } from '../../core/session/types.ts';
+import { ResumeChoiceSchema, type View, WarmupMarkSchema } from '../../core/session/types.ts';
 import type { Language } from '../../core/settings/settings.ts';
 import type { WarmupLine } from '../../core/workout/plan.ts';
 import type { Button, Rendered } from '../../ports/ui.ts';
@@ -11,6 +11,7 @@ import { MESSAGES } from './messages.ts';
 export type WorkoutView = Extract<View, { type: `workout_${string}` }>;
 
 const { high, low } = IntensitySchema.enum;
+const MARK = WarmupMarkSchema.enum;
 
 const text = (value: string, keyboard: Button[][] = []): Rendered => ({
   text: value,
@@ -109,22 +110,54 @@ export function renderWorkoutView(view: WorkoutView, lang: Language): Rendered {
     case 'workout_warmup': {
       const reps = view.repRange ? ` × ${view.repRange.min}–${view.repRange.max}` : '';
       const lines = view.lines.map((l, i) => `${i + 1}. ${warmupLine(l, view.addedWeight, lang)}`);
+      const comment = view.lastComment ? `${t.lastWarmupComment(view.lastComment)}\n` : '';
       return text(
-        `${t.warmupFor(weight(view.workLb, view.addedWeight))}${reps}:\n${lines.join('\n')}\n\n` +
-          t.orWorkSet,
-        [[
-          { label: t.warmupFull, action: { type: 'warmup', variant: 'full' } },
-          { label: t.warmupNone, action: { type: 'warmup', variant: 'none' } },
-        ]],
+        `${comment}${t.warmupFor(weight(view.workLb, view.addedWeight))}${reps}:\n` +
+          `${lines.join('\n')}\n\n${t.orWorkSet}`,
+        [
+          [
+            { label: t.warmupFull, action: { type: 'warmup', variant: 'full' } },
+            { label: t.warmupDiff, action: { type: 'warmup_diff' } },
+          ],
+          [
+            { label: t.warmupNone, action: { type: 'warmup', variant: 'none' } },
+            { label: t.back, action: { type: 'back' } },
+          ],
+        ],
       );
     }
+    case 'workout_warmup_mark': {
+      const head = t.markHead(view.step, view.total, warmupLine(view.line, view.addedWeight, lang));
+      return text(
+        [
+          head,
+          view.error ? `⚠️ ${t.errors[view.error]}` : null,
+          view.editing ? t.markAsk : null,
+        ].filter((l) => l !== null).join('\n'),
+        [
+          [
+            { label: t.markDone, action: { type: 'warmup_mark', mark: MARK.done } },
+            { label: t.markEdit, action: { type: 'warmup_mark', mark: MARK.edit } },
+            { label: t.markSkip, action: { type: 'warmup_mark', mark: MARK.skip } },
+          ],
+          [{ label: t.back, action: { type: 'back' } }],
+        ],
+      );
+    }
+    case 'workout_warmup_comment_prompt':
+      return text(t.warmupCommentAsk(view.exerciseName));
+    case 'workout_undo_nothing':
+      return text(t.undoNothing);
     case 'workout_reps': {
       const head = view.target
         ? t.setTarget(view.setIndex, view.target)
         : `${t.workSet(view.setIndex)} ${
           view.weightLb === null ? '' : `${weight(view.weightLb, view.addedWeight)} `
-        }× ?`;
+        }× ?${view.perSideLb === null ? '' : ` (${t.perSide(num(view.perSideLb, lang))})`}`;
       const lines = [
+        view.undone
+          ? t.undone(set(view.undone.weightLb, view.undone.reps, view.addedWeight))
+          : null,
         view.justRecorded
           ? t.recorded(set(view.justRecorded.weightLb, view.justRecorded.reps, view.addedWeight))
           : null,
@@ -136,7 +169,15 @@ export function renderWorkoutView(view: WorkoutView, lang: Language): Rendered {
         label: String(r),
         action: { type: 'reps_set', reps: r },
       }));
-      return text(lines.join('\n'), [...chunk(reps, 4), ...(view.setIndex === 1 ? [[skip]] : [])]);
+      const extra: Button[] = [
+        ...(view.justRecorded ? [{ label: t.fix, action: { type: 'undo' } } satisfies Button] : []),
+        ...(view.canCommentWarmup
+          ? [{ label: t.warmupComment, action: { type: 'warmup_comment' } } satisfies Button]
+          : []),
+        ...(view.canBack ? [{ label: t.back, action: { type: 'back' } } satisfies Button] : []),
+        ...(view.setIndex === 1 ? [skip] : []),
+      ];
+      return text(lines.join('\n'), [...chunk(reps, 4), ...(extra.length ? chunk(extra, 2) : [])]);
     }
     case 'workout_after_set':
       return text(
@@ -153,10 +194,13 @@ export function renderWorkoutView(view: WorkoutView, lang: Language): Rendered {
             },
             { label: t.comment, action: { type: 'comment' } },
           ],
-          [{
-            label: view.lastExercise ? t.finishWorkout : t.nextExercise,
-            action: { type: 'exercise_next' },
-          }],
+          [
+            { label: t.fix, action: { type: 'undo' } },
+            {
+              label: view.lastExercise ? t.finishWorkout : t.nextExercise,
+              action: { type: 'exercise_next' },
+            },
+          ],
         ],
       );
     case 'workout_comment_prompt':

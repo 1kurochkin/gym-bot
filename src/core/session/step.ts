@@ -28,6 +28,15 @@ import {
 } from './workout.ts';
 import { answerRevoke, pickMember, requestInvite, requestUsers, unknownCommand } from './access.ts';
 import {
+  goBack,
+  markWarmup,
+  requestWarmupComment,
+  startWarmupDiff,
+  undo,
+  warmupCommentText,
+  warmupMarkText,
+} from './workout-corrections.ts';
+import {
   backToSettings,
   chooseBar,
   chooseLanguage,
@@ -126,6 +135,16 @@ function transition(state: Session, event: BotEvent, ctx: StepContext): StepResu
       return chooseWeight(state, ctx, event.lb);
     case 'warmup_done':
       return finishWarmup(state, ctx, event.variant);
+    case 'warmup_diff_started':
+      return startWarmupDiff(state, ctx);
+    case 'warmup_marked':
+      return markWarmup(state, ctx, event.mark);
+    case 'warmup_comment_requested':
+      return requestWarmupComment(state, ctx);
+    case 'back_pressed':
+      return goBack(state, ctx);
+    case 'undo_requested':
+      return undo(state, ctx);
     case 'reps_chosen':
       return chooseReps(state, ctx, event.reps);
     case 'set_more':
@@ -174,6 +193,11 @@ function onText(state: Session, text: string, ctx: StepContext): StepResult {
     case S.settings_step_edit:
     case S.settings_language:
       return settingsText(state, ctx, text);
+    case S.workout_warmup_mark:
+    case S.workout_warmup_edit:
+      return warmupMarkText(state, ctx, text);
+    case S.workout_warmup_comment:
+      return warmupCommentText(state, ctx, text);
     case S.workout_day:
     case S.workout_resume:
     case S.workout_intensity:

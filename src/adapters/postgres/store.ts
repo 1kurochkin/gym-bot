@@ -217,6 +217,7 @@ async function loadLastResults(
     localDate: schema.exerciseLogs.localDate,
     source: schema.exerciseLogs.source,
     comment: schema.exerciseLogs.comment,
+    warmupComment: schema.exerciseLogs.warmupComment,
   }).from(schema.exerciseLogs).where(and(
     eq(schema.exerciseLogs.userId, userId),
     eq(schema.exerciseLogs.status, done),
@@ -266,10 +267,10 @@ async function loadActiveWorkout(db: Db, userId: number): Promise<ActiveWorkout 
   if (!w) return null;
   const logs = await db.select().from(schema.exerciseLogs)
     .where(eq(schema.exerciseLogs.workoutId, w.id)).orderBy(asc(schema.exerciseLogs.createdAt));
-  const sets = logs.length === 0 ? [] : await db.select().from(schema.sets).where(and(
+  // Пропущенные подходы разминки тоже: «Назад» и /undo снимают и их отметку.
+  const sets = logs.length === 0 ? [] : await db.select().from(schema.sets).where(
     inArray(schema.sets.exerciseLogId, logs.map((l) => l.id)),
-    eq(schema.sets.skipped, false),
-  )).orderBy(asc(schema.sets.createdAt));
+  ).orderBy(asc(schema.sets.createdAt), asc(schema.sets.index));
   const parsed = ActiveWorkoutSchema.safeParse({
     id: w.id,
     dayId: w.dayId,
@@ -283,9 +284,12 @@ async function loadActiveWorkout(db: Db, userId: number): Promise<ActiveWorkout 
       status: l.status,
       plannedWorkWeightLb: l.plannedWorkWeightLb,
       sets: sets.filter((st) => st.exerciseLogId === l.id).map((st) => ({
+        id: st.id,
         kind: st.kind,
+        index: st.index,
         weightLb: st.weightLb,
         reps: st.reps,
+        skipped: st.skipped,
       })),
     })),
   });
@@ -408,6 +412,16 @@ async function saveWorkoutWrite(
       return;
     case 'record_set':
       await tx.insert(schema.sets).values({ ...w.set, userId, programId });
+      return;
+    case 'delete_sets':
+      if (w.ids.length === 0) return;
+      await tx.delete(schema.sets)
+        .where(and(inArray(schema.sets.id, [...w.ids]), eq(schema.sets.userId, userId)));
+      return;
+    case 'delete_exercise_log':
+      // Подходы удаляются каскадом (sets.exercise_log_id → on delete cascade).
+      await tx.delete(schema.exerciseLogs)
+        .where(and(eq(schema.exerciseLogs.id, w.id), eq(schema.exerciseLogs.userId, userId)));
       return;
   }
 }

@@ -147,7 +147,17 @@ Deno.test('английский: ни одного русского слова �
   await w.press({ type: 'day_pick', dayId: 'tue' });
   await w.type('abc');
   await w.type('195');
+  await w.press({ type: 'warmup_diff' });
+  await w.press({ type: 'warmup_mark', mark: 'done' });
+  await w.press({ type: 'warmup_mark', mark: 'edit' });
+  await w.type('x');
+  await w.press({ type: 'back' });
+  await w.press({ type: 'back' });
   await w.press({ type: 'warmup', variant: 'full' });
+  await w.press({ type: 'warmup_comment' });
+  await w.type('tired');
+  await w.press({ type: 'reps_set', reps: 6 });
+  await w.press({ type: 'undo' });
   await w.type('x');
   await w.press({ type: 'reps_set', reps: 7 });
   await w.press({ type: 'comment' });
@@ -169,6 +179,7 @@ Deno.test('английский: ни одного русского слова �
   await w.press({ type: 'cancel_answer', confirm: true });
   await w.command('cancel');
   await w.command('stats');
+  await w.command('undo');
 
   // Название языка — на нём самом (кнопка «Русский»), это не утечка.
   const known = [...(await programStrings()), 'Русский'];

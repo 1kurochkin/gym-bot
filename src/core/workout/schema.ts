@@ -9,10 +9,14 @@ import { LbSchema } from '../units/lb.ts';
 export const WorkoutStatusSchema = z.enum(['in_progress', 'completed', 'aborted']);
 export type WorkoutStatus = z.infer<typeof WorkoutStatusSchema>;
 
+/** Записанный подход в порядке записи; skipped — разминочный подход, отмеченный «Пропустить». */
 export const LoggedSetSchema = z.object({
+  id: z.string(),
   kind: SetKindSchema,
+  index: z.number().int().positive(),
   weightLb: LbSchema.nullable(),
   reps: z.number().int().positive(),
+  skipped: z.boolean(),
 }).readonly();
 export type LoggedSet = z.infer<typeof LoggedSetSchema>;
 
@@ -76,6 +80,7 @@ export type NewExerciseLog = z.infer<typeof NewExerciseLogSchema>;
 export const ExerciseLogPatchSchema = z.object({
   status: ExerciseLogStatusSchema.optional(),
   warmupVariant: WarmupVariantSchema.optional(),
+  warmupComment: z.string().optional(),
   comment: z.string().optional(),
 }).readonly();
 
@@ -92,5 +97,7 @@ export const NewSetSchema = z.object({
   plannedReps: z.number().int().positive().nullable(),
   weightLb: LbSchema.nullable(),
   reps: z.number().int().positive(),
+  /** Разминочный подход отмечен «Пропустить»: записан для анализа, в подходы не входит. */
+  skipped: z.boolean(),
 }).readonly();
 export type NewSet = z.infer<typeof NewSetSchema>;

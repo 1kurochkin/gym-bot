@@ -34,6 +34,10 @@ const SIMPLE_CODES = {
   exercise_skip: 'ek',
   comment: 'cm',
   workout_done: 'wd',
+  warmup_diff: 'wf',
+  warmup_comment: 'wc',
+  back: 'bk',
+  undo: 'un',
 } as const;
 
 /** Коды действий с одним параметром: «bs:45», «sp:calves». */
@@ -53,6 +57,7 @@ const PARAM_CODES = {
   lang_set: 'lg',
   member_pick: 'mp',
   revoke_answer: 'ra',
+  warmup_mark: 'wm',
 } as const;
 
 function encodeAction(a: Action): string {
@@ -72,6 +77,10 @@ function encodeAction(a: Action): string {
     case 'exercise_skip':
     case 'comment':
     case 'workout_done':
+    case 'warmup_diff':
+    case 'warmup_comment':
+    case 'back':
+    case 'undo':
       return SIMPLE_CODES[a.type];
     case 'day_pick':
       return `${PARAM_CODES[a.type]}:${a.dayId}`;
@@ -100,6 +109,8 @@ function encodeAction(a: Action): string {
       return `${PARAM_CODES[a.type]}:${a.exerciseId}`;
     case 'lang_set':
       return `${PARAM_CODES[a.type]}:${a.language}`;
+    case 'warmup_mark':
+      return `${PARAM_CODES[a.type]}:${a.mark}`;
   }
 }
 
@@ -141,6 +152,8 @@ function rawAction(code: string): Record<string, unknown> | null {
       return { type, userId: Number(value) };
     case 'lang_set':
       return { type, language: value };
+    case 'warmup_mark':
+      return { type, mark: value };
     default:
       return { type, lb: Number(value) };
   }

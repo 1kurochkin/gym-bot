@@ -62,7 +62,9 @@ export type WorkoutWrite = Extract<
       | 'comment_workout'
       | 'open_exercise_log'
       | 'patch_exercise_log'
-      | 'record_set';
+      | 'record_set'
+      | 'delete_sets'
+      | 'delete_exercise_log';
   }
 >;
 
@@ -73,6 +75,8 @@ const WORKOUT_WRITES: ReadonlySet<string> = new Set([
   'open_exercise_log',
   'patch_exercise_log',
   'record_set',
+  'delete_sets',
+  'delete_exercise_log',
 ]);
 
 export const isWorkoutWrite = (e: Effect): e is WorkoutWrite => WORKOUT_WRITES.has(e.type);

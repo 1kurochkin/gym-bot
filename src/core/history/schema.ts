@@ -31,6 +31,8 @@ export const LastResultSchema = z.object({
   reps: z.number().int().positive(),
   source: LogSourceSchema,
   comment: z.string().nullable(),
+  /** Комментарий к разминке той же записи: показывается на экране разминки (§6.5). */
+  warmupComment: z.string().nullable(),
 }).readonly();
 export type LastResult = z.infer<typeof LastResultSchema>;
 

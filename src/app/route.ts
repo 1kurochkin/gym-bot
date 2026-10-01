@@ -71,6 +71,9 @@ export function render(view: View, lang: Language, env: RenderEnv): Rendered {
     case 'workout_intensity':
     case 'workout_card':
     case 'workout_warmup':
+    case 'workout_warmup_mark':
+    case 'workout_warmup_comment_prompt':
+    case 'workout_undo_nothing':
     case 'workout_reps':
     case 'workout_after_set':
     case 'workout_comment_prompt':

@@ -6,7 +6,7 @@ import { SettingsSectionSchema } from '../core/settings/options.ts';
 import { LanguageSchema } from '../core/settings/settings.ts';
 import { WarmupVariantSchema } from '../core/history/schema.ts';
 import { IntensitySchema } from '../core/program/schema.ts';
-import { FileProblemSchema, ResumeChoiceSchema } from '../core/session/types.ts';
+import { FileProblemSchema, ResumeChoiceSchema, WarmupMarkSchema } from '../core/session/types.ts';
 import { LbSchema } from '../core/units/lb.ts';
 
 /**
@@ -36,6 +36,11 @@ export const ActionSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('intensity_set'), intensity: IntensitySchema }).readonly(),
   z.object({ type: z.literal('weight_set'), lb: LbSchema }).readonly(),
   z.object({ type: z.literal('warmup'), variant: WarmupVariantSchema }).readonly(),
+  z.object({ type: z.literal('warmup_diff') }).readonly(),
+  z.object({ type: z.literal('warmup_mark'), mark: WarmupMarkSchema }).readonly(),
+  z.object({ type: z.literal('warmup_comment') }).readonly(),
+  z.object({ type: z.literal('back') }).readonly(),
+  z.object({ type: z.literal('undo') }).readonly(),
   z.object({ type: z.literal('reps_set'), reps: z.number().int().min(1).max(100) }).readonly(),
   z.object({ type: z.literal('set_more') }).readonly(),
   z.object({ type: z.literal('exercise_next') }).readonly(),
