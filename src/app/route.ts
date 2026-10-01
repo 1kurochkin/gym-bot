@@ -1,5 +1,6 @@
 import { parseTimeZone } from '../core/schedule/timezone.ts';
 import type { BotEvent, View } from '../core/session/types.ts';
+import type { Language } from '../core/settings/settings.ts';
 import { toEvent as onboardingEvent } from '../features/onboarding/handlers.ts';
 import { renderView as renderOnboarding } from '../features/onboarding/views.ts';
 import { KNOWN_COMMANDS } from '../features/help/commands.ts';
@@ -34,13 +35,13 @@ export async function routeEvent(input: Incoming, zoneAt: ZoneLocator): Promise<
     onboardingEvent(input);
 }
 
-/** Экран → текст и кнопки фичи, которой он принадлежит. */
-export function render(view: View): Rendered {
+/** Экран → текст и кнопки фичи, которой он принадлежит, на языке пользователя. */
+export function render(view: View, lang: Language): Rendered {
   switch (view.type) {
     case 'ask_time':
     case 'pick_zone':
     case 'home':
-      return renderOnboarding(view);
+      return renderOnboarding(view, lang);
     case 'program_status':
     case 'program_invalid':
     case 'program_confirm':
@@ -48,19 +49,20 @@ export function render(view: View): Rendered {
     case 'program_unchanged':
     case 'program_cancelled':
     case 'program_file_rejected':
-      return renderProgramView(view);
+      return renderProgramView(view, lang);
     case 'seed_prompt':
     case 'seed_done':
     case 'needs_program':
-      return renderSeedView(view);
+      return renderSeedView(view, lang);
     case 'unknown_command':
-      return renderHelpView(view);
+      return renderHelpView(view, lang);
     case 'settings_menu':
     case 'settings_bar':
     case 'settings_plates':
     case 'settings_steps':
     case 'settings_step_edit':
-      return renderSettingsView(view);
+    case 'settings_language':
+      return renderSettingsView(view, lang);
     case 'workout_days':
     case 'workout_resume':
     case 'workout_intensity':
@@ -74,7 +76,7 @@ export function render(view: View): Rendered {
     case 'workout_commented':
     case 'workout_cancelled':
     case 'workout_none':
-      return renderWorkoutView(view);
+      return renderWorkoutView(view, lang);
     default:
       return assertNever(view);
   }

@@ -35,6 +35,8 @@ export const settings = pgTable('settings', {
   barWeightLb: integer('bar_weight_lb').notNull().default(45),
   platesLb: jsonb('plates_lb').$type<unknown>().notNull(),
   exerciseOverrides: jsonb('exercise_overrides').$type<unknown>().notNull().default({}),
+  /** ru | en; null — по языку Telegram. */
+  language: text('language'),
   activeProgramId: uuid('active_program_id'),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 }).enableRLS();

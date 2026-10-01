@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { TimeZoneSchema } from '../core/schedule/timezone.ts';
 import { IdSchema } from '../core/program/schema.ts';
 import { SettingsSectionSchema } from '../core/settings/options.ts';
+import { LanguageSchema } from '../core/settings/settings.ts';
 import { WarmupVariantSchema } from '../core/history/schema.ts';
 import { IntensitySchema } from '../core/program/schema.ts';
 import { FileProblemSchema, ResumeChoiceSchema } from '../core/session/types.ts';
@@ -28,6 +29,7 @@ export const ActionSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('step_pick'), exerciseId: IdSchema }).readonly(),
   z.object({ type: z.literal('step_set'), lb: LbSchema }).readonly(),
   z.object({ type: z.literal('step_reset') }).readonly(),
+  z.object({ type: z.literal('lang_set'), language: LanguageSchema }).readonly(),
   z.object({ type: z.literal('day_pick'), dayId: IdSchema }).readonly(),
   z.object({ type: z.literal('resume'), choice: ResumeChoiceSchema }).readonly(),
   z.object({ type: z.literal('intensity_set'), intensity: IntensitySchema }).readonly(),
@@ -85,7 +87,10 @@ export type Button = z.infer<typeof ButtonSchema>;
  * Нижняя (reply) клавиатура: кнопка «отправить геопозицию» или её удаление.
  * Такое сообщение всегда отправляется новым: reply-клавиатуру нельзя повесить при редактировании.
  */
-export const ReplyKeyboardSchema = z.enum(['request_location', 'remove']);
+export const ReplyKeyboardSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('request_location'), label: z.string() }).readonly(),
+  z.object({ kind: z.literal('remove') }).readonly(),
+]);
 export type ReplyKeyboard = z.infer<typeof ReplyKeyboardSchema>;
 
 export const RenderedSchema = z.object({

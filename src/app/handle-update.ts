@@ -1,4 +1,4 @@
-import type { Settings } from '../core/settings/settings.ts';
+import { languageFor, type Settings } from '../core/settings/settings.ts';
 import { step } from '../core/session/step.ts';
 import type { Clock } from '../ports/clock.ts';
 import type { ZoneLocator } from '../ports/geo.ts';
@@ -87,9 +87,11 @@ export async function handleUpdate(deps: UpdateDeps, update: IncomingUpdate): Pr
       : undefined,
   });
 
+  // Язык — по настройкам после шага: выбор языка в /settings сразу виден на ответе.
+  const lang = languageFor((newSettings ?? settings).language, update.languageCode);
   for (const e of result.effects) {
     if (e.type !== 'render') continue;
     const messageId = input.kind === 'callback' ? update.messageId : null;
-    await deps.ui.show(update.chatId, render(e.view), result.state.stepNo, messageId);
+    await deps.ui.show(update.chatId, render(e.view, lang), result.state.stepNo, messageId);
   }
 }

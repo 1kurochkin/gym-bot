@@ -27,6 +27,8 @@ export function toEvent(input: Incoming): BotEvent | null {
       return { type: 'step_chosen', lb: a.lb };
     case 'step_reset':
       return { type: 'step_reset' };
+    case 'lang_set':
+      return { type: 'language_chosen', language: a.language };
     default:
       return null;
   }

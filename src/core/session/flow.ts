@@ -1,4 +1,4 @@
-import { formatZoneLabel, type TimeZone } from '../schedule/timezone.ts';
+import { type TimeZone, zoneLabel } from '../schedule/timezone.ts';
 import {
   type Effect,
   emptyContext,
@@ -35,7 +35,7 @@ export const withEffects = (result: StepResult, effects: readonly Effect[]): Ste
 export function home(state: Session, zone: TimeZone, ctx: StepContext): StepResult {
   return moveTo(state, SessionStepSchema.enum.idle, {
     type: 'home',
-    timezoneLabel: formatZoneLabel(zone, ctx.now),
+    zone: zoneLabel(zone, ctx.now),
     programName: ctx.activeProgram?.name ?? null,
   });
 }

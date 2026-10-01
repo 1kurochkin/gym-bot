@@ -1,11 +1,11 @@
 import {
   candidateZones,
   formatOffset,
-  formatZoneLabel,
   offsetFromLocalTime,
   parseClockTime,
   parseTimeZone,
   type TimeZone,
+  zoneLabel,
 } from '../schedule/timezone.ts';
 import { home, moveTo, withEffects } from './flow.ts';
 import { settingsMenu } from './settings.ts';
@@ -67,6 +67,6 @@ export function onTimeEntered(state: Session, text: string, ctx: StepContext): S
   return moveTo(state, onboarding_tz_pick, {
     type: 'pick_zone',
     offsetLabel: formatOffset(offset),
-    options: zones.map((zone) => ({ zone, label: formatZoneLabel(zone, ctx.now) })),
+    options: zones.map((zone) => ({ zone, label: zoneLabel(zone, ctx.now) })),
   }, keepReturn(state));
 }

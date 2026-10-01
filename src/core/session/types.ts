@@ -16,9 +16,9 @@ import { SetInputErrorSchema } from '../input/set-input.ts';
 import { ProgramIssueSchema, ProgramSummarySchema } from '../program/program.ts';
 import { IntensitySchema, ProgramSchema } from '../program/schema.ts';
 import { SettingsSectionSchema, StepSourceSchema } from '../settings/options.ts';
-import { SettingsSchema } from '../settings/settings.ts';
+import { LanguageSchema, SettingsSchema } from '../settings/settings.ts';
 import { LbSchema } from '../units/lb.ts';
-import { TimeInputErrorSchema, TimeZoneSchema } from '../schedule/timezone.ts';
+import { TimeInputErrorSchema, TimeZoneSchema, ZoneLabelSchema } from '../schedule/timezone.ts';
 
 /** Шаг диалога. Новые ветки диалога добавляются сюда и в step(). */
 export const SessionStepSchema = z.enum([
@@ -33,6 +33,7 @@ export const SessionStepSchema = z.enum([
   'settings_plates',
   'settings_steps',
   'settings_step_edit',
+  'settings_language',
   'workout_day',
   'workout_resume',
   'workout_intensity',
@@ -139,6 +140,7 @@ export const BotEventSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('step_exercise_picked'), exerciseId: z.string() }).readonly(),
   z.object({ type: z.literal('step_chosen'), lb: LbSchema }).readonly(),
   z.object({ type: z.literal('step_reset') }).readonly(),
+  z.object({ type: z.literal('language_chosen'), language: LanguageSchema }).readonly(),
   z.object({ type: z.literal('workout_requested') }).readonly(),
   z.object({ type: z.literal('day_chosen'), dayId: z.string() }).readonly(),
   z.object({ type: z.literal('resume_chosen'), choice: ResumeChoiceSchema }).readonly(),
@@ -156,7 +158,7 @@ export const BotEventSchema = z.discriminatedUnion('type', [
 ]);
 export type BotEvent = z.infer<typeof BotEventSchema>;
 
-export const TimeZoneOptionSchema = z.object({ zone: TimeZoneSchema, label: z.string() })
+export const TimeZoneOptionSchema = z.object({ zone: TimeZoneSchema, label: ZoneLabelSchema })
   .readonly();
 export type TimeZoneOption = z.infer<typeof TimeZoneOptionSchema>;
 
@@ -182,7 +184,7 @@ export const ViewSchema = z.discriminatedUnion('type', [
   }).readonly(),
   z.object({
     type: z.literal('home'),
-    timezoneLabel: z.string(),
+    zone: ZoneLabelSchema,
     programName: z.string().nullable(),
   }).readonly(),
   z.object({ type: z.literal('program_status'), current: ProgramSummarySchema.nullable() })
@@ -220,11 +222,12 @@ export const ViewSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('unknown_command'), name: z.string() }).readonly(),
   z.object({
     type: z.literal('settings_menu'),
-    timezoneLabel: z.string().nullable(),
+    zone: ZoneLabelSchema.nullable(),
     barLb: LbSchema,
     platesLb: z.array(LbSchema).readonly(),
     barStepLb: LbSchema,
     overrides: z.number().int().nonnegative(),
+    language: LanguageSchema,
     saved: z.boolean(),
   }).readonly(),
   z.object({ type: z.literal('settings_bar'), currentLb: LbSchema, invalid: z.boolean() })
@@ -253,6 +256,7 @@ export const ViewSchema = z.discriminatedUnion('type', [
     source: StepSourceSchema,
     invalid: z.boolean(),
   }).readonly(),
+  z.object({ type: z.literal('settings_language'), selected: LanguageSchema }).readonly(),
   z.object({
     type: z.literal('workout_days'),
     last: LastWorkoutSchema.nullable(),

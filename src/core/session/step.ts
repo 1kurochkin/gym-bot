@@ -29,6 +29,7 @@ import {
 import {
   backToSettings,
   chooseBar,
+  chooseLanguage,
   closeSettings,
   openSection,
   openSettings,
@@ -110,6 +111,8 @@ function transition(state: Session, event: BotEvent, ctx: StepContext): StepResu
       return setStep(state, ctx, event.lb);
     case 'step_reset':
       return setStep(state, ctx, null);
+    case 'language_chosen':
+      return chooseLanguage(state, ctx, event.language);
     case 'workout_requested':
       return requestWorkout(state, ctx);
     case 'day_chosen':
@@ -164,6 +167,7 @@ function onText(state: Session, text: string, ctx: StepContext): StepResult {
     case S.settings_plates:
     case S.settings_steps:
     case S.settings_step_edit:
+    case S.settings_language:
       return settingsText(state, ctx, text);
     case S.workout_day:
     case S.workout_resume:

@@ -27,7 +27,7 @@ const upd = (input: Incoming, messageId: number | null = null): IncomingUpdate =
   userId: 1,
   chatId: 1,
   messageId,
-  languageCode: 'en',
+  languageCode: 'ru',
   input,
 });
 const start: Incoming = { kind: 'command', name: 'start', args: '' };
@@ -41,7 +41,11 @@ Deno.test('онбординг: /start → время → кнопка зоны �
   await handleUpdate(deps, upd({ kind: 'callback', action: { type: 'tz', zone }, stepNo }, 55));
 
   assertEquals(store.settings.get(1)?.timezone, zone);
-  assertEquals(ui.shown.map((s) => s.rendered.replyKeyboard), ['request_location', null, 'remove']);
+  assertEquals(ui.shown.map((s) => s.rendered.replyKeyboard?.kind ?? null), [
+    'request_location',
+    null,
+    'remove',
+  ]);
   assertEquals(ui.shown[1]?.rendered.keyboard.length, 4, '3 города + фиксированное смещение');
   assertEquals(ui.shown[2]?.rendered.text.split('\n')[0], 'Часовой пояс: UTC−4 · New York');
   assertEquals(ui.shown[2]?.messageId, 55);
