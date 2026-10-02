@@ -1,5 +1,5 @@
 import { Bot, type Context, InlineKeyboard, Keyboard } from 'grammy';
-import type { UserFromGetMe } from 'grammy/types';
+import type { MessageEntity, UserFromGetMe } from 'grammy/types';
 import { FileProblemSchema } from '../../core/session/types.ts';
 import type { IncomingUpdate, Rendered, Ui } from '../../ports/ui.ts';
 import { decodeCallback, encodeCallback } from './callback.ts';
@@ -132,25 +132,42 @@ export function createTelegramUi(bot: Bot): Ui {
         const reply_markup = rendered.replyKeyboard.kind === 'remove'
           ? { remove_keyboard: true as const }
           : new Keyboard().requestLocation(rendered.replyKeyboard.label).resized().oneTime();
-        await bot.api.sendMessage(chatId, rendered.text, { reply_markup });
+        await bot.api.sendMessage(chatId, rendered.text, {
+          reply_markup,
+          entities: bold(rendered),
+        });
         return;
       }
       const reply_markup = toKeyboard(rendered, stepNo);
       if (messageId !== null) {
         try {
-          await bot.api.editMessageText(chatId, messageId, rendered.text, { reply_markup });
+          await bot.api.editMessageText(chatId, messageId, rendered.text, {
+            reply_markup,
+            entities: bold(rendered),
+          });
           return;
         } catch (e) {
           // Тот же текст — редактировать нечего; иначе сообщение слишком старое, отправим новое.
           if (String(e).includes('message is not modified')) return;
         }
       }
-      await bot.api.sendMessage(chatId, rendered.text, { reply_markup });
+      await bot.api.sendMessage(chatId, rendered.text, { reply_markup, entities: bold(rendered) });
     },
     async dropKeyboard(chatId, messageId): Promise<void> {
       await bot.api.editMessageReplyMarkup(chatId, messageId).catch(() => {});
     },
   };
+}
+
+/**
+ * Жирные фрагменты — разметкой Telegram (entities), а не HTML: тексту из программы не нужно
+ * экранирование. Смещения в UTF-16, как и индексы строк JS.
+ */
+export function bold(rendered: Rendered): MessageEntity[] {
+  return (rendered.bold ?? []).flatMap((part) => {
+    const offset = part ? rendered.text.indexOf(part) : -1;
+    return offset < 0 ? [] : [{ type: 'bold' as const, offset, length: part.length }];
+  });
 }
 
 function toKeyboard(rendered: Rendered, stepNo: number): InlineKeyboard {

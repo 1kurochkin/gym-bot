@@ -26,14 +26,14 @@ Deno.test('«Отметить отличия»: готово, изменить, 
   await pressAt195(w);
   assert(w.buttons().includes('✏️ Отметить отличия'), w.buttons().join(' | '));
   await w.press({ type: 'warmup_diff' });
-  assertEquals(w.last(), 'Разминка 1/4: 85 × 8 (по 20)');
+  assertEquals(w.last(), 'Жим на наклонной\nРазминка 1/4: 85 × 8 (по 20)');
   assertEquals(w.buttons(), ['✅ Готово', '✏️ Изменить', '⏭ Пропустить', '← Назад']);
 
   await w.press({ type: 'warmup_mark', mark: 'done' });
   await w.press({ type: 'warmup_mark', mark: 'edit' });
   assertEquals(
     w.last(),
-    'Разминка 2/4: 135 × 5 (по 45)\nНапиши, что сделал: 4 — повторения, 135/4 — вес и повторения.',
+    'Жим на наклонной\nРазминка 2/4: 135 × 5 (по 45)\nНапиши, что сделал: 4 — повторения, 135/4 — вес и повторения.',
   );
   await w.type('4');
   await w.press({ type: 'warmup_mark', mark: 'skip' });
@@ -71,7 +71,10 @@ Deno.test('без отличий — вариант full; комментарий
 
   w.setNow('2026-10-06T22:40:00Z');
   await pressAt195(w);
-  assert(w.last().startsWith('💬 Прошлый раз: устал после разминки\nРазминка под 195'), w.last());
+  assert(
+    w.last().startsWith('Жим на наклонной\n💬 Прошлый раз: устал после разминки\nРазминка под 195'),
+    w.last(),
+  );
 });
 
 Deno.test('[← Назад]: отметка → предыдущая, разминка → выбор веса, первый подход → разминка', async () => {
@@ -80,16 +83,16 @@ Deno.test('[← Назад]: отметка → предыдущая, разми
   await w.press({ type: 'warmup_diff' });
   await w.press({ type: 'warmup_mark', mark: 'done' });
   await w.press({ type: 'back' });
-  assertEquals(w.last(), 'Разминка 1/4: 85 × 8 (по 20)');
+  assertEquals(w.last(), 'Жим на наклонной\nРазминка 1/4: 85 × 8 (по 20)');
   assertEquals(warmupSets(w), [], 'отметка первого подхода снята');
   await w.press({ type: 'back' });
-  assert(w.last().startsWith('Разминка под 195'), 'с первой отметки — к разминке');
+  assert(w.last().includes('\nРазминка под 195'), 'с первой отметки — к разминке');
 
   await w.press({ type: 'warmup', variant: 'full' });
   assertEquals(warmupSets(w).length, 4);
   assert(w.buttons().includes('← Назад'));
   await w.press({ type: 'back' });
-  assert(w.last().startsWith('Разминка под 195'), w.last());
+  assert(w.last().includes('\nРазминка под 195'), w.last());
   assertEquals(warmupSets(w), [], 'разминка снята');
   assertEquals(pressLog(w)?.warmupVariant, 'none');
 
@@ -97,19 +100,19 @@ Deno.test('[← Назад]: отметка → предыдущая, разми
   assert(w.last().startsWith('🏋️ Жим на наклонной (1/4)'), 'к выбору веса');
   assertEquals(pressLog(w), undefined, 'запись упражнения удалена');
   await w.type('185');
-  assert(w.last().startsWith('Разминка под 185'), 'вес выбирается заново');
+  assert(w.last().includes('\nРазминка под 185'), 'вес выбирается заново');
 });
 
-Deno.test('[✏️ Исправить] и /undo: последний подход удаляется, бот ждёт его снова', async () => {
+Deno.test('[← Назад] после подхода и /undo: последний подход удаляется, бот ждёт его снова', async () => {
   const w = await world();
   await pressAt195(w);
   await w.press({ type: 'warmup', variant: 'none' });
   await w.press({ type: 'reps_set', reps: 7 });
-  assert(w.buttons().includes('✏️ Исправить'));
-  await w.press({ type: 'undo' });
+  assert(w.buttons().includes('← Назад'));
+  await w.press({ type: 'back' });
   assertEquals(workSets(w), []);
   assertEquals(
-    w.last().split('\n').slice(0, 2),
+    w.last().split('\n').slice(1, 3),
     ['↩️ Удалил 195 × 7.', 'Рабочий подход 1: 195 × ? (по 75)'],
   );
   await w.type('185/8');
@@ -142,7 +145,7 @@ Deno.test('/undo: разминка без рабочих подходов сни
   await w.press({ type: 'warmup', variant: 'full' });
   await w.send({ kind: 'command', name: 'undo', args: '' });
   assertEquals(warmupSets(w), []);
-  assert(w.last().startsWith('Разминка под 195'), w.last());
+  assert(w.last().includes('\nРазминка под 195'), w.last());
 });
 
 Deno.test('без штанги вес на сторону не показывается', async () => {

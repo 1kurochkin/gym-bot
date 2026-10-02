@@ -118,6 +118,8 @@ export type ReplyKeyboard = z.infer<typeof ReplyKeyboardSchema>;
 
 export const RenderedSchema = z.object({
   text: z.string(),
+  /** Фрагменты text, которые показать жирным (первое вхождение каждого); без разметки в тексте. */
+  bold: z.array(z.string()).readonly().optional(),
   keyboard: z.array(z.array(ButtonSchema).readonly()).readonly(),
   replyKeyboard: ReplyKeyboardSchema.nullable(),
 }).readonly();

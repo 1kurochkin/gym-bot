@@ -16,7 +16,7 @@ Deno.test('полный день: жим с разминкой и коммент
   assert(w.last().includes('Прошлого раза нет.'));
   await w.type('195');
   assertEquals(
-    w.last().split('\n').slice(0, 5),
+    w.last().split('\n').slice(1, 6),
     [
       'Разминка под 195 × 6–8:',
       '1. 85 × 8 (по 20)',
@@ -30,7 +30,7 @@ Deno.test('полный день: жим с разминкой и коммент
   assert(w.last().includes('Рабочий подход 1: 195 × ?'));
   assertEquals(w.buttons().slice(0, 6), ['5', '6', '7', '8', '9', '10']);
   await w.press({ type: 'reps_set', reps: 7 });
-  assert(w.last().startsWith('Записал 195 × 7.'));
+  assert(w.last().includes('\nЗаписал 195 × 7.'));
   await w.press({ type: 'comment' });
   await w.type('плечо ок');
   assert(w.last().includes('💬 Комментарий сохранён.'));
@@ -38,7 +38,7 @@ Deno.test('полный день: жим с разминкой и коммент
   await w.press({ type: 'exercise_next' });
   assert(w.last().includes('Подход 1 — 80% от отказа'), 'пресс — сразу к подходам с целью');
   await w.type('20');
-  assert(w.last().startsWith('Записал × 20.\nПодход 2 — 90% от отказа'), w.last());
+  assert(w.last().includes('\nЗаписал × 20.\nПодход 2 — 90% от отказа'), w.last());
   await w.type('18');
   await w.press({ type: 'reps_set', reps: 15 });
   await w.press({ type: 'exercise_next' });
@@ -155,7 +155,7 @@ Deno.test('продолжение: та же тренировка с того ж
   await w.send(workout);
   assertEquals(w.last(), 'Продолжить тренировку от 18:40 (Жим на наклонной, 1 из 4 упражнений)?');
   await w.press({ type: 'resume', choice: 'continue' });
-  assert(w.last().startsWith('Записал 195 × 7.'), 'вернулись к экрану после подхода');
+  assert(w.last().includes('\nЗаписал 195 × 7.'), 'вернулись к экрану после подхода');
   await w.press({ type: 'exercise_next' });
   assert(w.last().includes('Подход 1 — 80% от отказа'));
 
@@ -187,7 +187,7 @@ Deno.test('/cancel: подтверждение, записанное сохра�
   await w.type('195x7');
   await w.send({ kind: 'command', name: 'cancel', args: '' });
   await w.press({ type: 'cancel_answer', confirm: false });
-  assert(w.last().startsWith('Записал 195 × 7.'), '«Продолжить» — назад к тренировке');
+  assert(w.last().includes('\nЗаписал 195 × 7.'), '«Продолжить» — назад к тренировке');
   await w.send({ kind: 'command', name: 'cancel', args: '' });
   await w.press({ type: 'cancel_answer', confirm: true });
   assertEquals(w.last(), 'Тренировка прервана, записанное сохранено. Новая — /workout');
@@ -200,7 +200,7 @@ Deno.test('в карточке «185x7» — сразу рабочий подх�
   await w.send(workout);
   await w.press({ type: 'day_pick', dayId: 'tue' });
   await w.type('185x7');
-  assert(w.last().startsWith('Записал 185 × 7.'), w.last());
+  assert(w.last().includes('\nЗаписал 185 × 7.'), w.last());
   const log = w.store.logs.find((l) => l.exerciseId === 'incline_press');
   assertEquals([log?.plannedWorkWeightLb, log?.warmupVariant], [lb(185), 'none']);
 });
@@ -211,7 +211,7 @@ Deno.test('брусья: допвес, разминка от допвеса со
   await w.press({ type: 'day_pick', dayId: 'thu' });
   assert(w.last().includes('Допвес сегодня?'));
   await w.type('+25');
-  assertEquals(w.last().split('\n').slice(0, 5), [
+  assertEquals(w.last().split('\n').slice(1, 6), [
     'Разминка под +25 × 6–8:',
     '1. свой вес × 10',
     '2. +10 × 5',
@@ -220,5 +220,5 @@ Deno.test('брусья: допвес, разминка от допвеса со
   ]);
   await w.press({ type: 'warmup', variant: 'none' });
   await w.type('8');
-  assert(w.last().startsWith('Записал +25 × 8.'));
+  assert(w.last().includes('\nЗаписал +25 × 8.'));
 });

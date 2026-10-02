@@ -200,7 +200,7 @@ export const BotEventSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('replace_chosen'), exerciseId: z.string() }).readonly(),
   z.object({ type: z.literal('reorder_requested') }).readonly(),
   z.object({ type: z.literal('reorder_chosen'), index: z.number().int().nonnegative() }).readonly(),
-  /** [← Назад] до первого рабочего подхода. */
+  /** [← Назад]: отменить последнее действие и вернуться на предыдущий экран тренировки. */
   z.object({ type: z.literal('back_pressed') }).readonly(),
   /** /undo и [✏️ Исправить]: удалить последний записанный подход. */
   z.object({ type: z.literal('undo_requested') }).readonly(),
@@ -435,8 +435,6 @@ export const ViewSchema = z.discriminatedUnion('type', [
     perSideLb: LbSchema.nullable(),
     /** /undo или [✏️ Исправить]: что удалено перед этим вводом. */
     undone: SetViewSchema.nullable(),
-    /** [← Назад]: до первого рабочего подхода. */
-    canBack: z.boolean(),
     /** [💬 К разминке]: первый подход сразу после отмеченной разминки. */
     canCommentWarmup: z.boolean(),
     /** [🔄 Заменить] и [🔀 Другое упражнение] — у упражнений без карточки (reps_only) до первого подхода. */
