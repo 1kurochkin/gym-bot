@@ -24,9 +24,11 @@ export const WorkoutLogSchema = z.object({
   id: z.string(),
   exerciseId: z.string(),
   exerciseName: z.string(),
-  /** Замена: id упражнения программы, вместо которого сделано это (US-4). */
+  /** Замена (до меню дня): id упражнения программы, вместо которого сделано это. */
   substitutedFor: z.string().nullable(),
   status: ExerciseLogStatusSchema,
+  /** Нажато «Завершить упражнение» (✅ в меню дня). */
+  finishedAt: z.date().nullable(),
   plannedWorkWeightLb: LbSchema.nullable(),
   sets: z.array(LoggedSetSchema).readonly(),
 }).readonly();
@@ -86,6 +88,8 @@ export const ExerciseLogPatchSchema = z.object({
   warmupVariant: WarmupVariantSchema.optional(),
   warmupComment: z.string().optional(),
   comment: z.string().optional(),
+  /** «Завершить упражнение» (✅ в меню дня). */
+  finishedAt: z.date().optional(),
 }).readonly();
 
 export type ExerciseLogPatch = z.infer<typeof ExerciseLogPatchSchema>;

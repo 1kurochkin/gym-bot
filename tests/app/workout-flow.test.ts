@@ -1,90 +1,141 @@
 import { assert, assertEquals } from '@std/assert';
+import { bold } from '../../src/adapters/telegram/bot.ts';
 import { lb } from '../../src/core/units/lb.ts';
 import type { Incoming } from '../../src/ports/ui.ts';
-import { workout, world } from '../support/world.ts';
+import { workout, type World, world } from '../support/world.ts';
 
-/** US-2…US-5 (.specs/product.md): тренировка через весь цикл апдейта, программа владельца из спеки. */
+/**
+ * US-2…US-5 (.specs/product.md): тренировка — меню дня. Программа владельца из спеки;
+ * вторник — жим, пресс, шея: сгибания, шея: разгибания.
+ */
 
-Deno.test('полный день: жим с разминкой и комментарием, пресс, шея, пропуск, сводка', async () => {
+const open = (w: World, exerciseId: string): Promise<void> =>
+  w.press({ type: 'menu_pick', exerciseId });
+const finishExercise = (w: World): Promise<void> => w.press({ type: 'exercise_finish' });
+const lines = (w: World): string[] => w.last().split('\n');
+
+async function tuesday(w: World): Promise<void> {
+  await w.send(workout);
+  await w.press({ type: 'day_pick', dayId: 'tue' });
+}
+
+Deno.test('день → меню; ▶ следующее; ✅ ◐ ▫️; сводка по меню', async () => {
   const w = await world();
   await w.send(workout);
   assertEquals(w.last(), 'Выбери день:');
   assertEquals(w.buttons()[0], '▶ Фронтальный присед', 'истории нет — первый день');
   await w.press({ type: 'day_pick', dayId: 'tue' });
-
-  assert(w.last().startsWith('🏋️ Жим на наклонной (1/4)\nЦель: 1 рабочий × 6–8'), w.last());
-  assert(w.last().includes('Прошлого раза нет.'));
-  await w.type('195');
-  assertEquals(
-    w.last().split('\n').slice(1, 6),
-    [
-      'Разминка под 195 × 6–8:',
-      '1. 85 × 8 (по 20)',
-      '2. 135 × 5 (по 45)',
-      '3. 165 × 3 (по 60)',
-      '4. 205 × 1 (по 80) перегруз',
-    ],
-    'ровно разминка из таблицы 6.2',
-  );
-  await w.press({ type: 'warmup', variant: 'full' });
-  assert(w.last().includes('Рабочий подход 1: 195 × ?'));
-  assertEquals(w.buttons().slice(0, 6), ['5', '6', '7', '8', '9', '10']);
-  await w.press({ type: 'reps_set', reps: 7 });
-  assert(w.last().includes('\nЗаписал 195 × 7.'));
-  await w.press({ type: 'comment' });
-  await w.type('плечо ок');
-  assert(w.last().includes('💬 Комментарий сохранён.'));
-
-  await w.press({ type: 'exercise_next' });
-  assert(w.last().includes('Подход 1 — 80% от отказа'), 'пресс — сразу к подходам с целью');
-  await w.type('20');
-  assert(w.last().includes('\nЗаписал × 20.\nПодход 2 — 90% от отказа'), w.last());
-  await w.type('18');
-  await w.press({ type: 'reps_set', reps: 15 });
-  await w.press({ type: 'exercise_next' });
-
-  assert(w.last().startsWith('🏋️ Шея: сгибания (3/4)'));
-  await w.type('10');
-  assert(w.last().includes('Рабочий подход 1: 10 × ?'), 'шея без разминки');
-  await w.type('15');
-  await w.type('15');
-  await w.press({ type: 'exercise_next' });
-  assert(w.last().startsWith('🏋️ Шея: разгибания (4/4)'));
-  await w.press({ type: 'exercise_skip' });
-
-  assertEquals(w.last().split('\n'), [
-    'Тренировка завершена: Жим на наклонной, 30.09, 0 мин',
-    'Жим на наклонной: 195 × 7',
-    'Пресс: 20 / 18 / 15',
-    'Шея: сгибания: 10 × 15, 10 × 15',
-    'Шея: разгибания: пропущено',
+  assertEquals(lines(w), [
+    'Жим на наклонной · 30.09',
+    '▫️ Жим на наклонной',
+    '▫️ Пресс',
+    '▫️ Шея: сгибания',
+    '▫️ Шея: разгибания',
   ]);
-  const [wo] = [...w.store.workouts.values()];
-  assertEquals(wo?.status, 'completed');
-  assertEquals(w.store.sets.length, 4 + 1 + 3 + 2, 'разминка 4 + жим 1 + пресс 3 + шея 2');
+  assertEquals(w.buttons(), [
+    '▶ Жим на наклонной',
+    '▫️ Пресс',
+    '▫️ Шея: сгибания',
+    '▫️ Шея: разгибания',
+    '➕ Добавить упражнение',
+    '💬 Комментарий',
+    '🏁 Завершить тренировку',
+    '← Назад',
+  ]);
+
+  await open(w, 'incline_press');
+  assertEquals(lines(w).slice(0, 4), [
+    '🏋️ Жим на наклонной 🏋️',
+    '',
+    'Цель: 1 рабочий × 6–8',
+    'Прошлого раза нет.',
+  ]);
+  assertEquals(w.ui.shown.at(-1)?.rendered.bold, ['Жим на наклонной']);
+  await w.type('195');
+  assertEquals(lines(w).slice(2, 7), [
+    'Разминка под 195 × 6–8:',
+    '1. 85 × 8 (по 20)',
+    '2. 135 × 5 (по 45)',
+    '3. 165 × 3 (по 60)',
+    '4. 205 × 1 (по 80) перегруз',
+  ], 'ровно разминка из таблицы 6.2');
+  assertEquals(w.buttons(), [
+    '✅ Готово',
+    '✏️ Изменить',
+    '💬 Комментарий',
+    '⏭ Пропустить',
+    '← Назад',
+  ]);
+  await w.press({ type: 'warmup', variant: 'full' });
+  assertEquals(lines(w).slice(2), [
+    'Рабочий подход №1 — 195 × ? (по 75)',
+    '✍️ Или напиши: 7 — повторения, 185/6 — другой вес и повторения.',
+  ]);
+  await w.press({ type: 'reps_set', reps: 7 });
+  assertEquals(lines(w).slice(2, 4), [
+    'Записал: 195 × 7',
+    'Рабочий подход №2 — 195 × ? (по 75) (сверх программы)',
+  ]);
+  assertEquals(
+    w.buttons().slice(0, 8),
+    ['4', '5', '6', '7', '8', '9', '10', '11'],
+    'подряд от 7−3',
+  );
+  await w.type('185/6');
+  assert(w.last().includes('Записал: 195 × 7, 185 × 6'), w.last());
+  await finishExercise(w);
+  assert(w.last().includes('✅ Жим на наклонной — 195 × 7, 185 × 6'), w.last());
+  assertEquals(w.buttons()[0], '▶ Пресс');
+
+  await open(w, 'abs');
+  assert(w.last().includes('Подход №1 — 80% от отказа'), 'пресс — сразу подходы с целью');
+  await w.type('20');
+  await w.type('18');
+  await w.press({ type: 'back' }); // просмотр подхода №2
+  await w.press({ type: 'back' }); // подход №1
+  await w.press({ type: 'back' }); // меню — пресс начат
+  assert(w.last().includes('◐ Пресс — 20 / 18'), w.last());
+
+  await w.press({ type: 'workout_finish' });
+  assertEquals(lines(w), [
+    'Тренировка завершена: Жим на наклонной, 30.09, 0 мин',
+    'Жим на наклонной: 195 × 7, 185 × 6',
+    'Пресс: 20 / 18',
+    'Шея: сгибания: не делал',
+    'Шея: разгибания: не делал',
+  ]);
+  assertEquals([...w.store.workouts.values()][0]?.status, 'completed');
   const press = w.store.logs.find((l) => l.exerciseId === 'incline_press');
-  assertEquals([press?.warmupVariant, press?.comment, press?.warmupTier], ['full', 'плечо ок', 2]);
-  assertEquals(w.store.logs.find((l) => l.exerciseId === 'neck_ext')?.status, 'skipped');
+  assertEquals([press?.warmupVariant, press?.warmupTier, Boolean(press?.finishedAt)], [
+    'full',
+    2,
+    true,
+  ]);
+  assertEquals(w.store.logs.find((l) => l.exerciseId === 'abs')?.finishedAt, undefined);
 
   await w.press({ type: 'comment' });
   await w.type('хорошо выспался');
-  assertEquals(wo?.comment, 'хорошо выспался');
-  assertEquals(w.last(), '💬 Комментарий к тренировке сохранён.');
+  assertEquals([...w.store.workouts.values()][0]?.comment, 'хорошо выспался');
   await w.press({ type: 'workout_done' });
   assert(w.last().startsWith('Часовой пояс:'));
 });
 
-Deno.test('следующая тренировка: прошлая тренировка, следующий день, «прошлый раз» и кнопки веса', async () => {
+Deno.test('название жирным — entities Telegram без разметки в тексте', () => {
+  assertEquals(
+    bold({ text: '🏋️ Пресс 🏋️\n', keyboard: [], replyKeyboard: null, bold: ['Пресс'] }),
+    [{ type: 'bold', offset: 4, length: 5 }],
+  );
+});
+
+Deno.test('следующая тренировка: прошлая, следующий день, «прошлый раз» и кнопки веса', async () => {
   const w = await world();
-  await w.send(workout);
-  await w.press({ type: 'day_pick', dayId: 'tue' });
+  await tuesday(w);
+  await open(w, 'incline_press');
   await w.type('195');
   await w.press({ type: 'warmup', variant: 'none' });
   await w.type('9 последний тяжело');
-  for (let i = 0; i < 3; i++) {
-    await w.press({ type: 'exercise_next' });
-    await w.press({ type: 'exercise_skip' });
-  }
+  await finishExercise(w);
+  await w.press({ type: 'workout_finish' });
   await w.press({ type: 'workout_done' });
 
   w.setNow('2026-10-06T22:40:00Z');
@@ -92,9 +143,17 @@ Deno.test('следующая тренировка: прошлая тренир�
   assertEquals(w.last(), 'Прошлая тренировка: Ср, 30.09 — Жим на наклонной.\nВыбери день:');
   assertEquals(w.buttons()[0], '▶ Мёртвая тяга');
   await w.press({ type: 'day_pick', dayId: 'tue' });
+  await open(w, 'incline_press');
   assert(w.last().includes('Прошлый раз (30.09): 195 × 9 — выше диапазона'), w.last());
   assert(w.last().includes('💬 «последний тяжело»'));
   assertEquals(w.buttons().slice(0, 3), ['195', '205 (+10)', '185 (−10)']);
+  await w.type('195');
+  await w.press({ type: 'warmup', variant: 'none' });
+  assertEquals(
+    w.buttons().slice(0, 8),
+    ['6', '7', '8', '9', '10', '11', '12', '13'],
+    'от прошлых 9',
+  );
 });
 
 Deno.test('100/70: вопрос без истории, правило недели, 70% от последнего 100%, заметка к тяге', async () => {
@@ -102,6 +161,7 @@ Deno.test('100/70: вопрос без истории, правило недел
   w.setNow('2026-09-23T22:40:00Z'); // неделя 39
   await w.send(workout);
   await w.press({ type: 'day_pick', dayId: 'wed' });
+  await open(w, 'deadlift');
   assert(
     w.last().includes('ещё не ясно, что из пары «Фронтальный присед / Мёртвая тяга» идёт на 100%'),
   );
@@ -110,54 +170,42 @@ Deno.test('100/70: вопрос без истории, правило недел
   await w.type('225');
   await w.press({ type: 'warmup', variant: 'none' });
   await w.type('6');
-  await w.press({ type: 'exercise_next' });
+  await finishExercise(w);
+  await w.press({ type: 'workout_finish' });
   await w.press({ type: 'workout_done' });
 
   w.setNow('2026-09-29T22:40:00Z'); // неделя 40: становая была на 100% → теперь 70%
   await w.send(workout);
   await w.press({ type: 'day_pick', dayId: 'wed' });
+  await open(w, 'deadlift');
   assert(w.last().includes('На этой неделе: Фронтальный присед 100%, Мёртвая тяга 70%'), w.last());
-  assertEquals(
-    w.buttons().slice(0, 3),
-    ['155', '165 (+10)', '145 (−10)'],
-    '70% от 225 → 157,5 → 155',
-  );
+  assertEquals(w.buttons().slice(0, 3), ['155', '165 (+10)', '145 (−10)'], '70% от 225 → 155');
   await w.press({ type: 'intensity_set', intensity: 'high' });
   assertEquals(w.buttons().slice(0, 4), ['225', '235 (+10)', '215 (−10)', 'Сделать 70%']);
-
   await w.type('225');
   await w.press({ type: 'warmup', variant: 'none' });
   await w.type('5');
-  await w.press({ type: 'exercise_next' });
+  await finishExercise(w);
+  await w.press({ type: 'workout_finish' });
   await w.press({ type: 'workout_done' });
+
   await w.send(workout);
   await w.press({ type: 'day_pick', dayId: 'fri' });
-  await w.type('0');
-  await w.press({ type: 'warmup', variant: 'none' });
-  await w.type('8');
-  await w.press({ type: 'exercise_next' });
-  await w.press({ type: 'exercise_skip' });
-  assert(w.last().startsWith('🏋️ Тяга штанги в наклоне (3/3)'));
-  assert(
-    w.last().includes('📝 Становая на этой неделе шла на 100%'),
-    'становая на этой неделе — 100%',
-  );
+  await open(w, 'bb_row');
+  assert(w.last().includes('📝 Становая на этой неделе шла на 100%'), w.last());
 });
 
-Deno.test('продолжение: та же тренировка с того же места; старше 12 часов — закрывается', async () => {
+Deno.test('/workout при начатой тренировке — сразу её меню; старше 12 часов — закрывается', async () => {
   const w = await world();
-  await w.send(workout);
-  await w.press({ type: 'day_pick', dayId: 'tue' });
+  await tuesday(w);
+  await open(w, 'incline_press');
   await w.type('195');
   await w.press({ type: 'warmup', variant: 'none' });
   await w.type('7');
-
   await w.send(workout);
-  assertEquals(w.last(), 'Продолжить тренировку от 18:40 (Жим на наклонной, 1 из 4 упражнений)?');
-  await w.press({ type: 'resume', choice: 'continue' });
-  assert(w.last().includes('\nЗаписал 195 × 7.'), 'вернулись к экрану после подхода');
-  await w.press({ type: 'exercise_next' });
-  assert(w.last().includes('Подход 1 — 80% от отказа'));
+  assert(w.last().includes('◐ Жим на наклонной — 195 × 7'), w.last());
+  await open(w, 'incline_press');
+  assert(w.last().includes('Рабочий подход №2'), 'продолжение со следующего подхода');
 
   w.setNow('2026-10-01T12:00:00Z');
   await w.send(workout);
@@ -167,8 +215,8 @@ Deno.test('продолжение: та же тренировка с того ж
 
 Deno.test('двойное нажатие на кнопку повторений создаёт один подход', async () => {
   const w = await world();
-  await w.send(workout);
-  await w.press({ type: 'day_pick', dayId: 'tue' });
+  await tuesday(w);
+  await open(w, 'incline_press');
   await w.type('195');
   await w.press({ type: 'warmup', variant: 'none' });
   const stepNo = w.store.sessions.get(1)?.stepNo ?? -1;
@@ -178,40 +226,43 @@ Deno.test('двойное нажатие на кнопку повторений 
   assertEquals(w.store.sets.filter((s) => s.kind === 'work').length, 1);
 });
 
-Deno.test('/cancel: подтверждение, записанное сохраняется со статусом aborted', async () => {
+Deno.test('/cancel: подтверждение; «Продолжить» — в меню; записанное — aborted', async () => {
   const w = await world();
   await w.send({ kind: 'command', name: 'cancel', args: '' });
   assertEquals(w.last(), 'Сейчас нет начатой тренировки. Начать — /workout');
-  await w.send(workout);
-  await w.press({ type: 'day_pick', dayId: 'tue' });
-  await w.type('195x7');
+  await tuesday(w);
+  await open(w, 'incline_press');
+  await w.type('185x7');
   await w.send({ kind: 'command', name: 'cancel', args: '' });
   await w.press({ type: 'cancel_answer', confirm: false });
-  assert(w.last().includes('\nЗаписал 195 × 7.'), '«Продолжить» — назад к тренировке');
+  assert(w.last().startsWith('Жим на наклонной · 30.09'), w.last());
   await w.send({ kind: 'command', name: 'cancel', args: '' });
   await w.press({ type: 'cancel_answer', confirm: true });
   assertEquals(w.last(), 'Тренировка прервана, записанное сохранено. Новая — /workout');
   assertEquals([...w.store.workouts.values()][0]?.status, 'aborted');
-  assertEquals(w.store.sets.length, 1);
 });
 
-Deno.test('в карточке «185x7» — сразу рабочий подход без разминки; ≤ 3 действия на подход', async () => {
+Deno.test('в карточке «185x7» — сразу подход без разминки; 1 нажатие на подход', async () => {
   const w = await world();
-  await w.send(workout);
-  await w.press({ type: 'day_pick', dayId: 'tue' });
+  await tuesday(w);
+  await open(w, 'incline_press');
   await w.type('185x7');
-  assert(w.last().includes('\nЗаписал 185 × 7.'), w.last());
+  assert(w.last().includes('Записал: 185 × 7'), w.last());
   const log = w.store.logs.find((l) => l.exerciseId === 'incline_press');
   assertEquals([log?.plannedWorkWeightLb, log?.warmupVariant], [lb(185), 'none']);
+  const before = w.ui.shown.length;
+  await w.press({ type: 'reps_set', reps: 6 });
+  assertEquals(w.ui.shown.length - before, 1, 'подход — одно нажатие, сразу следующий ввод');
 });
 
 Deno.test('брусья: допвес, разминка от допвеса со своим весом и синглом', async () => {
   const w = await world();
   await w.send(workout);
   await w.press({ type: 'day_pick', dayId: 'thu' });
+  await open(w, 'dips');
   assert(w.last().includes('Допвес сегодня?'));
   await w.type('+25');
-  assertEquals(w.last().split('\n').slice(1, 6), [
+  assertEquals(lines(w).slice(2, 7), [
     'Разминка под +25 × 6–8:',
     '1. свой вес × 10',
     '2. +10 × 5',
@@ -220,5 +271,30 @@ Deno.test('брусья: допвес, разминка от допвеса со
   ]);
   await w.press({ type: 'warmup', variant: 'none' });
   await w.type('8');
-  assert(w.last().includes('\nЗаписал +25 × 8.'));
+  assert(w.last().includes('Записал: +25 × 8'));
+});
+
+Deno.test('[➕ Добавить упражнение]: из программы, сразу открывается и встаёт в меню', async () => {
+  const w = await world();
+  await tuesday(w);
+  await w.press({ type: 'menu_add' });
+  assertEquals(w.last(), 'Какое упражнение добавить?');
+  assertEquals(w.buttons().includes('Пресс'), false, 'уже в меню — не предлагается');
+  await w.press({ type: 'add_pick', exerciseId: 'dips' });
+  assert(w.last().startsWith('🏋️ Брусья узким хватом 🏋️'), w.last());
+  await w.type('0');
+  await w.press({ type: 'warmup', variant: 'none' });
+  await w.type('10');
+  await finishExercise(w);
+  assertEquals(lines(w).at(-1), '✅ Брусья узким хватом — свой вес × 10');
+});
+
+Deno.test('завершить тренировку без подходов — она удаляется', async () => {
+  const w = await world();
+  await tuesday(w);
+  await open(w, 'incline_press');
+  await w.press({ type: 'back' });
+  await w.press({ type: 'workout_finish' });
+  assertEquals(w.last(), 'Подходов не было — тренировку не сохранял. Начать — /workout');
+  assertEquals(w.store.workouts.size, 0);
 });

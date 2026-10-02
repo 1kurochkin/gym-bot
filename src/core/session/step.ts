@@ -11,19 +11,20 @@ import {
 import { requestSeed, seedText, skipSeed, stopSeed } from './seed.ts';
 import {
   answerCancel,
+  chooseAdd,
   chooseDay,
   chooseIntensity,
   chooseReps,
-  chooseResume,
   chooseWeight,
   closeSummary,
+  finishExercise,
   finishWarmup,
-  moreSets,
-  nextExercise,
+  finishWorkout,
+  pickMenuExercise,
+  requestAdd,
   requestCancel,
   requestComment,
   requestWorkout,
-  skipExercise,
   workoutText,
 } from './workout.ts';
 import { answerRevoke, pickMember, requestInvite, requestUsers, unknownCommand } from './access.ts';
@@ -41,13 +42,13 @@ import {
   turnPage,
 } from './history.ts';
 import {
-  chooseReorder,
-  chooseReplace,
+  deleteViewedSet,
+  forwardToInput,
   goBack,
   markWarmup,
-  requestReorder,
-  requestReplace,
+  requestSetEdit,
   requestWarmupComment,
+  setEditText,
   startWarmupDiff,
   undo,
   warmupCommentText,
@@ -144,8 +145,12 @@ function transition(state: Session, event: BotEvent, ctx: StepContext): StepResu
       return requestWorkout(state, ctx);
     case 'day_chosen':
       return chooseDay(state, ctx, event.dayId);
-    case 'resume_chosen':
-      return chooseResume(state, ctx, event.choice);
+    case 'menu_exercise_picked':
+      return pickMenuExercise(state, ctx, event.exerciseId);
+    case 'menu_add_requested':
+      return requestAdd(state, ctx);
+    case 'add_exercise_chosen':
+      return chooseAdd(state, ctx, event.exerciseId);
     case 'intensity_chosen':
       return chooseIntensity(state, ctx, event.intensity);
     case 'weight_chosen':
@@ -158,14 +163,6 @@ function transition(state: Session, event: BotEvent, ctx: StepContext): StepResu
       return markWarmup(state, ctx, event.mark);
     case 'warmup_comment_requested':
       return requestWarmupComment(state, ctx);
-    case 'replace_requested':
-      return requestReplace(state, ctx);
-    case 'replace_chosen':
-      return chooseReplace(state, ctx, event.exerciseId);
-    case 'reorder_requested':
-      return requestReorder(state, ctx);
-    case 'reorder_chosen':
-      return chooseReorder(state, ctx, event.index);
     case 'back_pressed':
       return isHistory(state) ? historyBack(state, ctx) : goBack(state, ctx);
     case 'history_requested':
@@ -188,12 +185,16 @@ function transition(state: Session, event: BotEvent, ctx: StepContext): StepResu
       return undo(state, ctx);
     case 'reps_chosen':
       return chooseReps(state, ctx, event.reps);
-    case 'set_more':
-      return moreSets(state, ctx);
-    case 'exercise_next':
-      return nextExercise(state, ctx);
-    case 'exercise_skip':
-      return skipExercise(state, ctx);
+    case 'exercise_finished':
+      return finishExercise(state, ctx);
+    case 'set_edit_requested':
+      return requestSetEdit(state, ctx);
+    case 'set_delete_requested':
+      return deleteViewedSet(state, ctx);
+    case 'set_forward':
+      return forwardToInput(state, ctx);
+    case 'workout_finished':
+      return finishWorkout(state, ctx);
     case 'comment_requested':
       return requestComment(state, ctx);
     case 'workout_done':
@@ -239,16 +240,17 @@ function onText(state: Session, text: string, ctx: StepContext): StepResult {
       return warmupMarkText(state, ctx, text);
     case S.workout_warmup_comment:
       return warmupCommentText(state, ctx, text);
-    case S.workout_replace:
-    case S.workout_reorder:
-      return goBack(state, ctx);
+    case S.workout_set_view:
+    case S.workout_set_edit:
+      return setEditText(state, ctx, text);
     case S.workout_day:
-    case S.workout_resume:
+    case S.workout_menu:
+    case S.workout_add:
+    case S.workout_menu_comment:
     case S.workout_intensity:
     case S.workout_card:
     case S.workout_warmup:
     case S.workout_reps:
-    case S.workout_after_set:
     case S.workout_comment:
     case S.workout_summary:
     case S.workout_final_comment:

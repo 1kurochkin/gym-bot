@@ -45,17 +45,18 @@ export const SessionStepSchema = z.enum([
   'settings_step_edit',
   'settings_language',
   'workout_day',
-  'workout_resume',
+  'workout_menu',
+  'workout_add',
+  'workout_menu_comment',
   'workout_intensity',
   'workout_card',
   'workout_warmup',
   'workout_warmup_mark',
   'workout_warmup_edit',
   'workout_warmup_comment',
-  'workout_replace',
-  'workout_reorder',
   'workout_reps',
-  'workout_after_set',
+  'workout_set_view',
+  'workout_set_edit',
   'workout_comment',
   'workout_summary',
   'workout_final_comment',
@@ -92,20 +93,21 @@ export const SessionContextSchema = z.discriminatedUnion('kind', [
   /** Блины в процессе выбора, до [Сохранить]. */
   z.object({ kind: z.literal('plates'), selected: z.array(LbSchema).readonly() }).readonly(),
   z.object({ kind: z.literal('step_edit'), exerciseId: z.string() }).readonly(),
-  /** Тренировка: текущее упражнение дня и его запись (после выбора веса). */
+  /** Тренировка: меню дня или упражнение в нём и его запись (после выбора веса). */
   z.object({
     kind: z.literal('workout'),
     workoutId: z.string(),
     dayId: z.string(),
     /** Локальная дата тренировки: зафиксирована при старте (ADR-0004). */
     localDate: LocalDateSchema,
-    index: z.number().int().nonnegative(),
+    /** Открытое упражнение (id упражнения программы); null — в меню дня. */
+    exerciseId: z.string().nullable().default(null),
     /** Интенсивность, выбранная пользователем для текущего упражнения (иначе — по правилам §6.4). */
     intensity: IntensitySchema.nullable(),
-    /** Замена на этом месте дня: id упражнения программы; null — упражнение по программе. */
-    exerciseId: z.string().nullable().default(null),
-    /** «Отметить отличия»: номер подхода разминки (с 0), который отмечаем сейчас. */
+    /** «Изменить» в разминке: номер подхода разминки (с 0), который отмечаем сейчас. */
     warmupStep: z.number().int().nonnegative().nullable().default(null),
+    /** Просмотр рабочего подхода: его номер (с 1) среди рабочих подходов упражнения. */
+    viewSet: z.number().int().positive().nullable().default(null),
     log: z.object({
       id: z.string(),
       workLb: LbSchema.nullable(),
@@ -151,9 +153,9 @@ export const initialSession = (userId: number): Session => ({
   context: emptyContext,
 });
 
-/** Незавершённая тренировка при /workout: продолжить, завершить её или начать новую. */
-export const ResumeChoiceSchema = z.enum(['continue', 'finish', 'new']);
-export type ResumeChoice = z.infer<typeof ResumeChoiceSchema>;
+/** Отметка упражнения в меню дня: ✅ завершено, ◐ начато (есть рабочие подходы), ▫️ не начато. */
+export const MenuMarkSchema = z.enum(['done', 'started', 'todo']);
+export type MenuMark = z.infer<typeof MenuMarkSchema>;
 
 /** Отметка подхода разминки в «Отметить отличия». */
 export const WarmupMarkSchema = z.enum(['done', 'edit', 'skip']);
@@ -189,26 +191,27 @@ export const BotEventSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('language_chosen'), language: LanguageSchema }).readonly(),
   z.object({ type: z.literal('workout_requested') }).readonly(),
   z.object({ type: z.literal('day_chosen'), dayId: z.string() }).readonly(),
-  z.object({ type: z.literal('resume_chosen'), choice: ResumeChoiceSchema }).readonly(),
+  z.object({ type: z.literal('menu_exercise_picked'), exerciseId: z.string() }).readonly(),
+  z.object({ type: z.literal('menu_add_requested') }).readonly(),
+  z.object({ type: z.literal('add_exercise_chosen'), exerciseId: z.string() }).readonly(),
   z.object({ type: z.literal('intensity_chosen'), intensity: IntensitySchema }).readonly(),
   z.object({ type: z.literal('weight_chosen'), lb: LbSchema }).readonly(),
   z.object({ type: z.literal('warmup_done'), variant: WarmupVariantSchema }).readonly(),
   z.object({ type: z.literal('warmup_diff_started') }).readonly(),
   z.object({ type: z.literal('warmup_marked'), mark: WarmupMarkSchema }).readonly(),
   z.object({ type: z.literal('warmup_comment_requested') }).readonly(),
-  z.object({ type: z.literal('replace_requested') }).readonly(),
-  z.object({ type: z.literal('replace_chosen'), exerciseId: z.string() }).readonly(),
-  z.object({ type: z.literal('reorder_requested') }).readonly(),
-  z.object({ type: z.literal('reorder_chosen'), index: z.number().int().nonnegative() }).readonly(),
-  /** [← Назад]: отменить последнее действие и вернуться на предыдущий экран тренировки. */
+  /** [← Назад]: на предыдущий экран; записанное не удаляется (US-4). */
   z.object({ type: z.literal('back_pressed') }).readonly(),
-  /** /undo и [✏️ Исправить]: удалить последний записанный подход. */
+  /** /undo: удалить последний рабочий подход тренировки. */
   z.object({ type: z.literal('undo_requested') }).readonly(),
   z.object({ type: z.literal('reps_chosen'), reps: z.number().int().positive() }).readonly(),
-  z.object({ type: z.literal('set_more') }).readonly(),
-  z.object({ type: z.literal('exercise_next') }).readonly(),
-  z.object({ type: z.literal('exercise_skip') }).readonly(),
+  z.object({ type: z.literal('exercise_finished') }).readonly(),
+  /** Просмотр подхода: [✏️ Изменить], [🗑 Удалить], [➡️ К подходу N]. */
+  z.object({ type: z.literal('set_edit_requested') }).readonly(),
+  z.object({ type: z.literal('set_delete_requested') }).readonly(),
+  z.object({ type: z.literal('set_forward') }).readonly(),
   z.object({ type: z.literal('comment_requested') }).readonly(),
+  z.object({ type: z.literal('workout_finished') }).readonly(),
   z.object({ type: z.literal('workout_done') }).readonly(),
   z.object({ type: z.literal('cancel_requested') }).readonly(),
   z.object({ type: z.literal('cancel_answered'), confirm: z.boolean() }).readonly(),
@@ -243,6 +246,14 @@ export const DayRefSchema = z.object({ id: z.string(), name: z.string() }).reado
 const RangeViewSchema = z.object({ min: z.number().int(), max: z.number().int() }).readonly();
 const SetViewSchema = z.object({ weightLb: LbSchema.nullable(), reps: z.number().int() })
   .readonly();
+
+/** Что показать над вводом подхода: отмена (/undo), правка или удаление подхода, комментарий. */
+const RepsNoticeSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('undone'), set: SetViewSchema }).readonly(),
+  z.object({ kind: z.literal('fixed'), index: z.number().int().positive() }).readonly(),
+  z.object({ kind: z.literal('deleted'), index: z.number().int().positive() }).readonly(),
+  z.object({ kind: z.literal('commented') }).readonly(),
+]);
 
 /** Упражнение в сводке тренировки (US-5) и в /history (US-10). */
 const SummaryItemSchema = z.object({
@@ -352,12 +363,25 @@ export const ViewSchema = z.discriminatedUnion('type', [
     others: z.array(DayRefSchema).readonly(),
   }).readonly(),
   z.object({
-    type: z.literal('workout_resume'),
+    type: z.literal('workout_menu'),
     dayName: z.string(),
-    startedLabel: z.string(),
-    done: z.number().int().nonnegative(),
-    total: z.number().int().nonnegative(),
+    localDate: LocalDateSchema,
+    items: z.array(
+      z.object({
+        exerciseId: z.string(),
+        name: z.string(),
+        mark: MenuMarkSchema,
+        addedWeight: z.boolean(),
+        sets: z.array(SetViewSchema).readonly(),
+      }).readonly(),
+    ).readonly(),
+    /** ▶ — первое не начатое упражнение дня; null — все начаты. */
+    next: z.string().nullable(),
+    commentSaved: z.boolean(),
   }).readonly(),
+  /** [➕ Добавить упражнение]: упражнения программы, которых нет в меню. */
+  z.object({ type: z.literal('workout_add'), options: z.array(DayRefSchema).readonly() })
+    .readonly(),
   z.object({
     type: z.literal('workout_intensity'),
     exerciseName: z.string(),
@@ -366,8 +390,6 @@ export const ViewSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('workout_card'),
     exerciseName: z.string(),
-    position: z.number().int().positive(),
-    total: z.number().int().positive(),
     workSets: RangeViewSchema,
     repRange: RangeViewSchema.nullable(),
     last: LastResultSchema.nullable(),
@@ -377,24 +399,6 @@ export const ViewSchema = z.discriminatedUnion('type', [
     noWeight: z.boolean(),
     options: z.array(LbSchema).readonly(),
     invalidWeight: z.boolean(),
-    /** Замена: название заменённого упражнения программы. */
-    replaces: z.string().nullable(),
-    /** [🔀 Другое упражнение]: есть другие невыполненные упражнения дня. */
-    canReorder: z.boolean(),
-  }).readonly(),
-  /** [🔄 Заменить]: упражнения программы, кроме текущего. */
-  z.object({
-    type: z.literal('workout_replace'),
-    exerciseName: z.string(),
-    options: z.array(DayRefSchema).readonly(),
-  }).readonly(),
-  /** [🔀 Другое упражнение]: невыполненные места дня (id — номер места). */
-  z.object({
-    type: z.literal('workout_reorder'),
-    options: z.array(
-      z.object({ index: z.number().int().nonnegative(), name: z.string() }).readonly(),
-    )
-      .readonly(),
   }).readonly(),
   z.object({
     type: z.literal('workout_warmup'),
@@ -405,6 +409,8 @@ export const ViewSchema = z.discriminatedUnion('type', [
     lines: z.array(WarmupLineSchema).readonly(),
     /** Комментарий к разминке с прошлого раза (§6.5). */
     lastComment: z.string().nullable(),
+    /** Комментарий к разминке только что сохранён. */
+    commentSaved: z.boolean(),
   }).readonly(),
   z.object({
     type: z.literal('workout_warmup_mark'),
@@ -428,28 +434,25 @@ export const ViewSchema = z.discriminatedUnion('type', [
     addedWeight: z.boolean(),
     options: z.array(z.number().int().positive()).readonly(),
     target: z.string().nullable(),
-    justRecorded: SetViewSchema.nullable(),
+    /** Рабочие подходы, записанные в этом упражнении: «Записал: 195 × 7, 195 × 6». */
+    recorded: z.array(SetViewSchema).readonly(),
     overMax: z.boolean(),
     error: SetInputErrorSchema.nullable(),
     /** Вес на сторону для штанги: «195 × ? (по 75)». */
     perSideLb: LbSchema.nullable(),
-    /** /undo или [✏️ Исправить]: что удалено перед этим вводом. */
-    undone: SetViewSchema.nullable(),
-    /** [💬 К разминке]: первый подход сразу после отмеченной разминки. */
-    canCommentWarmup: z.boolean(),
-    /** [🔄 Заменить] и [🔀 Другое упражнение] — у упражнений без карточки (reps_only) до первого подхода. */
-    canReplace: z.boolean(),
-    canReorder: z.boolean(),
+    notice: RepsNoticeSchema.nullable(),
   }).readonly(),
+  /** Просмотр рабочего подхода: [✏️ Изменить] (editing — ждём текст), [🗑 Удалить], листание. */
   z.object({
-    type: z.literal('workout_after_set'),
+    type: z.literal('workout_set_view'),
     exerciseName: z.string(),
-    recorded: SetViewSchema,
+    index: z.number().int().positive(),
+    set: SetViewSchema,
     addedWeight: z.boolean(),
-    setIndex: z.number().int().positive(),
-    nextOverMax: z.boolean(),
-    lastExercise: z.boolean(),
-    commentSaved: z.boolean(),
+    /** Номер подхода, который сейчас вводится: [➡️ К подходу N]. */
+    current: z.number().int().positive(),
+    editing: z.boolean(),
+    error: SetInputErrorSchema.nullable(),
   }).readonly(),
   z.object({ type: z.literal('workout_comment_prompt'), exerciseName: z.string().nullable() })
     .readonly(),
@@ -466,6 +469,8 @@ export const ViewSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('workout_cancelled') }).readonly(),
   z.object({ type: z.literal('workout_none') }).readonly(),
   z.object({ type: z.literal('workout_undo_nothing') }).readonly(),
+  /** [🏁 Завершить тренировку] без единого рабочего подхода: тренировка удалена. */
+  z.object({ type: z.literal('workout_empty_deleted') }).readonly(),
   z.object({
     type: z.literal('history_list'),
     items: z.array(HistoryItemSchema).readonly(),

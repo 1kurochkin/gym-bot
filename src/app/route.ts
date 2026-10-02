@@ -70,23 +70,23 @@ export function render(view: View, lang: Language, env: RenderEnv): Rendered {
     case 'settings_language':
       return renderSettingsView(view, lang);
     case 'workout_days':
-    case 'workout_resume':
+    case 'workout_menu':
+    case 'workout_add':
     case 'workout_intensity':
     case 'workout_card':
     case 'workout_warmup':
-    case 'workout_replace':
-    case 'workout_reorder':
     case 'workout_warmup_mark':
     case 'workout_warmup_comment_prompt':
-    case 'workout_undo_nothing':
     case 'workout_reps':
-    case 'workout_after_set':
+    case 'workout_set_view':
     case 'workout_comment_prompt':
     case 'workout_summary':
     case 'workout_cancel_confirm':
     case 'workout_commented':
     case 'workout_cancelled':
     case 'workout_none':
+    case 'workout_undo_nothing':
+    case 'workout_empty_deleted':
       return renderWorkoutView(view, lang);
     case 'history_list':
     case 'history_workout':

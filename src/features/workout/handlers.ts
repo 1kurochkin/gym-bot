@@ -14,46 +14,44 @@ export function toEvent(input: Incoming): BotEvent | null {
   switch (a.type) {
     case 'day_pick':
       return { type: 'day_chosen', dayId: a.dayId };
-    case 'resume':
-      return { type: 'resume_chosen', choice: a.choice };
+    case 'menu_pick':
+      return { type: 'menu_exercise_picked', exerciseId: a.exerciseId };
+    case 'menu_add':
+      return { type: 'menu_add_requested' };
+    case 'add_pick':
+      return { type: 'add_exercise_chosen', exerciseId: a.exerciseId };
     case 'intensity_set':
       return { type: 'intensity_chosen', intensity: a.intensity };
     case 'weight_set':
       return { type: 'weight_chosen', lb: a.lb };
     case 'warmup':
       return { type: 'warmup_done', variant: a.variant };
-    case 'reps_set':
-      return { type: 'reps_chosen', reps: a.reps };
-    case 'set_more':
-      return { type: 'set_more' };
-    case 'exercise_next':
-      return { type: 'exercise_next' };
-    case 'exercise_skip':
-      return { type: 'exercise_skip' };
-    case 'comment':
-      return { type: 'comment_requested' };
-    case 'workout_done':
-      return { type: 'workout_done' };
-    case 'cancel_answer':
-      return { type: 'cancel_answered', confirm: a.confirm };
     case 'warmup_diff':
       return { type: 'warmup_diff_started' };
     case 'warmup_mark':
       return { type: 'warmup_marked', mark: a.mark };
     case 'warmup_comment':
       return { type: 'warmup_comment_requested' };
+    case 'reps_set':
+      return { type: 'reps_chosen', reps: a.reps };
+    case 'exercise_finish':
+      return { type: 'exercise_finished' };
+    case 'set_edit':
+      return { type: 'set_edit_requested' };
+    case 'set_delete':
+      return { type: 'set_delete_requested' };
+    case 'set_forward':
+      return { type: 'set_forward' };
     case 'back':
       return { type: 'back_pressed' };
-    case 'replace':
-      return { type: 'replace_requested' };
-    case 'replace_pick':
-      return { type: 'replace_chosen', exerciseId: a.exerciseId };
-    case 'reorder':
-      return { type: 'reorder_requested' };
-    case 'reorder_pick':
-      return { type: 'reorder_chosen', index: a.index };
-    case 'undo':
-      return { type: 'undo_requested' };
+    case 'comment':
+      return { type: 'comment_requested' };
+    case 'workout_finish':
+      return { type: 'workout_finished' };
+    case 'workout_done':
+      return { type: 'workout_done' };
+    case 'cancel_answer':
+      return { type: 'cancel_answered', confirm: a.confirm };
     default:
       return null;
   }

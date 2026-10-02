@@ -1,5 +1,4 @@
 import {
-  type ExerciseLogStatus,
   ExerciseLogStatusSchema,
   SetKindSchema,
   type WarmupVariant,
@@ -14,12 +13,12 @@ import {
   LoadTypeSchema,
 } from '../program/schema.ts';
 import { weightGrid, weightStep } from '../program/weight-step.ts';
-import { perSide } from '../units/weight-grid.ts';
 import { isoWeekOf, localDateOf } from '../schedule/calendar.ts';
 import { activeNotes, pairIntensity, weekIntensities } from '../schedule/intensity.ts';
 import { nextDay } from '../schedule/rotation.ts';
 import { utcOffsetMinutes } from '../schedule/timezone.ts';
 import { type Lb, lb } from '../units/lb.ts';
+import { perSide } from '../units/weight-grid.ts';
 import {
   pairOf,
   repOptions,
@@ -28,13 +27,18 @@ import {
   type WarmupLine,
   weightOptions,
 } from '../workout/plan.ts';
-import { type ActiveWorkout, type WorkoutStatus, WorkoutStatusSchema } from '../workout/schema.ts';
+import {
+  type ActiveWorkout,
+  type WorkoutLog,
+  type WorkoutStatus,
+  WorkoutStatusSchema,
+} from '../workout/schema.ts';
 import { home, moveTo, unchanged, withEffects } from './flow.ts';
 import { askTime } from './onboarding.ts';
 import {
   type Effect,
-  type ResumeChoice,
-  ResumeChoiceSchema,
+  type MenuMark,
+  MenuMarkSchema,
   type Session,
   type SessionContext,
   SessionStepSchema,
@@ -43,15 +47,19 @@ import {
   type View,
 } from './types.ts';
 
-/** Тренировка — US-2…US-5 (.specs/product.md). */
+/**
+ * Тренировка — меню дня (.specs/product.md → US-2…US-5): выбор дня → меню → упражнение
+ * (вес → разминка → подходы до «Завершить упражнение») → меню → «Завершить тренировку».
+ * Исправления (разминка «Изменить», «Назад», просмотр подходов, /undo) — workout-corrections.ts.
+ */
 
 const S = SessionStepSchema.enum;
-const { done, skipped } = ExerciseLogStatusSchema.enum;
 const { warmup, work } = SetKindSchema.enum;
 const { full } = WarmupVariantSchema.enum;
 const { completed, aborted } = WorkoutStatusSchema.enum;
+const MARK = MenuMarkSchema.enum;
 
-/** Незавершённую тренировку старше этого предлагаем не продолжать, а закрыть (US-2). */
+/** Незавершённую тренировку старше этого не продолжаем, а закрываем (US-2). */
 const RESUME_WINDOW_MS = 12 * 60 * 60 * 1000;
 const MAX_WEIGHT_LB = 1500;
 
@@ -59,50 +67,91 @@ export type WorkoutContext = Extract<SessionContext, { kind: 'workout' }>;
 /** Интенсивность упражнения и всей недели с учётом выбора пользователя. */
 type IntensityInfo = { value: Intensity; byExercise: Readonly<Record<string, Intensity>> };
 type Ids = () => string;
+type RepsView = Extract<View, { type: 'workout_reps' }>;
+export type SetView = RepsView['recorded'][number];
 
 export const idsOf = (ctx: StepContext): Ids => {
   let i = 0;
   return () => ctx.newIds[i++] ?? `missing-id-${i}`;
 };
 
-// ---------------------------------------------------------------- начало и продолжение
+export const workoutContext = (state: Session): WorkoutContext | null =>
+  state.context.kind === 'workout' ? state.context : null;
 
-/** /workout: продолжить незавершённую, закрыть старую или выбрать день. */
+/** Контекст меню дня: упражнение не открыто. */
+export const menuContext = (
+  active: { id: string; dayId: string; localDate: ActiveWorkout['localDate'] },
+): WorkoutContext => ({
+  kind: 'workout',
+  workoutId: active.id,
+  dayId: active.dayId,
+  localDate: active.localDate,
+  exerciseId: null,
+  intensity: null,
+  warmupStep: null,
+  viewSet: null,
+  log: null,
+});
+
+/** Открыть упражнение: запись и интенсивность — заново. */
+export const atExercise = (c: WorkoutContext, exerciseId: string): WorkoutContext => ({
+  ...c,
+  exerciseId,
+  intensity: null,
+  warmupStep: null,
+  viewSet: null,
+  log: null,
+});
+
+export function currentExercise(ctx: StepContext, c: WorkoutContext): Exercise | undefined {
+  if (!ctx.activeProgram || c.exerciseId === null) return undefined;
+  return exerciseIndex(ctx.activeProgram).get(c.exerciseId);
+}
+
+/** Запись упражнения в текущей тренировке (как в БД до этого апдейта). */
+export const logOf = (
+  active: ActiveWorkout | null,
+  exerciseId: string,
+): WorkoutLog | undefined => active?.logs.find((l) => l.exerciseId === exerciseId);
+
+/** Рабочие подходы записи (пропущенные подходы разминки — не они). */
+export const workSetsOf = (log: WorkoutLog | undefined): WorkoutLog['sets'] =>
+  (log?.sets ?? []).filter((s) => s.kind === work && !s.skipped);
+
+const asView = (sets: WorkoutLog['sets']): SetView[] =>
+  sets.map((s) => ({ weightLb: s.weightLb, reps: s.reps }));
+
+/** Упражнения меню: дня по порядку программы, затем добавленные (по времени добавления). */
+export function menuExercises(ctx: StepContext, active: ActiveWorkout | null): Exercise[] {
+  if (!ctx.activeProgram || !active) return [];
+  const day = [...dayExercises(ctx.activeProgram, active.dayId)];
+  const index = exerciseIndex(ctx.activeProgram);
+  const ids = new Set(day.map((e) => e.id));
+  for (const log of active.logs) {
+    const ex = index.get(log.exerciseId);
+    if (ex && !ids.has(ex.id)) {
+      ids.add(ex.id);
+      day.push(ex);
+    }
+  }
+  return day;
+}
+
+const markOf = (log: WorkoutLog | undefined): MenuMark =>
+  log?.finishedAt ? MARK.done : workSetsOf(log).length > 0 ? MARK.started : MARK.todo;
+
+// ---------------------------------------------------------------- день и меню
+
+/** /workout: меню незавершённой тренировки, старую — закрыть, иначе — выбор дня. */
 export function requestWorkout(state: Session, ctx: StepContext): StepResult {
   if (ctx.activeProgram === null) return moveTo(state, S.idle, { type: 'needs_program' });
-  const zone = ctx.settings.timezone;
-  if (zone === null) return askTime(state, null);
+  if (ctx.settings.timezone === null) return askTime(state, null);
   const active = ctx.activeWorkout;
   if (active === null) return chooseDayScreen(state, ctx);
   if (ctx.now.getTime() - active.startedAt.getTime() >= RESUME_WINDOW_MS) {
     return withEffects(chooseDayScreen(state, ctx), [finish(active.id, aborted, ctx)]);
   }
-  const time = new Intl.DateTimeFormat('ru-RU', {
-    timeZone: zone,
-    hour: '2-digit',
-    minute: '2-digit',
-  })
-    .format(active.startedAt);
-  return moveTo(state, S.workout_resume, {
-    type: 'workout_resume',
-    dayName: active.dayName,
-    startedLabel: time,
-    done: active.logs.length,
-    total: dayExercises(ctx.activeProgram, active.dayId).length,
-  }, contextFor(active, 0));
-}
-
-export function chooseResume(state: Session, ctx: StepContext, choice: ResumeChoice): StepResult {
-  const active = ctx.activeWorkout;
-  if (state.step !== S.workout_resume || active === null) return unchanged(state);
-  switch (choice) {
-    case ResumeChoiceSchema.enum.continue:
-      return resumeAt(state, ctx, active);
-    case ResumeChoiceSchema.enum.finish:
-      return summary(state, ctx, active, [], completed);
-    case ResumeChoiceSchema.enum.new:
-      return withEffects(chooseDayScreen(state, ctx), [finish(active.id, aborted, ctx)]);
-  }
+  return menuScreen(state, ctx, active, false);
 }
 
 export function chooseDayScreen(state: Session, ctx: StepContext): StepResult {
@@ -119,16 +168,15 @@ export function chooseDayScreen(state: Session, ctx: StepContext): StepResult {
   });
 }
 
-/** Выбран день: создаём тренировку с локальной датой, ISO-неделей и смещением на момент старта. */
+/** Выбран день: тренировка с локальной датой, ISO-неделей и смещением на момент старта; меню. */
 export function chooseDay(state: Session, ctx: StepContext, dayId: string): StepResult {
   const program = ctx.activeProgram;
   const zone = ctx.settings.timezone;
   const day = program?.days.find((d) => d.id === dayId);
   if (state.step !== S.workout_day || !day || zone === null) return unchanged(state);
-  const ids = idsOf(ctx);
   const localDate = localDateOf(ctx.now, zone);
   const workout = {
-    id: ids(),
+    id: idsOf(ctx)(),
     dayId,
     dayName: day.name,
     startedAt: ctx.now,
@@ -136,97 +184,88 @@ export function chooseDay(state: Session, ctx: StepContext, dayId: string): Step
     isoWeek: isoWeekOf(localDate),
     utcOffsetMin: utcOffsetMinutes(zone, ctx.now),
   };
-  const fresh: ActiveWorkout = { ...workout, logs: [] };
-  return withEffects(
-    showExercise(
-      state,
-      { ...ctx, activeWorkout: fresh, newIds: ctx.newIds.slice(1) },
-      contextFor(fresh, 0),
-    ),
-    [{ type: 'start_workout', workout }],
-  );
+  return withEffects(menuScreen(state, ctx, { ...workout, logs: [] }, false), [
+    { type: 'start_workout', workout },
+  ]);
 }
 
-/**
- * Куда вернуться в незавершённой тренировке: последнее начатое упражнение, если рабочих
- * подходов меньше минимума; иначе — экран после подхода или следующее упражнение.
- */
-function resumeAt(state: Session, ctx: StepContext, active: ActiveWorkout): StepResult {
-  const exercises = ctx.activeProgram ? dayExercises(ctx.activeProgram, active.dayId) : [];
-  const next = (): StepResult =>
-    showExercise(state, ctx, contextFor(active, openSlots(ctx, active)[0] ?? exercises.length));
-  // Последняя начатая запись — по времени, а не по порядку дня: порядок мог быть другим.
-  const log = active.logs.at(-1);
-  if (!log) return next();
-  const index = exercises.findIndex((e) => e.id === slotId(log));
-  const at: WorkoutContext = {
-    ...contextFor(active, index),
-    exerciseId: log.substitutedFor === null ? null : log.exerciseId,
-  };
-  const ex = currentExercise(ctx, at);
-  if (index < 0 || !ex || log.status !== done) return next();
-
-  const workSets = log.sets.filter((s) => s.kind === work);
-  const workLb = workSets.at(-1)?.weightLb ?? log.plannedWorkWeightLb;
-  const c: WorkoutContext = { ...at, log: { id: log.id, workLb, workSets: workSets.length } };
-  const last = workSets.at(-1);
-  if (workSets.length >= ex.workSets.min && last) return afterSet(state, ctx, c, ex, last, false);
-  return repsPrompt(state, ctx, c, ex, null, null);
-}
-
-const contextFor = (
-  active: { id: string; dayId: string; localDate: ActiveWorkout['localDate'] },
-  index: number,
-): WorkoutContext => ({
-  kind: 'workout',
-  workoutId: active.id,
-  dayId: active.dayId,
-  localDate: active.localDate,
-  index,
-  exerciseId: null,
-  intensity: null,
-  warmupStep: null,
-  log: null,
-});
-
-/** Место дня, которое закрывает запись: заменённое упражнение или само упражнение. */
-export const slotId = (log: { exerciseId: string; substitutedFor: string | null }): string =>
-  log.substitutedFor ?? log.exerciseId;
-
-/** Номера невыполненных мест дня по порядку: у места нет ни своей записи, ни записи замены. */
-export function openSlots(
+/** Меню дня; active — снимок тренировки с изменениями этого апдейта. */
+export function menuScreen(
+  state: Session,
   ctx: StepContext,
-  active: { dayId: string; logs: ActiveWorkout['logs'] } | null,
-): number[] {
-  if (!ctx.activeProgram || !active) return [];
-  const done = new Set(active.logs.map(slotId));
-  return dayExercises(ctx.activeProgram, active.dayId).flatMap((e, i) => done.has(e.id) ? [] : [i]);
+  active: ActiveWorkout,
+  commentSaved: boolean,
+): StepResult {
+  const day = ctx.activeProgram ? dayExercises(ctx.activeProgram, active.dayId) : [];
+  const items = menuExercises(ctx, active).map((ex) => {
+    const log = logOf(active, ex.id);
+    return {
+      exerciseId: ex.id,
+      name: ex.name,
+      mark: markOf(log),
+      addedWeight: ex.loadType === LoadTypeSchema.enum.weighted_bodyweight,
+      sets: asView(workSetsOf(log)),
+    };
+  });
+  const next = day.find((ex) => markOf(logOf(active, ex.id)) === MARK.todo)?.id ?? null;
+  return moveTo(state, S.workout_menu, {
+    type: 'workout_menu',
+    dayName: active.dayName,
+    localDate: active.localDate,
+    items,
+    next,
+    commentSaved,
+  }, menuContext(active));
 }
 
-/** Следующее место после текущего: первое невыполненное; за последним — сводка. */
-function nextSlot(ctx: StepContext, active: ActiveWorkout | null, current: number): number {
-  const total = ctx.activeProgram && active
-    ? dayExercises(ctx.activeProgram, active.dayId).length
-    : 0;
-  return openSlots(ctx, active).find((i) => i !== current) ?? total;
+/** Упражнение из меню: ▫️ — заново; ◐ и ✅ — на ввод следующего подхода. */
+export function pickMenuExercise(state: Session, ctx: StepContext, exerciseId: string): StepResult {
+  const c = workoutContext(state);
+  const active = ctx.activeWorkout;
+  if (!c || !active || state.step !== S.workout_menu) return unchanged(state);
+  if (!menuExercises(ctx, active).some((e) => e.id === exerciseId)) return unchanged(state);
+  return enterExercise(state, ctx, atExercise(c, exerciseId));
 }
 
-/** Упражнение программы на месте дня (без учёта замены). */
-export function slotExercise(ctx: StepContext, c: WorkoutContext): Exercise | undefined {
-  return ctx.activeProgram ? dayExercises(ctx.activeProgram, c.dayId)[c.index] : undefined;
+/** Вход в упражнение: с записанным — на ввод подхода, пустая запись — заново. */
+export function enterExercise(state: Session, ctx: StepContext, c: WorkoutContext): StepResult {
+  const ex = currentExercise(ctx, c);
+  if (!ex) return unchanged(state);
+  const log = logOf(ctx.activeWorkout, ex.id);
+  if (!log) return showExercise(state, ctx, c);
+  const works = workSetsOf(log);
+  if (works.length > 0 || log.sets.some((s) => s.kind === warmup)) {
+    const workLb = works.at(-1)?.weightLb ?? log.plannedWorkWeightLb;
+    return repsPrompt(state, ctx, {
+      ...c,
+      log: { id: log.id, workLb, workSets: works.length },
+    }, ex);
+  }
+  // Пустая запись (вес выбран, но ничего не записано) — начинаем заново.
+  return withEffects(showExercise(state, ctx, c), [{ type: 'delete_exercise_log', id: log.id }]);
 }
 
-// ---------------------------------------------------------------- карточка упражнения
-
-export const workoutContext = (state: Session): WorkoutContext | null =>
-  state.context.kind === 'workout' ? state.context : null;
-
-/** Упражнение, которое делаем сейчас: замена, если выбрана, иначе — по программе. */
-export function currentExercise(ctx: StepContext, c: WorkoutContext): Exercise | undefined {
-  if (!ctx.activeProgram) return undefined;
-  if (c.exerciseId !== null) return exerciseIndex(ctx.activeProgram).get(c.exerciseId);
-  return slotExercise(ctx, c);
+/** [➕ Добавить упражнение]: упражнения программы, которых нет в меню. */
+export function requestAdd(state: Session, ctx: StepContext): StepResult {
+  const c = workoutContext(state);
+  const program = ctx.activeProgram;
+  if (!c || !program || state.step !== S.workout_menu) return unchanged(state);
+  const inMenu = new Set(menuExercises(ctx, ctx.activeWorkout).map((e) => e.id));
+  const options = [...exerciseIndex(program).values()]
+    .filter((e) => !inMenu.has(e.id))
+    .map((e) => ({ id: e.id, name: e.name }));
+  return moveTo(state, S.workout_add, { type: 'workout_add', options }, c);
 }
+
+export function chooseAdd(state: Session, ctx: StepContext, exerciseId: string): StepResult {
+  const c = workoutContext(state);
+  const program = ctx.activeProgram;
+  if (!c || !program || state.step !== S.workout_add) return unchanged(state);
+  if (!exerciseIndex(program).has(exerciseId)) return unchanged(state);
+  return showExercise(state, ctx, atExercise(c, exerciseId));
+}
+
+// ---------------------------------------------------------------- вход в упражнение и вес
 
 /** Интенсивность упражнения: выбранная кнопкой или по правилам §6.4; null — не из пары. */
 function intensityOf(
@@ -257,15 +296,16 @@ function intensityOf(
   };
 }
 
+/** Первый экран упражнения: подходы (reps_only), вопрос 100/70 или выбор веса. */
 export function showExercise(state: Session, ctx: StepContext, c: WorkoutContext): StepResult {
   const program = ctx.activeProgram;
   const ex = currentExercise(ctx, c);
-  const active = ctx.activeWorkout;
-  if (!program || !active) return moveTo(state, S.idle, { type: 'workout_none' });
-  if (!ex) return summary(state, ctx, active, [], completed);
-
+  if (!program || !ctx.activeWorkout || !ex) {
+    return ctx.activeWorkout
+      ? menuScreen(state, ctx, ctx.activeWorkout, false)
+      : moveTo(state, S.idle, { type: 'workout_none' });
+  }
   if (ex.loadType === LoadTypeSchema.enum.reps_only) return startRepsOnly(state, ctx, c, ex);
-
   const intensity = intensityOf(ctx, c, ex);
   if (intensity === 'unknown') {
     const pair = pairOf(program, ex.id);
@@ -312,8 +352,6 @@ export function card(
   return moveTo(state, S.workout_card, {
     type: 'workout_card',
     exerciseName: ex.name,
-    position: c.index + 1,
-    total: dayExercises(program, c.dayId).length,
     workSets: ex.workSets,
     repRange: 'repRange' in ex ? ex.repRange : null,
     last,
@@ -326,9 +364,16 @@ export function card(
     noWeight: false,
     options: grid && base !== null ? weightOptions(grid, base) : [],
     invalidWeight,
-    replaces: c.exerciseId === null ? null : slotExercise(ctx, c)?.name ?? null,
-    canReorder: openSlots(ctx, ctx.activeWorkout).some((i) => i !== c.index),
-  }, { ...c, intensity: intensity?.value ?? c.intensity });
+  }, { ...c, intensity: intensity?.value ?? c.intensity, log: null });
+}
+
+export function cardIntensity(
+  ctx: StepContext,
+  c: WorkoutContext,
+  ex: Exercise,
+): IntensityInfo | null {
+  const i = intensityOf(ctx, c, ex);
+  return i === 'unknown' ? null : i;
 }
 
 /** Кнопка 100% / 70% в карточке или ответ на вопрос «кто ведущий на этой неделе». */
@@ -340,23 +385,17 @@ export function chooseIntensity(state: Session, ctx: StepContext, value: Intensi
   return showExercise(state, ctx, { ...c, intensity: value, log: null });
 }
 
-// ---------------------------------------------------------------- вес и разминка
-
 /** Выбран рабочий вес: открываем запись упражнения и показываем разминку (или сразу подход). */
 export function chooseWeight(state: Session, ctx: StepContext, weightLb: Lb): StepResult {
   const c = workoutContext(state);
   const ex = c && currentExercise(ctx, c);
-  if (!c || !ex || state.step !== S.workout_card) return unchanged(state);
-  const program = ctx.activeProgram;
-  if (!program) return unchanged(state);
-  const ids = idsOf(ctx);
-  const intensity = c.intensity;
-  const plan = warmupFor(ex, program, ctx.settings, weightLb, intensity);
-  const logId = ids();
-  const open: Effect = openLog(ctx, c, ex, logId, done, weightLb, intensity, plan?.tier ?? null);
+  if (!c || !ex || state.step !== S.workout_card || !ctx.activeProgram) return unchanged(state);
+  const plan = warmupFor(ex, ctx.activeProgram, ctx.settings, weightLb, c.intensity);
+  const logId = idsOf(ctx)();
+  const open = openLog(ctx, c, ex, logId, weightLb, c.intensity, plan?.tier ?? null);
   const next: WorkoutContext = { ...c, log: { id: logId, workLb: weightLb, workSets: 0 } };
-  const shown = warmupScreen(state, ctx, next, ex);
-  return withEffects(shown ?? repsPrompt(state, ctx, next, ex, null, null), [open]);
+  const shown = warmupScreen(state, ctx, next, ex, false);
+  return withEffects(shown ?? repsPrompt(state, ctx, next, ex, { recorded: [] }), [open]);
 }
 
 /** План разминки текущего упражнения под выбранный рабочий вес; [] — разминки нет. */
@@ -376,6 +415,7 @@ export function warmupScreen(
   ctx: StepContext,
   c: WorkoutContext,
   ex: Exercise,
+  commentSaved: boolean,
 ): StepResult | null {
   const lines = warmupLines(ctx, c, ex);
   const workLb = c.log?.workLb ?? null;
@@ -388,18 +428,16 @@ export function warmupScreen(
     repRange: 'repRange' in ex ? ex.repRange : null,
     lines,
     lastComment: ctx.lastResults[ex.id]?.warmupComment ?? null,
-  }, { ...c, warmupStep: null });
+    commentSaved,
+  }, { ...c, warmupStep: null, viewSet: null });
 }
 
-/** [✅ Всё по плану] — записать разминку как по плану; [⏭ Без разминки] — ничего не писать. */
+/** [✅ Готово] — разминка по плану; [⏭ Пропустить] — без разминки. */
 export function finishWarmup(state: Session, ctx: StepContext, variant: WarmupVariant): StepResult {
   const c = workoutContext(state);
   const ex = c && currentExercise(ctx, c);
   const log = c?.log;
-  if (
-    !c || !ex || !log || log.workLb === null || state.step !== S.workout_warmup ||
-    !ctx.activeProgram
-  ) {
+  if (!c || !ex || !log || log.workLb === null || state.step !== S.workout_warmup) {
     return unchanged(state);
   }
   const effects: Effect[] = [{
@@ -409,8 +447,7 @@ export function finishWarmup(state: Session, ctx: StepContext, variant: WarmupVa
   }];
   if (variant === full) {
     const ids = idsOf(ctx);
-    const plan = warmupFor(ex, ctx.activeProgram, ctx.settings, log.workLb, c.intensity);
-    plan?.lines.forEach((line, i) =>
+    warmupLines(ctx, c, ex).forEach((line, i) =>
       effects.push({
         type: 'record_set',
         set: {
@@ -429,50 +466,52 @@ export function finishWarmup(state: Session, ctx: StepContext, variant: WarmupVa
       })
     );
   }
-  const afterWarmup = variant === full ? { canCommentWarmup: true } : {};
-  return withEffects(repsPrompt(state, ctx, c, ex, null, null, afterWarmup), effects);
+  return withEffects(repsPrompt(state, ctx, c, ex), effects);
 }
 
 // ---------------------------------------------------------------- рабочие подходы
 
-type RepsExtras = {
-  /** Что удалено /undo или [✏️ Исправить] перед этим вводом. */
-  readonly undone?: { weightLb: Lb | null; reps: number } | null;
-  readonly canCommentWarmup?: boolean;
+type RepsOptions = {
+  /** Рабочие подходы упражнения с изменениями этого апдейта; по умолчанию — из БД. */
+  readonly recorded?: readonly SetView[];
+  readonly error?: SetInputError | null;
+  readonly notice?: RepsView['notice'];
 };
 
+/** Ввод рабочего подхода: записанные, кнопки повторений, ✍️ подсказка. */
 export function repsPrompt(
   state: Session,
   ctx: StepContext,
   c: WorkoutContext,
   ex: Exercise,
-  justRecorded: { weightLb: Lb | null; reps: number } | null,
-  error: SetInputError | null,
-  extras: RepsExtras = {},
+  opts: RepsOptions = {},
 ): StepResult {
-  const setIndex = (c.log?.workSets ?? 0) + 1;
+  const recorded = opts.recorded ?? asView(workSetsOf(logOf(ctx.activeWorkout, ex.id)));
+  const setIndex = recorded.length + 1;
   const workLb = c.log?.workLb ?? null;
   const grid = weightGrid(ex, ctx.settings);
+  const anchor = recorded.at(-1)?.reps ?? ctx.lastResults[ex.id]?.reps ?? null;
   return moveTo(state, S.workout_reps, {
     type: 'workout_reps',
     exerciseName: ex.name,
     setIndex,
-    weightLb: c.log?.workLb ?? null,
+    weightLb: workLb,
     addedWeight: ex.loadType === LoadTypeSchema.enum.weighted_bodyweight,
-    options: repOptions('repRange' in ex ? ex.repRange : null),
+    options: repOptions('repRange' in ex ? ex.repRange : null, anchor),
     target: ex.loadType === LoadTypeSchema.enum.reps_only
       ? ex.setTargets?.[setIndex - 1] ?? null
       : null,
-    justRecorded,
+    recorded,
     overMax: setIndex > ex.workSets.max,
-    error,
+    error: opts.error ?? null,
     perSideLb: grid && workLb !== null ? perSide(grid, workLb) : null,
-    undone: extras.undone ?? null,
-    canCommentWarmup: setIndex === 1 && (extras.canCommentWarmup ?? false),
-    canReplace: setIndex === 1 && ex.loadType === LoadTypeSchema.enum.reps_only,
-    canReorder: setIndex === 1 && ex.loadType === LoadTypeSchema.enum.reps_only &&
-      openSlots(ctx, ctx.activeWorkout).some((i) => i !== c.index),
-  }, { ...c, warmupStep: null });
+    notice: opts.notice ?? null,
+  }, {
+    ...c,
+    warmupStep: null,
+    viewSet: null,
+    log: c.log && { ...c.log, workSets: recorded.length },
+  });
 }
 
 /** Пресс и другие reps_only: без веса и разминки — сразу к подходам. */
@@ -484,10 +523,12 @@ function startRepsOnly(
 ): StepResult {
   const logId = idsOf(ctx)();
   const next: WorkoutContext = { ...c, log: { id: logId, workLb: null, workSets: 0 } };
-  return withEffects(repsPrompt(state, ctx, next, ex, null, null), [
-    openLog(ctx, c, ex, logId, done, null, null, null),
+  return withEffects(repsPrompt(state, ctx, next, ex, { recorded: [] }), [
+    openLog(ctx, c, ex, logId, null, null, null),
   ]);
 }
+
+const REPS_STEPS: ReadonlySet<string> = new Set([S.workout_reps, S.workout_warmup]);
 
 /** Повторения кнопкой — с текущим рабочим весом. */
 export function chooseReps(state: Session, ctx: StepContext, reps: number): StepResult {
@@ -508,7 +549,8 @@ export function recordWork(
 ): StepResult {
   const log = c.log;
   if (!log) return unchanged(state);
-  const index = log.workSets + 1;
+  const before = workSetsOf(logOf(ctx.activeWorkout, ex.id));
+  const index = (before.at(-1)?.index ?? 0) + 1;
   const effects: Effect[] = [{
     type: 'record_set',
     set: {
@@ -526,155 +568,94 @@ export function recordWork(
     },
   }];
   if (comment) effects.push({ type: 'patch_exercise_log', id: log.id, patch: { comment } });
-  const next: WorkoutContext = { ...c, log: { ...log, workLb: weightLb, workSets: index } };
-  const recorded = { weightLb, reps };
-  const result = index < ex.workSets.min
-    ? repsPrompt(state, ctx, next, ex, recorded, null)
-    : afterSet(state, ctx, next, ex, recorded, false);
-  return withEffects(result, effects);
-}
-
-export function afterSet(
-  state: Session,
-  ctx: StepContext,
-  c: WorkoutContext,
-  ex: Exercise,
-  recorded: { weightLb: Lb | null; reps: number },
-  commentSaved: boolean,
-): StepResult {
-  const setIndex = c.log?.workSets ?? 1;
-  return moveTo(state, S.workout_after_set, {
-    type: 'workout_after_set',
-    exerciseName: ex.name,
-    recorded,
-    addedWeight: ex.loadType === LoadTypeSchema.enum.weighted_bodyweight,
-    setIndex,
-    nextOverMax: setIndex + 1 > ex.workSets.max,
-    lastExercise: !openSlots(ctx, ctx.activeWorkout).some((i) => i !== c.index),
-    commentSaved,
-  }, c);
-}
-
-export function moreSets(state: Session, ctx: StepContext): StepResult {
-  const c = workoutContext(state);
-  const ex = c && currentExercise(ctx, c);
-  if (!c || !ex || state.step !== S.workout_after_set) return unchanged(state);
-  return repsPrompt(state, ctx, c, ex, null, null);
-}
-
-export function nextExercise(state: Session, ctx: StepContext): StepResult {
-  const c = workoutContext(state);
-  if (!c || state.step !== S.workout_after_set) return unchanged(state);
-  return showExercise(state, ctx, atSlot(c, nextSlot(ctx, ctx.activeWorkout, c.index)));
-}
-
-/**
- * [⏭ Пропустить]: до первого рабочего подхода — запись со статусом skipped; после — упражнение
- * заканчивается досрочно, записанное остаётся. Дальше — следующее невыполненное.
- */
-export function skipExercise(state: Session, ctx: StepContext): StepResult {
-  const c = workoutContext(state);
-  const ex = c && currentExercise(ctx, c);
-  if (!c || !ex || !SKIP_STEPS.has(state.step)) return unchanged(state);
-  if ((c.log?.workSets ?? 0) > 0) {
-    return showExercise(state, ctx, atSlot(c, nextSlot(ctx, ctx.activeWorkout, c.index)));
-  }
-  const effect: Effect = c.log
-    ? { type: 'patch_exercise_log', id: c.log.id, patch: { status: skipped } }
-    : openLog(ctx, c, ex, idsOf(ctx)(), skipped, null, c.intensity, null);
-  const activeWorkout = withSkip(ctx.activeWorkout, ex, slotExercise(ctx, c)?.id ?? ex.id);
-  const nextCtx = { ...ctx, newIds: ctx.newIds.slice(1), activeWorkout };
+  const next: WorkoutContext = { ...c, log: { ...log, workLb: weightLb } };
   return withEffects(
-    showExercise(state, nextCtx, atSlot(c, nextSlot(nextCtx, activeWorkout, c.index))),
-    [effect],
+    repsPrompt(state, ctx, next, ex, {
+      recorded: [...asView(before), { weightLb, reps }],
+      notice: comment ? { kind: 'commented' } : null,
+    }),
+    effects,
   );
 }
 
-/** Новое место дня: упражнение по программе, интенсивность и запись — заново. */
-export const atSlot = (c: WorkoutContext, index: number): WorkoutContext => ({
-  ...c,
-  index,
-  exerciseId: null,
-  intensity: null,
-  warmupStep: null,
-  log: null,
-});
-
-/** Пропуск в этом же апдейте ещё не в БД — добавляем его в снимок для сводки. */
-const withSkip = (
-  active: ActiveWorkout | null,
-  ex: Exercise,
-  slot: string,
-): ActiveWorkout | null =>
-  active && {
+/** [🏁 Завершить упражнение]: ✅ в меню; без рабочих подходов запись не нужна. */
+export function finishExercise(state: Session, ctx: StepContext): StepResult {
+  const c = workoutContext(state);
+  const active = ctx.activeWorkout;
+  if (!c?.log || !active || c.exerciseId === null || state.step !== S.workout_reps) {
+    return unchanged(state);
+  }
+  const logId = c.log.id;
+  const hasWork = workSetsOf(logOf(active, c.exerciseId)).length > 0;
+  const effect: Effect = hasWork
+    ? { type: 'patch_exercise_log', id: logId, patch: { finishedAt: ctx.now } }
+    : { type: 'delete_exercise_log', id: logId };
+  const after: ActiveWorkout = {
     ...active,
-    logs: [
-      ...active.logs.filter((l) => slotId(l) !== slot),
-      {
-        id: '',
-        exerciseId: ex.id,
-        exerciseName: ex.name,
-        substitutedFor: slot === ex.id ? null : slot,
-        status: skipped,
-        plannedWorkWeightLb: null,
-        sets: [],
-      },
-    ],
+    logs: hasWork
+      ? active.logs.map((l) => (l.id === logId ? { ...l, finishedAt: ctx.now } : l))
+      : active.logs.filter((l) => l.id !== logId),
   };
+  return withEffects(menuScreen(state, ctx, after, false), [effect]);
+}
 
 // ---------------------------------------------------------------- комментарии и текст
 
+/** [💬 Комментарий]: на подходе — к упражнению, в меню и на сводке — к тренировке. */
 export function requestComment(state: Session, ctx: StepContext): StepResult {
   const c = workoutContext(state);
   if (!c) return unchanged(state);
   const ex = currentExercise(ctx, c);
-  if (state.step === S.workout_after_set) {
-    return moveTo(state, S.workout_comment, {
-      type: 'workout_comment_prompt',
-      exerciseName: ex?.name ?? '',
-    }, c);
+  switch (state.step) {
+    case S.workout_reps:
+      return moveTo(state, S.workout_comment, {
+        type: 'workout_comment_prompt',
+        exerciseName: ex?.name ?? '',
+      }, c);
+    case S.workout_menu:
+      return moveTo(state, S.workout_menu_comment, {
+        type: 'workout_comment_prompt',
+        exerciseName: null,
+      }, c);
+    case S.workout_summary:
+      return moveTo(state, S.workout_final_comment, {
+        type: 'workout_comment_prompt',
+        exerciseName: null,
+      }, c);
+    default:
+      return unchanged(state);
   }
-  if (state.step === S.workout_summary) {
-    return moveTo(state, S.workout_final_comment, {
-      type: 'workout_comment_prompt',
-      exerciseName: null,
-    }, c);
-  }
-  return unchanged(state);
 }
 
-/** Текст во время тренировки: вес в карточке, подход, комментарий. */
+/** Текст во время тренировки: вес в карточке, подход, комментарии. */
 export function workoutText(state: Session, ctx: StepContext, text: string): StepResult {
   const c = workoutContext(state);
-  const ex = c && currentExercise(ctx, c);
   if (!c) return unchanged(state);
+  const comment = text.trim();
 
   if (state.step === S.workout_final_comment) {
     // Тренировка уже завершена — остаёмся на шаге сводки, чтобы «Готово» работало.
     return withEffects(moveTo(state, S.workout_summary, { type: 'workout_commented' }, c), [
-      { type: 'comment_workout', workoutId: c.workoutId, comment: text.trim() },
+      { type: 'comment_workout', workoutId: c.workoutId, comment },
     ]);
   }
+  if (state.step === S.workout_menu_comment && ctx.activeWorkout) {
+    return withEffects(menuScreen(state, ctx, ctx.activeWorkout, true), [
+      { type: 'comment_workout', workoutId: c.workoutId, comment },
+    ]);
+  }
+  const ex = currentExercise(ctx, c);
   if (!ex) return unchanged(state);
 
   if (state.step === S.workout_comment && c.log) {
-    const lastSet = ctx.activeWorkout?.logs.find((l) => l.id === c.log?.id)?.sets.filter((s) =>
-      s.kind === work
-    ).at(-1);
-    return withEffects(
-      afterSet(state, ctx, c, ex, {
-        weightLb: lastSet?.weightLb ?? c.log.workLb,
-        reps: lastSet?.reps ?? 0,
-      }, true),
-      [{ type: 'patch_exercise_log', id: c.log.id, patch: { comment: text.trim() } }],
-    );
+    return withEffects(repsPrompt(state, ctx, c, ex, { notice: { kind: 'commented' } }), [
+      { type: 'patch_exercise_log', id: c.log.id, patch: { comment } },
+    ]);
   }
-
   if (state.step === S.workout_card) return cardText(state, ctx, c, ex, text);
-
   if (REPS_STEPS.has(state.step) && c.log) {
     const parsed = parseSetInput(text, { loadType: ex.loadType, suggestedLb: c.log.workLb });
-    if (!parsed.ok) return repsPrompt(state, ctx, c, ex, null, parsed.error);
+    if (!parsed.ok) return repsPrompt(state, ctx, c, ex, { error: parsed.error });
     return recordWork(
       state,
       ctx,
@@ -721,15 +702,6 @@ function cardText(
   return withEffects(recorded, logEffects);
 }
 
-export function cardIntensity(
-  ctx: StepContext,
-  c: WorkoutContext,
-  ex: Exercise,
-): IntensityInfo | null {
-  const i = intensityOf(ctx, c, ex);
-  return i === 'unknown' ? null : i;
-}
-
 /** Интенсивности недели по правилам — для условных заметок упражнений не из пары. */
 function currentWeekIntensities(ctx: StepContext): Readonly<Record<string, Intensity>> {
   const zone = ctx.settings.timezone;
@@ -743,46 +715,45 @@ function currentWeekIntensities(ctx: StepContext): Readonly<Record<string, Inten
 
 // ---------------------------------------------------------------- завершение и отмена
 
-/** Сводка: подходы по упражнениям дня, прошлый раз, длительность. */
-function summary(
-  state: Session,
-  ctx: StepContext,
-  active: ActiveWorkout,
-  extra: readonly Effect[],
-  status: WorkoutStatus | null,
-  commentSaved = false,
-): StepResult {
-  const program = ctx.activeProgram;
-  const exercises = program ? dayExercises(program, active.dayId) : [];
-  const index = program ? exerciseIndex(program) : new Map<string, Exercise>();
-  const items = exercises.flatMap((slot) => {
-    const log = active.logs.find((l) => slotId(l) === slot.id);
-    if (!log) return [];
-    const ex = index.get(log.exerciseId) ?? slot;
+/** [🏁 Завершить тренировку]: сводка; без единого рабочего подхода — тренировка удаляется. */
+export function finishWorkout(state: Session, ctx: StepContext): StepResult {
+  const active = ctx.activeWorkout;
+  if (!active || state.step !== S.workout_menu) return unchanged(state);
+  if (!active.logs.some((l) => workSetsOf(l).length > 0)) {
+    return withEffects(moveTo(state, S.idle, { type: 'workout_empty_deleted' }), [
+      { type: 'delete_workout', id: active.id },
+    ]);
+  }
+  return summary(state, ctx, active);
+}
+
+/** Сводка: подходы по упражнениям меню, прошлый раз, длительность. */
+function summary(state: Session, ctx: StepContext, active: ActiveWorkout): StepResult {
+  const day = new Set(
+    ctx.activeProgram ? dayExercises(ctx.activeProgram, active.dayId).map((e) => e.id) : [],
+  );
+  const items = menuExercises(ctx, active).flatMap((ex) => {
+    const sets = workSetsOf(logOf(active, ex.id));
+    if (sets.length === 0 && !day.has(ex.id)) return [];
     return [{
       name: ex.name,
-      replaces: log.substitutedFor === null ? null : slot.name,
-      skipped: log.status === skipped,
+      replaces: null,
+      skipped: sets.length === 0,
       addedWeight: ex.loadType === LoadTypeSchema.enum.weighted_bodyweight,
-      sets: log.sets.filter((s) => s.kind === work).map((s) => ({
-        weightLb: s.weightLb,
-        reps: s.reps,
-      })),
+      sets: asView(sets),
       last: ctx.lastResults[ex.id] ?? null,
     }];
   });
-  const view: View = {
-    type: 'workout_summary',
-    dayName: active.dayName,
-    localDate: active.localDate,
-    minutes: Math.max(0, Math.round((ctx.now.getTime() - active.startedAt.getTime()) / 60_000)),
-    items,
-    commentSaved,
-  };
-  const effects = status ? [...extra, finish(active.id, status, ctx)] : extra;
   return withEffects(
-    moveTo(state, S.workout_summary, view, contextFor(active, exercises.length)),
-    effects,
+    moveTo(state, S.workout_summary, {
+      type: 'workout_summary',
+      dayName: active.dayName,
+      localDate: active.localDate,
+      minutes: Math.max(0, Math.round((ctx.now.getTime() - active.startedAt.getTime()) / 60_000)),
+      items,
+      commentSaved: false,
+    }, menuContext(active)),
+    [finish(active.id, completed, ctx)],
   );
 }
 
@@ -800,50 +771,19 @@ export function requestCancel(state: Session, ctx: StepContext): StepResult {
   return moveTo(state, S.workout_cancel_confirm, {
     type: 'workout_cancel_confirm',
     dayName: active.dayName,
-  }, contextFor(active, 0));
+  }, menuContext(active));
 }
 
 export function answerCancel(state: Session, ctx: StepContext, confirm: boolean): StepResult {
   const active = ctx.activeWorkout;
   if (state.step !== S.workout_cancel_confirm || active === null) return unchanged(state);
-  if (!confirm) return resumeAt(state, ctx, active);
+  if (!confirm) return menuScreen(state, ctx, active, false);
   return withEffects(moveTo(state, S.idle, { type: 'workout_cancelled' }), [
     finish(active.id, aborted, ctx),
   ]);
 }
 
 // ---------------------------------------------------------------- общее
-
-const REPS_STEPS: ReadonlySet<string> = new Set([
-  S.workout_reps,
-  S.workout_after_set,
-  S.workout_warmup,
-]);
-const SKIP_STEPS: ReadonlySet<string> = new Set([
-  S.workout_card,
-  S.workout_intensity,
-  S.workout_reps,
-  S.workout_warmup,
-]);
-
-export const WORKOUT_STEPS: ReadonlySet<string> = new Set([
-  S.workout_day,
-  S.workout_resume,
-  S.workout_intensity,
-  S.workout_card,
-  S.workout_warmup,
-  S.workout_warmup_mark,
-  S.workout_warmup_edit,
-  S.workout_warmup_comment,
-  S.workout_replace,
-  S.workout_reorder,
-  S.workout_reps,
-  S.workout_after_set,
-  S.workout_comment,
-  S.workout_summary,
-  S.workout_final_comment,
-  S.workout_cancel_confirm,
-]);
 
 const finish = (workoutId: string, status: WorkoutStatus, ctx: StepContext): Effect => ({
   type: 'finish_workout',
@@ -857,11 +797,12 @@ export function openLog(
   c: WorkoutContext,
   ex: Exercise,
   id: string,
-  status: ExerciseLogStatus,
   plannedWorkWeightLb: Lb | null,
   intensity: Intensity | null,
   warmupTier: number | null,
 ): Effect {
+  const menu = menuExercises(ctx, ctx.activeWorkout);
+  const at = menu.findIndex((e) => e.id === ex.id);
   return {
     type: 'open_exercise_log',
     log: {
@@ -869,9 +810,9 @@ export function openLog(
       workoutId: c.workoutId,
       exerciseId: ex.id,
       exerciseName: ex.name,
-      substitutedFor: c.exerciseId === null ? null : slotExercise(ctx, c)?.id ?? null,
-      order: c.index + 1,
-      status,
+      substitutedFor: null,
+      order: (at >= 0 ? at : menu.length) + 1,
+      status: ExerciseLogStatusSchema.enum.done,
       intensity,
       plannedWorkWeightLb,
       stepLbUsed: weightStep(ex, ctx.settings),
