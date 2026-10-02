@@ -18,10 +18,12 @@ export type WorkoutView = Extract<View, { type: `workout_${string}` }>;
 const { high, low } = IntensitySchema.enum;
 const MARK = WarmupMarkSchema.enum;
 
-const text = (value: string, keyboard: Button[][] = []): Rendered => ({
+/** bold — фрагменты текста жирным: название упражнения на его экранах. */
+const text = (value: string, keyboard: Button[][] = [], bold: string[] = []): Rendered => ({
   text: value,
   keyboard,
   replyKeyboard: null,
+  ...(bold.length ? { bold } : {}),
 });
 
 /** Вес подхода: «195», допвес «+25», свой вес «свой вес», без веса — пусто. */
@@ -40,6 +42,7 @@ export function renderWorkoutView(view: WorkoutView, lang: Language): Rendered {
   const set = (w: number | null, reps: number, added: boolean): string =>
     setIn(lang, w, reps, added);
   const skip: Button = { label: t.skip, action: { type: 'exercise_skip' } };
+  const back: Button = { label: t.back, action: { type: 'back' } };
   switch (view.type) {
     case 'workout_days': {
       const head = view.last
@@ -58,6 +61,7 @@ export function renderWorkoutView(view: WorkoutView, lang: Language): Rendered {
       return text(`${head}${t.pickDay}`, [
         [{ label: `▶ ${view.next.name}`, action: { type: 'day_pick', dayId: view.next.id } }],
         ...chunk(others, 2),
+        [back],
       ]);
     }
     case 'workout_resume':
@@ -73,12 +77,12 @@ export function renderWorkoutView(view: WorkoutView, lang: Language): Rendered {
       ], [{
         label: t.startNew,
         action: { type: 'resume', choice: ResumeChoiceSchema.enum.new },
-      }]]);
+      }, back]]);
     case 'workout_intensity':
       return text(t.intensityAsk(view.exerciseName, view.pairNames[0], view.pairNames[1]), [[
         { label: '100%', action: { type: 'intensity_set', intensity: high } },
         { label: '70%', action: { type: 'intensity_set', intensity: low } },
-      ], [skip]]);
+      ], [skip, back]], [view.exerciseName]);
     case 'workout_card': {
       const reps = view.repRange ? ` × ${view.repRange.min}–${view.repRange.max}` : '';
       const lines = [
@@ -116,7 +120,8 @@ export function renderWorkoutView(view: WorkoutView, lang: Language): Rendered {
         ...(options.length ? [options] : []),
         [...toggle, skip],
         switchRow(view.canReorder, lang),
-      ]);
+        [back],
+      ], [view.exerciseName]);
     }
     case 'workout_replace':
       return text(t.replaceAsk(view.exerciseName), [
@@ -142,7 +147,8 @@ export function renderWorkoutView(view: WorkoutView, lang: Language): Rendered {
       const lines = view.lines.map((l, i) => `${i + 1}. ${warmupLine(l, view.addedWeight, lang)}`);
       const comment = view.lastComment ? `${t.lastWarmupComment(view.lastComment)}\n` : '';
       return text(
-        `${comment}${t.warmupFor(weight(view.workLb, view.addedWeight))}${reps}:\n` +
+        `${view.exerciseName}\n${comment}` +
+          `${t.warmupFor(weight(view.workLb, view.addedWeight))}${reps}:\n` +
           `${lines.join('\n')}\n\n${t.orWorkSet}`,
         [
           [
@@ -151,15 +157,17 @@ export function renderWorkoutView(view: WorkoutView, lang: Language): Rendered {
           ],
           [
             { label: t.warmupNone, action: { type: 'warmup', variant: 'none' } },
-            { label: t.back, action: { type: 'back' } },
+            back,
           ],
         ],
+        [view.exerciseName],
       );
     }
     case 'workout_warmup_mark': {
       const head = t.markHead(view.step, view.total, warmupLine(view.line, view.addedWeight, lang));
       return text(
         [
+          view.exerciseName,
           head,
           view.error ? `⚠️ ${t.errors[view.error]}` : null,
           view.editing ? t.markAsk : null,
@@ -170,12 +178,13 @@ export function renderWorkoutView(view: WorkoutView, lang: Language): Rendered {
             { label: t.markEdit, action: { type: 'warmup_mark', mark: MARK.edit } },
             { label: t.markSkip, action: { type: 'warmup_mark', mark: MARK.skip } },
           ],
-          [{ label: t.back, action: { type: 'back' } }],
+          [back],
         ],
+        [view.exerciseName],
       );
     }
     case 'workout_warmup_comment_prompt':
-      return text(t.warmupCommentAsk(view.exerciseName));
+      return text(t.warmupCommentAsk(view.exerciseName), [[back]]);
     case 'workout_undo_nothing':
       return text(t.undoNothing);
     case 'workout_reps': {
@@ -185,6 +194,7 @@ export function renderWorkoutView(view: WorkoutView, lang: Language): Rendered {
           view.weightLb === null ? '' : `${weight(view.weightLb, view.addedWeight)} `
         }× ?${view.perSideLb === null ? '' : ` (${t.perSide(num(view.perSideLb, lang))})`}`;
       const lines = [
+        view.exerciseName,
         view.undone
           ? t.undone(set(view.undone.weightLb, view.undone.reps, view.addedWeight))
           : null,
@@ -200,22 +210,22 @@ export function renderWorkoutView(view: WorkoutView, lang: Language): Rendered {
         action: { type: 'reps_set', reps: r },
       }));
       const extra: Button[] = [
-        ...(view.justRecorded ? [{ label: t.fix, action: { type: 'undo' } } satisfies Button] : []),
         ...(view.canCommentWarmup
           ? [{ label: t.warmupComment, action: { type: 'warmup_comment' } } satisfies Button]
           : []),
-        ...(view.canBack ? [{ label: t.back, action: { type: 'back' } } satisfies Button] : []),
-        ...(view.setIndex === 1 ? [skip] : []),
+        skip,
+        back,
       ];
       return text(lines.join('\n'), [
         ...chunk(reps, 4),
-        ...(extra.length ? chunk(extra, 2) : []),
+        ...chunk(extra, 2),
         ...(view.canReplace ? [switchRow(view.canReorder, lang)] : []),
-      ]);
+      ], [view.exerciseName]);
     }
     case 'workout_after_set':
       return text(
         [
+          view.exerciseName,
           t.recorded(set(view.recorded.weightLb, view.recorded.reps, view.addedWeight)),
           view.commentSaved ? t.commentSaved : null,
           t.nextSetHint,
@@ -229,18 +239,19 @@ export function renderWorkoutView(view: WorkoutView, lang: Language): Rendered {
             { label: t.comment, action: { type: 'comment' } },
           ],
           [
-            { label: t.fix, action: { type: 'undo' } },
+            back,
             {
               label: view.lastExercise ? t.finishWorkout : t.nextExercise,
               action: { type: 'exercise_next' },
             },
           ],
         ],
+        [view.exerciseName],
       );
     case 'workout_comment_prompt':
-      return text(
-        view.exerciseName === null ? t.workoutCommentAsk : t.exerciseCommentAsk(view.exerciseName),
-      );
+      return view.exerciseName === null
+        ? text(t.workoutCommentAsk)
+        : text(t.exerciseCommentAsk(view.exerciseName), [[back]]);
     case 'workout_summary': {
       const items = view.items.map((i) => summaryLine(i, lang));
       return text(

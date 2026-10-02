@@ -5,7 +5,7 @@ import { type Exercise, LoadTypeSchema } from '../program/schema.ts';
 import type { Lb } from '../units/lb.ts';
 import type { WarmupLine } from '../workout/plan.ts';
 import type { WorkoutLog } from '../workout/schema.ts';
-import { moveTo, unchanged, withEffects } from './flow.ts';
+import { home, moveTo, unchanged, withEffects } from './flow.ts';
 import {
   type Effect,
   type Session,
@@ -16,9 +16,12 @@ import {
   WarmupMarkSchema,
 } from './types.ts';
 import {
+  afterSet,
+  answerCancel,
   atSlot,
   card,
   cardIntensity,
+  chooseDayScreen,
   currentExercise,
   idsOf,
   openSlots,
@@ -190,14 +193,37 @@ export function warmupCommentText(state: Session, ctx: StepContext, text: string
 
 // ---------------------------------------------------------------- [← Назад]
 
-/** Назад — только до первого рабочего подхода: разминка → вес, отметка → предыдущая, подход → разминка. */
+/**
+ * [← Назад] на любом экране тренировки: отменить последнее действие и вернуться на предыдущий
+ * экран (.specs/product.md → US-4).
+ */
 export function goBack(state: Session, ctx: StepContext): StepResult {
+  switch (state.step) {
+    case S.workout_day:
+    case S.workout_resume:
+      return toHome(state, ctx);
+    case S.workout_cancel_confirm:
+      return answerCancel(state, ctx, false);
+    case S.workout_after_set:
+      return undo(state, ctx);
+  }
   const c = workoutContext(state);
   const ex = c && currentExercise(ctx, c);
-  if (c && (state.step === S.workout_replace || state.step === S.workout_reorder)) {
-    return showExercise(state, ctx, c);
+  if (!c || !ex) return unchanged(state);
+
+  switch (state.step) {
+    case S.workout_replace:
+    case S.workout_reorder:
+      return showExercise(state, ctx, c);
+    case S.workout_card:
+    case S.workout_intensity:
+      return toPreviousExercise(state, ctx, c);
+    case S.workout_comment:
+      return afterLastSet(state, ctx, c, ex);
+    case S.workout_warmup_comment:
+      return repsPrompt(state, ctx, c, ex, null, null, { canCommentWarmup: true });
   }
-  if (!c?.log || !ex) return unchanged(state);
+  if (!c.log) return unchanged(state);
   const log = currentLog(ctx, c);
   const warmupSets = (log?.sets ?? []).filter((s) => s.kind === warmup);
 
@@ -212,7 +238,10 @@ export function goBack(state: Session, ctx: StepContext): StepResult {
     ]);
   }
 
-  if (state.step === S.workout_reps && c.log.workSets === 0) {
+  if (state.step !== S.workout_reps) return unchanged(state);
+  if (c.log.workSets === 0) {
+    // Упражнение без карточки (reps_only): назад — к предыдущему упражнению.
+    if (ex.loadType === LoadTypeSchema.enum.reps_only) return toPreviousExercise(state, ctx, c);
     const effects: Effect[] = [];
     if (warmupSets.length > 0) {
       effects.push({ type: 'delete_sets', ids: warmupSets.map((s) => s.id) }, {
@@ -224,7 +253,66 @@ export function goBack(state: Session, ctx: StepContext): StepResult {
     const shown = warmupScreen(state, ctx, c, ex);
     return shown ? withEffects(shown, effects) : backToCard(state, ctx, c, ex);
   }
-  return unchanged(state);
+  // Подход после [➕ Ещё подход] — обратно к экрану после подхода; пока минимум не набран,
+  // предыдущим экраном был ввод прошлого подхода — его запись отменяется.
+  return c.log.workSets >= ex.workSets.min ? afterLastSet(state, ctx, c, ex) : undo(state, ctx);
+}
+
+function toHome(state: Session, ctx: StepContext): StepResult {
+  const zone = ctx.settings.timezone;
+  return zone ? home(state, zone, ctx) : unchanged(state);
+}
+
+/** Экран после последнего записанного подхода текущего упражнения. */
+function afterLastSet(
+  state: Session,
+  ctx: StepContext,
+  c: WorkoutContext,
+  ex: Exercise,
+): StepResult {
+  const last = (currentLog(ctx, c)?.sets ?? []).filter((s) => s.kind === work).at(-1);
+  if (!last) return unchanged(state);
+  return afterSet(state, ctx, c, ex, { weightLb: last.weightLb, reps: last.reps }, false);
+}
+
+/**
+ * С карточки (ничего ещё не записано) — к предыдущему упражнению: после его последнего подхода;
+ * если оно пропущено — пропуск снимается, снова его карточка. Первое упражнение — к выбору дня,
+ * пустая тренировка удаляется. Пустая запись текущего (reps_only) удаляется.
+ */
+function toPreviousExercise(state: Session, ctx: StepContext, c: WorkoutContext): StepResult {
+  const active = ctx.activeWorkout;
+  const program = ctx.activeProgram;
+  if (!active || !program) return unchanged(state);
+  const current = active.logs.find((l) => l.id === c.log?.id && l.sets.length === 0);
+  const drop: Effect[] = current ? [{ type: 'delete_exercise_log', id: current.id }] : [];
+  const prev = active.logs.filter((l) => l !== current).at(-1);
+  if (!prev) {
+    return withEffects(chooseDayScreen(state, { ...ctx, activeWorkout: null }), [
+      ...drop,
+      { type: 'delete_workout', id: active.id },
+    ]);
+  }
+  const lastWork = prev.sets.filter((s) => s.kind === work).at(-1);
+  // Предыдущее пропущено (или только с разминкой) — снимаем это, как /undo.
+  if (!lastWork) return undo(state, ctx);
+  const index = dayExercises(program, active.dayId).findIndex((e) => e.id === slotId(prev));
+  const works = prev.sets.filter((s) => s.kind === work);
+  const target: WorkoutContext = {
+    ...atSlot(c, index),
+    exerciseId: prev.substitutedFor === null ? null : prev.exerciseId,
+    log: {
+      id: prev.id,
+      workLb: lastWork.weightLb ?? prev.plannedWorkWeightLb,
+      workSets: works.length,
+    },
+  };
+  const ex = currentExercise(ctx, target);
+  if (index < 0 || !ex) return unchanged(state);
+  return withEffects(
+    afterSet(state, ctx, target, ex, { weightLb: lastWork.weightLb, reps: lastWork.reps }, false),
+    drop,
+  );
 }
 
 /** К выбору рабочего веса: запись упражнения (пока без подходов) удаляется. */
@@ -314,7 +402,8 @@ export function undo(state: Session, ctx: StepContext): StepResult {
     }
   }
 
-  return withEffects(card(state, ctx, base, ex, cardIntensity(ctx, base, ex), false), [
+  // Пропуск снимается: упражнение открывается как обычно (у reps_only — сразу подход).
+  return withEffects(showExercise(state, ctx, base), [
     ...dropCurrent,
     { type: 'delete_exercise_log', id: log.id },
   ]);

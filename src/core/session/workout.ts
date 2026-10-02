@@ -105,7 +105,7 @@ export function chooseResume(state: Session, ctx: StepContext, choice: ResumeCho
   }
 }
 
-function chooseDayScreen(state: Session, ctx: StepContext): StepResult {
+export function chooseDayScreen(state: Session, ctx: StepContext): StepResult {
   const program = ctx.activeProgram;
   if (program === null) return moveTo(state, S.idle, { type: 'needs_program' });
   const names = new Map(program.days.map((d) => [d.id, d.name]));
@@ -468,7 +468,6 @@ export function repsPrompt(
     error,
     perSideLb: grid && workLb !== null ? perSide(grid, workLb) : null,
     undone: extras.undone ?? null,
-    canBack: setIndex === 1 && ex.loadType !== LoadTypeSchema.enum.reps_only,
     canCommentWarmup: setIndex === 1 && (extras.canCommentWarmup ?? false),
     canReplace: setIndex === 1 && ex.loadType === LoadTypeSchema.enum.reps_only,
     canReorder: setIndex === 1 && ex.loadType === LoadTypeSchema.enum.reps_only &&
@@ -569,12 +568,16 @@ export function nextExercise(state: Session, ctx: StepContext): StepResult {
   return showExercise(state, ctx, atSlot(c, nextSlot(ctx, ctx.activeWorkout, c.index)));
 }
 
-/** Пропустить упражнение: запись со статусом skipped, дальше — следующее. */
+/**
+ * [⏭ Пропустить]: до первого рабочего подхода — запись со статусом skipped; после — упражнение
+ * заканчивается досрочно, записанное остаётся. Дальше — следующее невыполненное.
+ */
 export function skipExercise(state: Session, ctx: StepContext): StepResult {
   const c = workoutContext(state);
   const ex = c && currentExercise(ctx, c);
-  if (!c || !ex || !SKIP_STEPS.has(state.step) || (c.log?.workSets ?? 0) > 0) {
-    return unchanged(state);
+  if (!c || !ex || !SKIP_STEPS.has(state.step)) return unchanged(state);
+  if ((c.log?.workSets ?? 0) > 0) {
+    return showExercise(state, ctx, atSlot(c, nextSlot(ctx, ctx.activeWorkout, c.index)));
   }
   const effect: Effect = c.log
     ? { type: 'patch_exercise_log', id: c.log.id, patch: { status: skipped } }

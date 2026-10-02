@@ -19,7 +19,7 @@ async function neck(w: World): Promise<void> {
 Deno.test('замена: брусья вместо жима — своя карточка, запись с substitutedFor, в сводке «вместо»', async () => {
   const w = await world();
   await tuesday(w);
-  assertEquals(w.buttons().slice(-2), ['🔄 Заменить', '🔀 Другое упражнение']);
+  assertEquals(w.buttons().slice(-3), ['🔄 Заменить', '🔀 Другое упражнение', '← Назад']);
   await w.press({ type: 'replace' });
   assertEquals(w.last(), 'Чем заменить «Жим на наклонной»?');
   assertEquals(w.buttons().includes('Жим на наклонной'), false, 'текущего в списке нет');

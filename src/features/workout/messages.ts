@@ -47,7 +47,6 @@ const ru = {
   warmupCommentAsk: (name: string) =>
     `Комментарий к разминке «${name}» — напиши текстом. Покажу его перед разминкой в следующий раз.`,
   undone: (set: string) => `↩️ Удалил ${set}.`,
-  fix: '✏️ Исправить',
   undoNothing: 'Нечего отменять.',
   replace: '🔄 Заменить',
   reorder: '🔀 Другое упражнение',
@@ -138,7 +137,6 @@ const en: typeof ru = {
   warmupCommentAsk: (name: string) =>
     `Comment on the “${name}” warm-up — type it. I’ll show it before the warm-up next time.`,
   undone: (set: string) => `↩️ Removed ${set}.`,
-  fix: '✏️ Fix',
   undoNothing: 'Nothing to undo.',
   replace: '🔄 Replace',
   reorder: '🔀 Another exercise',
