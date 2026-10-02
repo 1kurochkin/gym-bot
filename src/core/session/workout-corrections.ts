@@ -1,6 +1,5 @@
-import { ExerciseLogStatusSchema, SetKindSchema, WarmupVariantSchema } from '../history/schema.ts';
+import { SetKindSchema, WarmupVariantSchema } from '../history/schema.ts';
 import { parseSetInput, type SetInputError } from '../input/set-input.ts';
-import { dayExercises, exerciseIndex } from '../program/program.ts';
 import { type Exercise, LoadTypeSchema } from '../program/schema.ts';
 import type { Lb } from '../units/lb.ts';
 import type { WarmupLine } from '../workout/plan.ts';
@@ -16,43 +15,44 @@ import {
   WarmupMarkSchema,
 } from './types.ts';
 import {
-  afterSet,
   answerCancel,
-  atSlot,
+  atExercise,
   card,
   cardIntensity,
-  chooseDayScreen,
   currentExercise,
+  enterExercise,
   idsOf,
-  openSlots,
+  logOf,
+  menuScreen,
   repsPrompt,
-  showExercise,
-  slotExercise,
-  slotId,
+  type SetView,
   warmupLines,
   warmupScreen,
   type WorkoutContext,
   workoutContext,
+  workSetsOf,
 } from './workout.ts';
 
 /**
- * Исправления по ходу тренировки (.specs/product.md → US-3, US-4): «Отметить отличия» в разминке,
- * комментарий к разминке, [← Назад] до первого рабочего подхода, /undo и [✏️ Исправить],
- * замена упражнения и другой порядок.
+ * Исправления по ходу тренировки (.specs/product.md → US-3, US-4): «Изменить» в разминке,
+ * комментарий к разминке, [← Назад] (ничего не удаляет из записанного), просмотр, правка и
+ * удаление рабочего подхода, /undo.
  */
 
 const S = SessionStepSchema.enum;
-const { warmup, work } = SetKindSchema.enum;
+const { warmup } = SetKindSchema.enum;
 const { full, custom, none } = WarmupVariantSchema.enum;
-const { skipped } = ExerciseLogStatusSchema.enum;
 
 /** Запись текущего упражнения в том виде, в каком она в БД (до этого апдейта). */
 const currentLog = (ctx: StepContext, c: WorkoutContext): WorkoutLog | undefined =>
-  ctx.activeWorkout?.logs.find((l) => l.id === c.log?.id);
+  c.exerciseId === null ? undefined : logOf(ctx.activeWorkout, c.exerciseId);
 
-// ---------------------------------------------------------------- «Отметить отличия»
+const asView = (sets: WorkoutLog['sets']): SetView[] =>
+  sets.map((s) => ({ weightLb: s.weightLb, reps: s.reps }));
 
-/** [✏️ Отметить отличия]: идём по подходам разминки с первого. */
+// ---------------------------------------------------------------- «Изменить» в разминке
+
+/** [✏️ Изменить]: идём по подходам разминки с первого. */
 export function startWarmupDiff(state: Session, ctx: StepContext): StepResult {
   const c = workoutContext(state);
   const ex = c && currentExercise(ctx, c);
@@ -158,24 +158,20 @@ function recordWarmup(
       const planned = lines[s.index - 1];
       return s.skipped || !planned || s.weightLb !== planned.weightLb || s.reps !== planned.reps;
     });
-  return withEffects(
-    repsPrompt(state, ctx, c, ex, null, null, { canCommentWarmup: true }),
-    [record, {
-      type: 'patch_exercise_log',
-      id: log.id,
-      patch: { warmupVariant: differs ? custom : full },
-    }],
-  );
+  return withEffects(repsPrompt(state, ctx, c, ex), [record, {
+    type: 'patch_exercise_log',
+    id: log.id,
+    patch: { warmupVariant: differs ? custom : full },
+  }]);
 }
 
 // ---------------------------------------------------------------- комментарий к разминке
 
+/** [💬 Комментарий] на экране разминки. */
 export function requestWarmupComment(state: Session, ctx: StepContext): StepResult {
   const c = workoutContext(state);
   const ex = c && currentExercise(ctx, c);
-  if (!c?.log || !ex || state.step !== S.workout_reps || c.log.workSets > 0) {
-    return unchanged(state);
-  }
+  if (!c?.log || !ex || state.step !== S.workout_warmup) return unchanged(state);
   return moveTo(state, S.workout_warmup_comment, {
     type: 'workout_warmup_comment_prompt',
     exerciseName: ex.name,
@@ -186,42 +182,44 @@ export function warmupCommentText(state: Session, ctx: StepContext, text: string
   const c = workoutContext(state);
   const ex = c && currentExercise(ctx, c);
   if (!c?.log || !ex) return unchanged(state);
-  return withEffects(repsPrompt(state, ctx, c, ex, null, null), [
+  const shown = warmupScreen(state, ctx, c, ex, true) ?? repsPrompt(state, ctx, c, ex);
+  return withEffects(shown, [
     { type: 'patch_exercise_log', id: c.log.id, patch: { warmupComment: text.trim() } },
   ]);
 }
 
 // ---------------------------------------------------------------- [← Назад]
 
-/**
- * [← Назад] на любом экране тренировки: отменить последнее действие и вернуться на предыдущий
- * экран (.specs/product.md → US-4).
- */
+/** [← Назад] на любом экране тренировки: на предыдущий экран, записанное не удаляется (US-4). */
 export function goBack(state: Session, ctx: StepContext): StepResult {
+  const active = ctx.activeWorkout;
   switch (state.step) {
     case S.workout_day:
-    case S.workout_resume:
+    case S.workout_menu:
       return toHome(state, ctx);
     case S.workout_cancel_confirm:
       return answerCancel(state, ctx, false);
-    case S.workout_after_set:
-      return undo(state, ctx);
+    case S.workout_add:
+    case S.workout_menu_comment:
+      return active ? menuScreen(state, ctx, active, false) : unchanged(state);
   }
   const c = workoutContext(state);
   const ex = c && currentExercise(ctx, c);
-  if (!c || !ex) return unchanged(state);
+  if (!c || !ex || !active) return unchanged(state);
 
   switch (state.step) {
-    case S.workout_replace:
-    case S.workout_reorder:
-      return showExercise(state, ctx, c);
     case S.workout_card:
     case S.workout_intensity:
-      return toPreviousExercise(state, ctx, c);
+      return menuScreen(state, ctx, active, false);
     case S.workout_comment:
-      return afterLastSet(state, ctx, c, ex);
+      return repsPrompt(state, ctx, c, ex);
     case S.workout_warmup_comment:
-      return repsPrompt(state, ctx, c, ex, null, null, { canCommentWarmup: true });
+      return warmupScreen(state, ctx, c, ex, false) ?? repsPrompt(state, ctx, c, ex);
+    case S.workout_set_view:
+    case S.workout_set_edit: {
+      const k = c.viewSet ?? 1;
+      return k > 1 ? setView(state, ctx, c, ex, k - 1, false, null) : leaveExercise(state, ctx, c);
+    }
   }
   if (!c.log) return unchanged(state);
   const log = currentLog(ctx, c);
@@ -231,7 +229,7 @@ export function goBack(state: Session, ctx: StepContext): StepResult {
 
   if (MARK_STEPS.has(state.step)) {
     const step = c.warmupStep ?? 0;
-    if (step === 0) return warmupScreen(state, ctx, c, ex) ?? unchanged(state);
+    if (step === 0) return warmupScreen(state, ctx, c, ex, false) ?? unchanged(state);
     const previous = warmupSets.filter((s) => s.index === step);
     return withEffects(markScreen(state, ctx, c, ex, step - 1, false, null), [
       { type: 'delete_sets', ids: previous.map((s) => s.id) },
@@ -239,23 +237,20 @@ export function goBack(state: Session, ctx: StepContext): StepResult {
   }
 
   if (state.step !== S.workout_reps) return unchanged(state);
-  if (c.log.workSets === 0) {
-    // Упражнение без карточки (reps_only): назад — к предыдущему упражнению.
-    if (ex.loadType === LoadTypeSchema.enum.reps_only) return toPreviousExercise(state, ctx, c);
-    const effects: Effect[] = [];
-    if (warmupSets.length > 0) {
-      effects.push({ type: 'delete_sets', ids: warmupSets.map((s) => s.id) }, {
-        type: 'patch_exercise_log',
-        id: c.log.id,
-        patch: { warmupVariant: none },
-      });
-    }
-    const shown = warmupScreen(state, ctx, c, ex);
-    return shown ? withEffects(shown, effects) : backToCard(state, ctx, c, ex);
+  const works = workSetsOf(log);
+  if (works.length > 0) return setView(state, ctx, c, ex, works.length, false, null);
+  // Подходов нет: reps_only — в меню (пустая запись удаляется); иначе — к разминке или весу.
+  if (ex.loadType === LoadTypeSchema.enum.reps_only) return leaveExercise(state, ctx, c);
+  const effects: Effect[] = [];
+  if (warmupSets.length > 0) {
+    effects.push({ type: 'delete_sets', ids: warmupSets.map((s) => s.id) }, {
+      type: 'patch_exercise_log',
+      id: c.log.id,
+      patch: { warmupVariant: none },
+    });
   }
-  // Подход после [➕ Ещё подход] — обратно к экрану после подхода; пока минимум не набран,
-  // предыдущим экраном был ввод прошлого подхода — его запись отменяется.
-  return c.log.workSets >= ex.workSets.min ? afterLastSet(state, ctx, c, ex) : undo(state, ctx);
+  const shown = warmupScreen(state, ctx, c, ex, false);
+  return shown ? withEffects(shown, effects) : backToCard(state, ctx, c, ex);
 }
 
 function toHome(state: Session, ctx: StepContext): StepResult {
@@ -263,55 +258,16 @@ function toHome(state: Session, ctx: StepContext): StepResult {
   return zone ? home(state, zone, ctx) : unchanged(state);
 }
 
-/** Экран после последнего записанного подхода текущего упражнения. */
-function afterLastSet(
-  state: Session,
-  ctx: StepContext,
-  c: WorkoutContext,
-  ex: Exercise,
-): StepResult {
-  const last = (currentLog(ctx, c)?.sets ?? []).filter((s) => s.kind === work).at(-1);
-  if (!last) return unchanged(state);
-  return afterSet(state, ctx, c, ex, { weightLb: last.weightLb, reps: last.reps }, false);
-}
-
-/**
- * С карточки (ничего ещё не записано) — к предыдущему упражнению: после его последнего подхода;
- * если оно пропущено — пропуск снимается, снова его карточка. Первое упражнение — к выбору дня,
- * пустая тренировка удаляется. Пустая запись текущего (reps_only) удаляется.
- */
-function toPreviousExercise(state: Session, ctx: StepContext, c: WorkoutContext): StepResult {
+/** Из упражнения — в меню; пустая запись (ничего не записано) удаляется. */
+function leaveExercise(state: Session, ctx: StepContext, c: WorkoutContext): StepResult {
   const active = ctx.activeWorkout;
-  const program = ctx.activeProgram;
-  if (!active || !program) return unchanged(state);
-  const current = active.logs.find((l) => l.id === c.log?.id && l.sets.length === 0);
-  const drop: Effect[] = current ? [{ type: 'delete_exercise_log', id: current.id }] : [];
-  const prev = active.logs.filter((l) => l !== current).at(-1);
-  if (!prev) {
-    return withEffects(chooseDayScreen(state, { ...ctx, activeWorkout: null }), [
-      ...drop,
-      { type: 'delete_workout', id: active.id },
-    ]);
-  }
-  const lastWork = prev.sets.filter((s) => s.kind === work).at(-1);
-  // Предыдущее пропущено (или только с разминкой) — снимаем это, как /undo.
-  if (!lastWork) return undo(state, ctx);
-  const index = dayExercises(program, active.dayId).findIndex((e) => e.id === slotId(prev));
-  const works = prev.sets.filter((s) => s.kind === work);
-  const target: WorkoutContext = {
-    ...atSlot(c, index),
-    exerciseId: prev.substitutedFor === null ? null : prev.exerciseId,
-    log: {
-      id: prev.id,
-      workLb: lastWork.weightLb ?? prev.plannedWorkWeightLb,
-      workSets: works.length,
-    },
-  };
-  const ex = currentExercise(ctx, target);
-  if (index < 0 || !ex) return unchanged(state);
+  if (!active) return unchanged(state);
+  const log = currentLog(ctx, c) ?? active.logs.find((l) => l.id === c.log?.id);
+  const empty = log && log.sets.length === 0;
+  const after = empty ? { ...active, logs: active.logs.filter((l) => l.id !== log.id) } : active;
   return withEffects(
-    afterSet(state, ctx, target, ex, { weightLb: lastWork.weightLb, reps: lastWork.reps }, false),
-    drop,
+    menuScreen(state, ctx, after, false),
+    empty ? [{ type: 'delete_exercise_log', id: log.id }] : [],
   );
 }
 
@@ -329,10 +285,93 @@ function backToCard(
   ]);
 }
 
-// ---------------------------------------------------------------- /undo и [✏️ Исправить]
+// ---------------------------------------------------------------- просмотр подхода
+
+function setView(
+  state: Session,
+  ctx: StepContext,
+  c: WorkoutContext,
+  ex: Exercise,
+  k: number,
+  editing: boolean,
+  error: SetInputError | null,
+): StepResult {
+  const works = workSetsOf(currentLog(ctx, c));
+  const set = works[k - 1];
+  if (!set) return repsPrompt(state, ctx, c, ex);
+  return moveTo(state, editing ? S.workout_set_edit : S.workout_set_view, {
+    type: 'workout_set_view',
+    exerciseName: ex.name,
+    index: k,
+    set: { weightLb: set.weightLb, reps: set.reps },
+    addedWeight: ex.loadType === LoadTypeSchema.enum.weighted_bodyweight,
+    current: works.length + 1,
+    editing,
+    error,
+  }, { ...c, viewSet: k });
+}
+
+const VIEW_STEPS: ReadonlySet<string> = new Set([S.workout_set_view, S.workout_set_edit]);
+
+/** [✏️ Изменить]: ждём текст «7» или «185/7». */
+export function requestSetEdit(state: Session, ctx: StepContext): StepResult {
+  const c = workoutContext(state);
+  const ex = c && currentExercise(ctx, c);
+  if (!c || !ex || c.viewSet === null || !VIEW_STEPS.has(state.step)) return unchanged(state);
+  return setView(state, ctx, c, ex, c.viewSet, true, null);
+}
+
+/** Текст на просмотре подхода: перезаписать его и вернуться к вводу. */
+export function setEditText(state: Session, ctx: StepContext, text: string): StepResult {
+  const c = workoutContext(state);
+  const ex = c && currentExercise(ctx, c);
+  if (!c || !ex || c.viewSet === null) return unchanged(state);
+  const works = workSetsOf(currentLog(ctx, c));
+  const set = works[c.viewSet - 1];
+  if (!set) return repsPrompt(state, ctx, c, ex);
+  const parsed = parseSetInput(text, { loadType: ex.loadType, suggestedLb: set.weightLb });
+  if (!parsed.ok) return setView(state, ctx, c, ex, c.viewSet, true, parsed.error);
+  const { weightLb, reps } = parsed.value;
+  const recorded = works.map((s) =>
+    s.id === set.id ? { weightLb, reps } : { weightLb: s.weightLb, reps: s.reps }
+  );
+  return withEffects(
+    repsPrompt(state, ctx, c, ex, { recorded, notice: { kind: 'fixed', index: c.viewSet } }),
+    [{ type: 'update_set', id: set.id, weightLb, reps }],
+  );
+}
+
+/** [🗑 Удалить]: подход удаляется, бот возвращается к вводу. */
+export function deleteViewedSet(state: Session, ctx: StepContext): StepResult {
+  const c = workoutContext(state);
+  const ex = c && currentExercise(ctx, c);
+  if (!c || !ex || c.viewSet === null || !VIEW_STEPS.has(state.step)) return unchanged(state);
+  const works = workSetsOf(currentLog(ctx, c));
+  const set = works[c.viewSet - 1];
+  if (!set) return repsPrompt(state, ctx, c, ex);
+  return withEffects(
+    repsPrompt(state, ctx, c, ex, {
+      recorded: asView(works.filter((s) => s.id !== set.id)),
+      notice: { kind: 'deleted', index: c.viewSet },
+    }),
+    [{ type: 'delete_sets', ids: [set.id] }],
+  );
+}
+
+/** [➡️ К подходу N]: обратно к вводу. */
+export function forwardToInput(state: Session, ctx: StepContext): StepResult {
+  const c = workoutContext(state);
+  const ex = c && currentExercise(ctx, c);
+  if (!c || !ex || !VIEW_STEPS.has(state.step)) return unchanged(state);
+  return repsPrompt(state, ctx, c, ex);
+}
+
+// ---------------------------------------------------------------- /undo
 
 /** Шаги, на которых /undo имеет смысл: тренировка идёт, сводки ещё нет. */
 const UNDO_STEPS: ReadonlySet<string> = new Set([
+  S.workout_menu,
+  S.workout_add,
   S.workout_intensity,
   S.workout_card,
   S.workout_warmup,
@@ -340,149 +379,59 @@ const UNDO_STEPS: ReadonlySet<string> = new Set([
   S.workout_warmup_edit,
   S.workout_warmup_comment,
   S.workout_reps,
-  S.workout_after_set,
+  S.workout_set_view,
+  S.workout_set_edit,
   S.workout_comment,
 ]);
 
 /**
- * Удалить последнюю запись тренировки и вернуться к её вводу: рабочий подход → ввод подхода;
- * разминка без рабочих → экран разминки; пропуск упражнения → его карточка.
- * Пустая запись текущего упражнения (вес выбран, пресс открыт) — позиция, а не запись:
- * она удаляется заодно, отменяется то, что записано до неё.
+ * /undo: удалить последний рабочий подход тренировки и вернуться к его вводу. Если у последнего
+ * упражнения рабочих подходов нет, но отмечена разминка — удаляется разминка, бот показывает её.
  */
 export function undo(state: Session, ctx: StepContext): StepResult {
   const active = ctx.activeWorkout;
-  const program = ctx.activeProgram;
   const nothing = moveTo(state, state.step, { type: 'workout_undo_nothing' }, state.context);
   const c = workoutContext(state);
-  if (!active || !program || !c || !UNDO_STEPS.has(state.step)) return nothing;
-  const current = active.logs.find((l) => l.id === c.log?.id && l.sets.length === 0);
-  const log = active.logs.filter((l) =>
-    l !== current && (l.status === skipped || l.sets.length > 0)
-  ).at(-1);
+  if (!active || !c || !UNDO_STEPS.has(state.step)) return nothing;
+  const lastWithWork = [...active.logs].reverse().find((l) => workSetsOf(l).length > 0);
+  const lastWithWarmup = [...active.logs].reverse().find((l) =>
+    l.sets.some((s) => s.kind === warmup)
+  );
+  const log = lastWithWork ?? lastWithWarmup;
   if (!log) return nothing;
-  const dropCurrent: Effect[] = current ? [{ type: 'delete_exercise_log', id: current.id }] : [];
-  const index = dayExercises(program, active.dayId).findIndex((e) => e.id === slotId(log));
-  const base: WorkoutContext = {
-    ...atSlot(c, index),
-    exerciseId: log.substitutedFor === null ? null : log.exerciseId,
-  };
-  const ex = currentExercise(ctx, base);
-  if (index < 0 || !ex) return nothing;
+  const at = atExercise(c, log.exerciseId);
+  const ex = currentExercise(ctx, at);
+  if (!ex) return nothing;
 
-  const works = log.sets.filter((s) => s.kind === work);
-  const warmups = log.sets.filter((s) => s.kind === warmup);
+  const works = workSetsOf(log);
   const lastWork = works.at(-1);
-
   if (lastWork) {
-    const workLb = lastWork.weightLb ?? log.plannedWorkWeightLb;
+    const rest = works.slice(0, -1);
     const next: WorkoutContext = {
-      ...base,
-      log: { id: log.id, workLb, workSets: works.length - 1 },
+      ...at,
+      log: {
+        id: log.id,
+        workLb: lastWork.weightLb ?? log.plannedWorkWeightLb,
+        workSets: rest.length,
+      },
     };
     const undone = { weightLb: lastWork.weightLb, reps: lastWork.reps };
-    return withEffects(repsPrompt(state, ctx, next, ex, null, null, { undone }), [
-      ...dropCurrent,
-      { type: 'delete_sets', ids: [lastWork.id] },
-    ]);
+    return withEffects(
+      repsPrompt(state, ctx, next, ex, {
+        recorded: asView(rest),
+        notice: { kind: 'undone', set: undone },
+      }),
+      [{ type: 'delete_sets', ids: [lastWork.id] }],
+    );
   }
-
-  if (warmups.length > 0) {
-    const next: WorkoutContext = {
-      ...base,
-      log: { id: log.id, workLb: log.plannedWorkWeightLb, workSets: 0 },
-    };
-    const shown = warmupScreen(state, ctx, next, ex);
-    if (shown) {
-      return withEffects(shown, [
-        ...dropCurrent,
-        { type: 'delete_sets', ids: warmups.map((s) => s.id) },
-        { type: 'patch_exercise_log', id: log.id, patch: { warmupVariant: none } },
-      ]);
-    }
-  }
-
-  // Пропуск снимается: упражнение открывается как обычно (у reps_only — сразу подход).
-  return withEffects(showExercise(state, ctx, base), [
-    ...dropCurrent,
-    { type: 'delete_exercise_log', id: log.id },
-  ]);
-}
-
-// ---------------------------------------------------------------- замена и порядок
-
-/**
- * Откуда можно уйти к другому упражнению: карточка или первый подход упражнения без карточки
- * (reps_only), пока ничего не записано. Пустая запись такого упражнения удаляется.
- */
-function leaving(
-  state: Session,
-  ctx: StepContext,
-): { c: WorkoutContext; ex: Exercise; drop: Effect[] } | null {
-  const c = workoutContext(state);
-  const ex = c && currentExercise(ctx, c);
-  if (!c || !ex) return null;
-  if (state.step === S.workout_card) return { c: { ...c, log: null }, ex, drop: [] };
-  const empty = ex.loadType === LoadTypeSchema.enum.reps_only && c.log?.workSets === 0;
-  if (state.step !== S.workout_reps || !empty || !c.log) return null;
-  return {
-    c: { ...c, log: null },
-    ex,
-    drop: [{ type: 'delete_exercise_log', id: c.log.id }],
+  const warmups = log.sets.filter((s) => s.kind === warmup);
+  const next: WorkoutContext = {
+    ...at,
+    log: { id: log.id, workLb: log.plannedWorkWeightLb, workSets: 0 },
   };
-}
-
-/** [🔄 Заменить]: упражнения программы, кроме текущего (заменённое — тоже, чтобы вернуть). */
-export function requestReplace(state: Session, ctx: StepContext): StepResult {
-  const from = leaving(state, ctx);
-  if (!from || !ctx.activeProgram) return unchanged(state);
-  const options = [...exerciseIndex(ctx.activeProgram).values()]
-    .filter((e) => e.id !== from.ex.id)
-    .map((e) => ({ id: e.id, name: e.name }));
-  return withEffects(
-    moveTo(state, S.workout_replace, {
-      type: 'workout_replace',
-      exerciseName: from.ex.name,
-      options,
-    }, from.c),
-    from.drop,
-  );
-}
-
-export function chooseReplace(state: Session, ctx: StepContext, exerciseId: string): StepResult {
-  const c = workoutContext(state);
-  const program = ctx.activeProgram;
-  if (!c || !program || state.step !== S.workout_replace) return unchanged(state);
-  if (!exerciseIndex(program).has(exerciseId)) return unchanged(state);
-  const slot = slotExercise(ctx, c);
-  return showExercise(state, ctx, {
-    ...atSlot(c, c.index),
-    exerciseId: exerciseId === slot?.id ? null : exerciseId,
-  });
-}
-
-/** [🔀 Другое упражнение]: невыполненные места дня, кроме текущего. */
-export function requestReorder(state: Session, ctx: StepContext): StepResult {
-  const from = leaving(state, ctx);
-  const program = ctx.activeProgram;
-  if (!from || !program) return unchanged(state);
-  const exercises = dayExercises(program, from.c.dayId);
-  const options = openSlots(ctx, ctx.activeWorkout)
-    .filter((i) => i !== from.c.index)
-    .flatMap((index) => {
-      const e = exercises[index];
-      return e ? [{ index, name: e.name }] : [];
-    });
-  if (options.length === 0) return unchanged(state);
-  return withEffects(
-    moveTo(state, S.workout_reorder, { type: 'workout_reorder', options }, from.c),
-    from.drop,
-  );
-}
-
-export function chooseReorder(state: Session, ctx: StepContext, index: number): StepResult {
-  const c = workoutContext(state);
-  if (!c || state.step !== S.workout_reorder) return unchanged(state);
-  if (!openSlots(ctx, ctx.activeWorkout).includes(index)) return unchanged(state);
-  return showExercise(state, ctx, atSlot(c, index));
+  const shown = warmupScreen(state, ctx, next, ex, false) ?? enterExercise(state, ctx, at);
+  return withEffects(shown, [
+    { type: 'delete_sets', ids: warmups.map((s) => s.id) },
+    { type: 'patch_exercise_log', id: log.id, patch: { warmupVariant: none } },
+  ]);
 }

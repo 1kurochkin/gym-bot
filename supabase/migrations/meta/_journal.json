@@ -43,6 +43,13 @@
       "when": 1790891029360,
       "tag": "20261001214349_invites",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1790975563917,
+      "tag": "20261002211243_exercise_finished_at",
+      "breakpoints": true
     }
   ]
 }

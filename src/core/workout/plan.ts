@@ -59,17 +59,20 @@ export function weightOptions(grid: WeightGrid, base: Lb): readonly Lb[] {
   return options;
 }
 
-/** Кнопки повторений: от min−1 до max+2, не больше 8; пресс без диапазона — 10…30. */
+/** Сколько кнопок повторений показывать (US-3, шаг 3). */
+const REP_BUTTONS = 8;
+
+/**
+ * Кнопки повторений — 8 чисел подряд, без пропусков: от ориентира −3. Ориентир — прошлый подход
+ * в этой тренировке, для первого — прошлый результат, без истории — начало диапазона.
+ */
 export function repOptions(
   range: { readonly min: number; readonly max: number } | null,
+  anchor: number | null,
 ): readonly number[] {
-  if (range === null) return [10, 15, 20, 25, 30];
-  const from = Math.max(1, range.min - 1);
-  const to = range.max + 2;
-  const all = Array.from({ length: to - from + 1 }, (_, i) => from + i);
-  if (all.length <= 8) return all;
-  const step = Math.ceil(all.length / 8);
-  return all.filter((r, i) => i % step === 0 || r === range.min || r === range.max);
+  const around = anchor ?? range?.min ?? 10;
+  const from = Math.max(1, around - 3);
+  return Array.from({ length: REP_BUTTONS }, (_, i) => from + i);
 }
 
 export const WarmupLineLabelSchema = z.enum([

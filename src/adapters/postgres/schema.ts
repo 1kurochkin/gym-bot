@@ -105,6 +105,8 @@ export const exerciseLogs = pgTable('exercise_logs', {
   warmupTier: integer('warmup_tier'),
   warmupVariant: text('warmup_variant').$type<WarmupVariant>().notNull(),
   warmupComment: text('warmup_comment'),
+  /** «Завершить упражнение» (✅ в меню дня). */
+  finishedAt: timestamp('finished_at', { withTimezone: true }),
   comment: text('comment'),
   source: text('source').$type<LogSource>().notNull(),
   localDate: date('local_date').notNull(),

@@ -309,6 +309,7 @@ async function loadWorkoutLogs(
     exerciseName: l.exerciseName,
     substitutedFor: l.substitutedFor,
     status: l.status,
+    finishedAt: l.finishedAt,
     plannedWorkWeightLb: l.plannedWorkWeightLb,
     sets: sets.filter((st) => st.exerciseLogId === l.id).map((st) => ({
       id: st.id,

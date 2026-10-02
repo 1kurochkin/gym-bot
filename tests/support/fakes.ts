@@ -43,6 +43,7 @@ type LogRow = Omit<NewExerciseLog, 'workoutId'> & {
   source: LogSource;
   warmupVariant: string;
   warmupComment?: string;
+  finishedAt?: Date;
   comment: string | null;
   seq: number;
 };
@@ -353,6 +354,7 @@ function snapshot(store: MemoryStore, w: WorkoutRow): ActiveWorkout {
       exerciseName: l.exerciseName,
       substitutedFor: l.substitutedFor,
       status: l.status,
+      finishedAt: l.finishedAt ?? null,
       plannedWorkWeightLb: l.plannedWorkWeightLb,
       sets: store.sets.filter((s) => s.exerciseLogId === l.id).map((s) => ({
         id: s.id,

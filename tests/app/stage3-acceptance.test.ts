@@ -11,9 +11,12 @@ Deno.test('приёмка 1: после пятницы прошлой недел
   w.setNow('2026-09-25T22:40:00Z'); // пт, 25.09 — прошлая неделя
   await w.send(workout);
   await w.press({ type: 'day_pick', dayId: 'fri' });
-  for (let i = 0; i < 10 && !w.last().startsWith('Тренировка завершена'); i++) {
-    await w.press({ type: 'exercise_skip' });
-  }
+  await w.press({ type: 'menu_pick', exerciseId: 'pullups' });
+  await w.type('0');
+  await w.press({ type: 'warmup', variant: 'none' });
+  await w.type('8');
+  await w.press({ type: 'exercise_finish' });
+  await w.press({ type: 'workout_finish' });
   assert(w.last().startsWith('Тренировка завершена'), w.last());
   await w.press({ type: 'workout_done' });
 

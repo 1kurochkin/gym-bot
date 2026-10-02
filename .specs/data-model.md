@@ -58,11 +58,11 @@ updated: 2026-10-01
   intensity?: 'high' | 'low',
   plannedWorkWeightLb?, stepLbUsed,
   warmupTier?: number, warmupVariant: 'full' | 'short' | 'custom' | 'none',
-  warmupComment?, comment?,
+  warmupComment?, comment?, finishedAt?,   // finishedAt — нажато «Завершить упражнение» (✅ в меню)
   source: 'workout' | 'manual_import' | 'llm_import', localDate }
 ```
 
-Замена упражнения в тренировке — запись со `status: done`, `exerciseId` замены и `substitutedFor` = id заменённого упражнения программы; у заменённого записи нет (product.md → US-4). Статус `substituted` зарезервирован и не используется.
+`substitutedFor` — у записей замены, сделанных до меню дня (01.10): `exerciseId` замены, `substitutedFor` = заменённое. С меню дня (02.10) упражнение не заменяют, а добавляют в меню — новые записи с `substitutedFor` не появляются. Статусы `skipped` и `substituted` в новых тренировках не пишутся: несделанное упражнение просто без записи.
 
 `workoutId` пуст у записей не из тренировки (`source: manual_import`, `llm_import`): у стартовых результатов тренировки нет. У их подходов `workoutId` тоже пуст.
 

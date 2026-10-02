@@ -29,19 +29,19 @@ const SIMPLE_CODES = {
   settings_close: 'sc',
   plates_save: 'ps',
   step_reset: 'sr',
-  set_more: 'sm',
-  exercise_next: 'en',
-  exercise_skip: 'ek',
+  menu_add: 'ma',
+  exercise_finish: 'ef',
+  set_edit: 'ed',
+  set_delete: 'sd',
+  set_forward: 'sf',
+  workout_finish: 'wx',
   comment: 'cm',
   workout_done: 'wd',
   warmup_diff: 'wf',
   warmup_comment: 'wc',
   back: 'bk',
-  replace: 'rx',
-  reorder: 'ro',
   history_add: 'ha',
   history_delete: 'hd',
-  undo: 'un',
 } as const;
 
 /** Коды действий с одним параметром: «bs:45», «sp:calves». */
@@ -52,7 +52,8 @@ const PARAM_CODES = {
   step_pick: 'sp',
   step_set: 'st',
   day_pick: 'dp',
-  resume: 'rs',
+  menu_pick: 'mn',
+  add_pick: 'ad',
   intensity_set: 'is',
   weight_set: 'ws',
   warmup: 'wu',
@@ -62,8 +63,6 @@ const PARAM_CODES = {
   member_pick: 'mp',
   revoke_answer: 'ra',
   warmup_mark: 'wm',
-  replace_pick: 'rq',
-  reorder_pick: 'rr',
   history_page: 'hp',
   history_workout: 'hw',
   history_log: 'hl',
@@ -83,24 +82,25 @@ function encodeAction(a: Action): string {
     case 'settings_close':
     case 'plates_save':
     case 'step_reset':
-    case 'set_more':
-    case 'exercise_next':
-    case 'exercise_skip':
+    case 'menu_add':
+    case 'exercise_finish':
+    case 'set_edit':
+    case 'set_delete':
+    case 'set_forward':
+    case 'workout_finish':
     case 'comment':
     case 'workout_done':
     case 'warmup_diff':
     case 'warmup_comment':
     case 'back':
-    case 'undo':
-    case 'replace':
-    case 'reorder':
     case 'history_add':
     case 'history_delete':
       return SIMPLE_CODES[a.type];
     case 'day_pick':
       return `${PARAM_CODES[a.type]}:${a.dayId}`;
-    case 'resume':
-      return `${PARAM_CODES[a.type]}:${a.choice}`;
+    case 'menu_pick':
+    case 'add_pick':
+      return `${PARAM_CODES[a.type]}:${a.exerciseId}`;
     case 'intensity_set':
       return `${PARAM_CODES[a.type]}:${a.intensity}`;
     case 'weight_set':
@@ -126,10 +126,6 @@ function encodeAction(a: Action): string {
       return `${PARAM_CODES[a.type]}:${a.language}`;
     case 'warmup_mark':
       return `${PARAM_CODES[a.type]}:${a.mark}`;
-    case 'replace_pick':
-      return `${PARAM_CODES[a.type]}:${a.exerciseId}`;
-    case 'reorder_pick':
-      return `${PARAM_CODES[a.type]}:${a.index}`;
     case 'history_page':
       return `${PARAM_CODES[a.type]}:${a.offset}`;
     case 'history_workout':
@@ -161,11 +157,11 @@ function rawAction(code: string): Record<string, unknown> | null {
     case 'settings_section':
       return { type, section: value };
     case 'step_pick':
+    case 'menu_pick':
+    case 'add_pick':
       return { type, exerciseId: value };
     case 'day_pick':
       return { type, dayId: value };
-    case 'resume':
-      return { type, choice: value };
     case 'intensity_set':
       return { type, intensity: value };
     case 'warmup':
@@ -181,10 +177,6 @@ function rawAction(code: string): Record<string, unknown> | null {
       return { type, language: value };
     case 'warmup_mark':
       return { type, mark: value };
-    case 'replace_pick':
-      return { type, exerciseId: value };
-    case 'reorder_pick':
-      return { type, index: Number(value) };
     case 'history_page':
       return { type, offset: Number(value) };
     case 'history_workout':

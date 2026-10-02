@@ -10,14 +10,15 @@ const history = { kind: 'command', name: 'history', args: '' } as const;
 async function tuesday(w: World): Promise<void> {
   await w.send(workout);
   await w.press({ type: 'day_pick', dayId: 'tue' });
+  await w.press({ type: 'menu_pick', exerciseId: 'incline_press' });
   await w.type('195');
   await w.press({ type: 'warmup', variant: 'none' });
   await w.type('7');
-  await w.press({ type: 'exercise_next' });
+  await w.press({ type: 'exercise_finish' });
+  await w.press({ type: 'menu_pick', exerciseId: 'abs' });
   for (const reps of ['20', '18', '15']) await w.type(reps);
-  await w.press({ type: 'exercise_next' });
-  await w.press({ type: 'exercise_skip' });
-  await w.press({ type: 'exercise_skip' });
+  await w.press({ type: 'exercise_finish' });
+  await w.press({ type: 'workout_finish' });
   await w.press({ type: 'workout_done' });
 }
 
@@ -40,8 +41,6 @@ Deno.test('список → тренировка → упражнение: ис�
     'Ср 30.09 — Жим на наклонной',
     'Жим на наклонной: 195 × 7',
     'Пресс: 20 / 18 / 15',
-    'Шея: сгибания: пропущено',
-    'Шея: разгибания: пропущено',
   ]);
   assertEquals(w.buttons(), [
     '✏️ Жим на наклонной',
@@ -90,6 +89,7 @@ Deno.test('список → тренировка → упражнение: ис�
   w.setNow('2026-10-06T22:40:00Z');
   await w.send(workout);
   await w.press({ type: 'day_pick', dayId: 'tue' });
+  await w.press({ type: 'menu_pick', exerciseId: 'incline_press' });
   assert(w.last().includes('Прошлый раз (30.09): 195 × 6'), w.last());
 });
 
