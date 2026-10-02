@@ -94,7 +94,7 @@ Deno.test('замена: подтверждение кнопкой, старая
   assertEquals(versions(store), [[1, true]], 'до подтверждения ничего не сохранено');
   const confirm = ui.shown.at(-1)?.rendered;
   assert(confirm?.text.includes('«6 базовых, 5 дней» будет архивирована, история сохранится'));
-  assertEquals(confirm?.keyboard[0]?.map((b) => b.label), ['Заменить', 'Отмена']);
+  assertEquals(confirm?.keyboard.map((row) => row.map((b) => b.label)), [['Заменить'], ['Отмена']]);
 
   await send(
     deps,

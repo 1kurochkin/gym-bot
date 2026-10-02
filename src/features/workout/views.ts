@@ -11,7 +11,7 @@ import {
 import type { Language } from '../../core/settings/settings.ts';
 import type { WarmupLine } from '../../core/workout/plan.ts';
 import type { Button, Rendered } from '../../ports/ui.ts';
-import { chunk, date, num, weekday } from '../i18n/format.ts';
+import { chunk, column, date, num, weekday } from '../i18n/format.ts';
 import { MESSAGES } from './messages.ts';
 
 export type WorkoutView = Extract<View, { type: `workout_${string}` }>;
@@ -84,7 +84,7 @@ export function renderWorkoutView(view: WorkoutView, lang: Language): Rendered {
       }));
       return text(`${head}${t.pickDay}`, [
         [{ label: `▶ ${view.next.name}`, action: { type: 'day_pick', dayId: view.next.id } }],
-        ...chunk(others, 2),
+        ...column(others),
         [back],
       ]);
     }
@@ -108,24 +108,24 @@ export function renderWorkoutView(view: WorkoutView, lang: Language): Rendered {
           .filter((l) => l !== null).join('\n'),
         [
           ...(nextItem ? [[pick(nextItem.exerciseId, `▶ ${nextItem.name}`)]] : []),
-          ...chunk(rest, 2),
-          [
+          ...column(rest),
+          ...column<Button>([
             { label: t.addExercise, action: { type: 'menu_add' } },
             { label: t.comment, action: { type: 'comment' } },
-          ],
-          [{ label: t.finishWorkout, action: { type: 'workout_finish' } }, back],
+            { label: t.finishWorkout, action: { type: 'workout_finish' } },
+            back,
+          ]),
         ],
         [head],
       );
     }
     case 'workout_add':
       return text(view.options.length ? t.addAsk : t.addNone, [
-        ...chunk(
+        ...column(
           view.options.map((o): Button => ({
             label: o.name,
             action: { type: 'add_pick', exerciseId: o.id },
           })),
-          2,
         ),
         [back],
       ]);
@@ -165,43 +165,45 @@ export function renderWorkoutView(view: WorkoutView, lang: Language): Rendered {
         view.invalidWeight ? t.invalidWeight : null,
         view.addedWeight ? t.askAdded : t.askWeight,
         t.typeWeight,
-      ], [...(options.length ? [options] : []), [...toggle, back]]);
+      ], [...(options.length ? [options] : []), ...column([...toggle, back])]);
     }
     case 'workout_warmup': {
       const reps = view.repRange ? ` × ${view.repRange.min}–${view.repRange.max}` : '';
       const lines = view.lines.map((l, i) => `${i + 1}. ${warmupLine(l, view.addedWeight, lang)}`);
-      return exerciseScreen(view.exerciseName, [
-        view.commentSaved ? t.warmupCommentSaved : null,
-        view.lastComment ? t.lastWarmupComment(view.lastComment) : null,
-        `${t.warmupFor(weight(view.workLb, view.addedWeight))}${reps}:`,
-        ...lines,
-        '',
-        t.orWorkSet,
-      ], [
+      return exerciseScreen(
+        view.exerciseName,
         [
+          view.commentSaved ? t.warmupCommentSaved : null,
+          view.lastComment ? t.lastWarmupComment(view.lastComment) : null,
+          `${t.warmupFor(weight(view.workLb, view.addedWeight))}${reps}:`,
+          ...lines,
+          '',
+          t.orWorkSet,
+        ],
+        column<Button>([
           { label: t.warmupDone, action: { type: 'warmup', variant: 'full' } },
           { label: t.warmupEdit, action: { type: 'warmup_diff' } },
-        ],
-        [
           { label: t.comment, action: { type: 'warmup_comment' } },
           { label: t.warmupSkip, action: { type: 'warmup', variant: 'none' } },
-        ],
-        [back],
-      ]);
+          back,
+        ]),
+      );
     }
     case 'workout_warmup_mark':
-      return exerciseScreen(view.exerciseName, [
-        t.markHead(view.step, view.total, warmupLine(view.line, view.addedWeight, lang)),
-        view.error ? `⚠️ ${t.errors[view.error]}` : null,
-        view.editing ? t.markAsk : null,
-      ], [
+      return exerciseScreen(
+        view.exerciseName,
         [
+          t.markHead(view.step, view.total, warmupLine(view.line, view.addedWeight, lang)),
+          view.error ? `⚠️ ${t.errors[view.error]}` : null,
+          view.editing ? t.markAsk : null,
+        ],
+        column<Button>([
           { label: t.warmupDone, action: { type: 'warmup_mark', mark: MARK.done } },
           { label: t.warmupEdit, action: { type: 'warmup_mark', mark: MARK.edit } },
           { label: t.warmupSkip, action: { type: 'warmup_mark', mark: MARK.skip } },
-        ],
-        [back],
-      ]);
+          back,
+        ]),
+      );
     case 'workout_warmup_comment_prompt':
       return exerciseScreen(view.exerciseName, [t.warmupCommentAsk], [[back]]);
     case 'workout_reps': {
@@ -234,25 +236,28 @@ export function renderWorkoutView(view: WorkoutView, lang: Language): Rendered {
         view.weightLb === null ? t.typeReps : t.typeSet,
       ], [
         ...chunk(reps, 4),
-        [{ label: t.comment, action: { type: 'comment' } }, back],
-        [{ label: t.finishExercise, action: { type: 'exercise_finish' } }],
+        ...column<Button>([
+          { label: t.comment, action: { type: 'comment' } },
+          { label: t.finishExercise, action: { type: 'exercise_finish' } },
+          back,
+        ]),
       ]);
     }
     case 'workout_set_view':
-      return exerciseScreen(view.exerciseName, [
-        t.setHead(view.index, set(view.set.weightLb, view.set.reps, view.addedWeight)),
-        view.error ? `⚠️ ${t.errors[view.error]}` : null,
-        view.editing ? t.setEditAsk : null,
-      ], [
+      return exerciseScreen(
+        view.exerciseName,
         [
+          t.setHead(view.index, set(view.set.weightLb, view.set.reps, view.addedWeight)),
+          view.error ? `⚠️ ${t.errors[view.error]}` : null,
+          view.editing ? t.setEditAsk : null,
+        ],
+        column<Button>([
           { label: t.setEdit, action: { type: 'set_edit' } },
           { label: t.setDelete, action: { type: 'set_delete' } },
-        ],
-        [
-          { label: view.index > 1 ? t.toSet(view.index - 1) : t.toMenu, action: { type: 'back' } },
           { label: t.forward(view.current), action: { type: 'set_forward' } },
-        ],
-      ]);
+          { label: view.index > 1 ? t.toSet(view.index - 1) : t.toMenu, action: { type: 'back' } },
+        ]),
+      );
     case 'workout_comment_prompt':
       return view.exerciseName === null
         ? text(t.workoutCommentAsk, [[back]])
@@ -265,17 +270,20 @@ export function renderWorkoutView(view: WorkoutView, lang: Language): Rendered {
           ...items,
           view.commentSaved ? `\n${t.workoutCommentSaved}` : null,
         ].filter((l) => l !== null).join('\n'),
-        [[
+        column<Button>([
           { label: t.workoutComment, action: { type: 'comment' } },
           { label: t.done, action: { type: 'workout_done' } },
-        ]],
+        ]),
       );
     }
     case 'workout_cancel_confirm':
-      return text(t.cancelAsk(view.dayName), [[
-        { label: t.cancelYes, action: { type: 'cancel_answer', confirm: true } },
-        { label: t.continue, action: { type: 'cancel_answer', confirm: false } },
-      ]]);
+      return text(
+        t.cancelAsk(view.dayName),
+        column<Button>([
+          { label: t.cancelYes, action: { type: 'cancel_answer', confirm: true } },
+          { label: t.continue, action: { type: 'cancel_answer', confirm: false } },
+        ]),
+      );
     case 'workout_commented':
       return text(t.workoutCommentSaved, [[
         { label: t.done, action: { type: 'workout_done' } },

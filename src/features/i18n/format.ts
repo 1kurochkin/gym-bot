@@ -90,3 +90,6 @@ export function chunk<T>(items: readonly T[], size: number): T[][] {
   for (let i = 0; i < items.length; i += size) rows.push(items.slice(i, i + size));
   return rows;
 }
+
+/** Кнопки списком — по одной в строку (кнопки с текстом; числовые — сеткой через chunk). */
+export const column = <T>(items: readonly T[]): T[][] => items.map((i) => [i]);

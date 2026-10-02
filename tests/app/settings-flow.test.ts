@@ -68,8 +68,10 @@ Deno.test('экран настроек: текущие значения и ра�
       'Язык: Русский',
   );
   assertEquals(labels(ui), [
-    ['Часовой пояс', 'Гриф'],
-    ['Блины', 'Шаг по упражнениям'],
+    ['Часовой пояс'],
+    ['Гриф'],
+    ['Блины'],
+    ['Шаг по упражнениям'],
     ['Язык'],
     ['Готово'],
   ]);
@@ -131,7 +133,7 @@ Deno.test('шаг по упражнениям: без штанги и пресс
   assertEquals(labels(ui)[0], ['Икры стоя — 7,5 lb']);
 
   await press({ type: 'step_pick', exerciseId: 'calves' });
-  assertEquals(labels(ui)[1], ['По умолчанию', 'Назад']);
+  assertEquals(labels(ui).slice(1), [['По умолчанию'], ['Назад']]);
   await press({ type: 'step_reset' });
   assertEquals(store.settings.get(1)?.exerciseOverrides, {});
 });

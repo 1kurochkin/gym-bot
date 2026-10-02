@@ -163,6 +163,8 @@ export type WarmupMark = z.infer<typeof WarmupMarkSchema>;
 
 export const BotEventSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('start') }).readonly(),
+  /** /clear: очистить переписку и показать главный экран. */
+  z.object({ type: z.literal('clear_requested') }).readonly(),
   z.object({ type: z.literal('text_entered'), text: z.string() }).readonly(),
   z.object({ type: z.literal('tz_chosen'), zone: TimeZoneSchema }).readonly(),
   /** Геопозиция уже переведена в зону оболочкой; null — по координатам зону не нашли. */
@@ -546,6 +548,8 @@ export type View = z.infer<typeof ViewSchema>;
 export const EffectSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('save_settings'), settings: SettingsSchema }).readonly(),
   z.object({ type: z.literal('render'), view: ViewSchema }).readonly(),
+  /** Удалить переписку (оболочка — до отрисовки экранов этого апдейта). */
+  z.object({ type: z.literal('clear_chat') }).readonly(),
   /** Сохранить программу активной; предыдущая архивируется. */
   z.object({ type: z.literal('save_program'), program: ProgramSchema }).readonly(),
   /** Записать результат, введённый вручную (/seed). */

@@ -90,10 +90,10 @@ export function renderAccessView(view: AccessView, lang: Language, env: RenderEn
       );
     }
     case 'users_revoke_confirm':
-      return text(t.revokeAsk(who(view.person)), [[
-        { label: t.revokeYes, action: { type: 'revoke_answer', confirm: true } },
-        { label: t.cancel, action: { type: 'revoke_answer', confirm: false } },
-      ]]);
+      return text(t.revokeAsk(who(view.person)), [
+        [{ label: t.revokeYes, action: { type: 'revoke_answer', confirm: true } }],
+        [{ label: t.cancel, action: { type: 'revoke_answer', confirm: false } }],
+      ]);
     default:
       return assertNever(view);
   }

@@ -43,6 +43,10 @@ const COMMANDS: readonly {
     },
   },
   {
+    command: 'clear',
+    description: { ru: 'Очистить переписку', en: 'Clear the chat' },
+  },
+  {
     command: 'invite',
     description: { ru: 'Пригласить нового пользователя', en: 'Invite a new user' },
     ownerOnly: true,

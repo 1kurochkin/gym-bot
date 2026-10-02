@@ -115,10 +115,10 @@ async function toIncoming(ctx: Context, download: Download): Promise<IncomingUpd
   return cmd
     ? {
       ...base,
-      messageId: null,
+      messageId: ctx.message?.message_id ?? null,
       input: { kind: 'command', name: cmd[1] ?? '', args: cmd[2] ?? '' },
     }
-    : { ...base, messageId: null, input: { kind: 'text', text } };
+    : { ...base, messageId: ctx.message?.message_id ?? null, input: { kind: 'text', text } };
 }
 
 export function createTelegramUi(bot: Bot): Ui {
@@ -156,7 +156,30 @@ export function createTelegramUi(bot: Bot): Ui {
     async dropKeyboard(chatId, messageId): Promise<void> {
       await bot.api.editMessageReplyMarkup(chatId, messageId).catch(() => {});
     },
+    async clearChat(chatId, upToMessageId): Promise<void> {
+      // От свежих к старым; первый отказ — дальше сообщения старше 48 часов, удалить нельзя.
+      for (const ids of clearBatches(upToMessageId)) {
+        const ok = await bot.api.deleteMessages(chatId, ids).catch(() => false);
+        if (!ok) return;
+      }
+    },
   };
+}
+
+/** Сколько последних сообщений чата пытается удалить /clear: id в личном чате идут подряд. */
+const CLEAR_DEPTH = 2000;
+/** deleteMessages принимает до 100 id за раз. */
+const CLEAR_BATCH = 100;
+
+/** Пачки id для /clear: от upTo назад, по 100, новые первыми. */
+export function clearBatches(upTo: number): number[][] {
+  const from = Math.max(1, upTo - CLEAR_DEPTH + 1);
+  const batches: number[][] = [];
+  for (let end = upTo; end >= from; end -= CLEAR_BATCH) {
+    const start = Math.max(from, end - CLEAR_BATCH + 1);
+    batches.push(Array.from({ length: end - start + 1 }, (_, i) => end - i));
+  }
+  return batches;
 }
 
 /**

@@ -43,10 +43,10 @@ export function renderProgramView(view: ProgramView, lang: Language): Rendered {
     case 'program_confirm':
       return {
         text: t.incoming(describe(view.incoming), view.currentName),
-        keyboard: [[
-          { label: t.replace, action: { type: 'program_confirm' } },
-          { label: t.cancel, action: { type: 'program_cancel' } },
-        ]],
+        keyboard: [
+          [{ label: t.replace, action: { type: 'program_confirm' } }],
+          [{ label: t.cancel, action: { type: 'program_cancel' } }],
+        ],
         replyKeyboard: null,
       };
     case 'program_saved':

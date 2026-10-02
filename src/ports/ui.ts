@@ -91,7 +91,10 @@ export const IncomingUpdateSchema = z.object({
   updateId: z.number().int(),
   userId: z.number().int().positive(),
   chatId: z.number().int(),
-  /** Сообщение с нажатой кнопкой: его редактируем вместо отправки нового. */
+  /**
+   * Сообщение апдейта: у кнопки — сообщение с кнопкой (его редактируем вместо отправки нового),
+   * у текста и команды — само сообщение (с него /clear удаляет переписку назад).
+   */
   messageId: z.number().int().nullable(),
   /** language_code пользователя из Telegram. */
   languageCode: z.string().nullable(),
@@ -138,4 +141,6 @@ export type Ui = {
   ) => Promise<void>;
   /** Убрать клавиатуру у сообщения с устаревшими кнопками. */
   readonly dropKeyboard: (chatId: number, messageId: number) => Promise<void>;
+  /** /clear: удалить сообщения чата от upToMessageId назад, сколько Telegram позволит (48 ч). */
+  readonly clearChat: (chatId: number, upToMessageId: number) => Promise<void>;
 };
