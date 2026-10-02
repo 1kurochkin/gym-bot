@@ -76,7 +76,7 @@ export function renderSeedView(view: SeedView, lang: Language): Rendered {
         { label: view.current ? t.keep : t.noData, action: { type: 'seed_next' } },
         { label: t.stop, action: { type: 'seed_stop' } },
       ];
-      return { text: lines.join('\n'), keyboard: [buttons], replyKeyboard: null };
+      return { text: lines.join('\n'), keyboard: buttons.map((b) => [b]), replyKeyboard: null };
     }
     case 'seed_done':
       return text(view.filled > 0 ? t.done(view.filled, view.total) : t.nothing);

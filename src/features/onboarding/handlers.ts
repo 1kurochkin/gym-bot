@@ -8,7 +8,8 @@ import type { Incoming } from '../../ports/ui.ts';
 export function toEvent(input: Incoming): BotEvent | null {
   switch (input.kind) {
     case 'command':
-      return input.name === 'start' ? { type: 'start' } : null;
+      if (input.name === 'start') return { type: 'start' };
+      return input.name === 'clear' ? { type: 'clear_requested' } : null;
     case 'text':
       return { type: 'text_entered', text: input.text };
     case 'callback':

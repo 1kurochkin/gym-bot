@@ -146,6 +146,10 @@ async function processUpdate(deps: UpdateDeps, update: IncomingUpdate, mark: Mar
   // Язык — по настройкам после шага: выбор языка в /settings сразу виден на ответе.
   const lang = languageFor((newSettings ?? settings).language, update.languageCode);
   const env = { botUsername: deps.botUsername() };
+  // /clear: сначала удаляем переписку, потом показываем экран — новое сообщение остаётся.
+  if (result.effects.some((e) => e.type === 'clear_chat') && update.messageId !== null) {
+    await deps.ui.clearChat(update.chatId, update.messageId);
+  }
   for (const e of result.effects) {
     if (e.type !== 'render') continue;
     const messageId = input.kind === 'callback' ? update.messageId : null;

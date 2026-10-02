@@ -4,7 +4,7 @@ import { HistoryNoticeSchema, type View } from '../../core/session/types.ts';
 import type { Language } from '../../core/settings/settings.ts';
 import { HISTORY_PAGE_SIZE } from '../../core/workout/schema.ts';
 import type { Button, Rendered } from '../../ports/ui.ts';
-import { chunk, date, weekday } from '../i18n/format.ts';
+import { column, date, weekday } from '../i18n/format.ts';
 import { setIn, summaryLine } from '../workout/views.ts';
 
 export type HistoryView = Extract<View, { type: `history_${string}` }>;
@@ -119,13 +119,13 @@ export function renderHistoryView(view: HistoryView, lang: Language): Rendered {
           ]
           : []),
       ];
-      if (view.items.length === 0) return text(`${head}${t.empty}`, pages.length ? [pages] : []);
+      if (view.items.length === 0) return text(`${head}${t.empty}`, column(pages));
       return text(`${head}${t.title}`, [
         ...view.items.map((i): Button[] => [{
           label: `${weekday(i.localDate, lang)} ${date(i.localDate, lang)} · ${i.dayName}`,
           action: { type: 'history_workout', id: i.id },
         }]),
-        ...(pages.length ? [pages] : []),
+        ...column(pages),
       ]);
     }
     case 'history_workout':
@@ -135,17 +135,16 @@ export function renderHistoryView(view: HistoryView, lang: Language): Rendered {
           ...view.items.map((i) => summaryLine(i, lang)),
         ].join('\n'),
         [
-          ...chunk(
+          ...column(
             view.exercises.map((e): Button => ({
               label: t.edit(e.name),
               action: { type: 'history_log', id: e.logId },
             })),
-            2,
           ),
-          [
+          ...column<Button>([
             { label: t.deleteWorkout, action: { type: 'history_delete' } },
             { label: t.toList, action: { type: 'back' } },
-          ],
+          ]),
         ],
       );
     case 'history_exercise': {
@@ -155,14 +154,13 @@ export function renderHistoryView(view: HistoryView, lang: Language): Rendered {
         view.sets.length ? null : t.noSets,
       ].filter((l) => l !== null);
       return text(lines.join('\n'), [
-        ...chunk(
+        ...column(
           view.sets.map((s): Button => ({
             label: `${s.index}: ${setIn(lang, s.weightLb, s.reps, view.addedWeight)}`,
             action: { type: 'history_set', id: s.id },
           })),
-          2,
         ),
-        [{ label: t.addSet, action: { type: 'history_add' } }, back],
+        ...column<Button>([{ label: t.addSet, action: { type: 'history_add' } }, back]),
       ]);
     }
     case 'history_set': {
@@ -176,22 +174,27 @@ export function renderHistoryView(view: HistoryView, lang: Language): Rendered {
       return text(
         [view.error ? `⚠️ ${t.errors[view.error]}` : null, head].filter((l) => l !== null)
           .join('\n'),
-        [view.set ? [{ label: t.deleteSet, action: { type: 'history_delete' } }, back] : [back]],
+        column<Button>(
+          view.set ? [{ label: t.deleteSet, action: { type: 'history_delete' } }, back] : [back],
+        ),
       );
     }
     case 'history_delete_set':
       return text(
         t.confirmSet(view.index, setIn(lang, view.set.weightLb, view.set.reps, view.addedWeight)),
-        [[
+        column<Button>([
           { label: t.yes, action: { type: 'history_confirm', confirm: true } },
           { label: t.no, action: { type: 'history_confirm', confirm: false } },
-        ]],
+        ]),
       );
     case 'history_delete_workout':
-      return text(t.confirmWorkout(date(view.localDate, lang), view.dayName), [[
-        { label: t.yes, action: { type: 'history_confirm', confirm: true } },
-        { label: t.no, action: { type: 'history_confirm', confirm: false } },
-      ]]);
+      return text(
+        t.confirmWorkout(date(view.localDate, lang), view.dayName),
+        column<Button>([
+          { label: t.yes, action: { type: 'history_confirm', confirm: true } },
+          { label: t.no, action: { type: 'history_confirm', confirm: false } },
+        ]),
+      );
     default:
       return assertNever(view);
   }

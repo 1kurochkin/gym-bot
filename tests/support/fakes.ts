@@ -399,12 +399,19 @@ export type Shown = {
   messageId: number | null;
 };
 
-export function fakeUi(): Ui & { shown: Shown[]; dropped: number[] } {
+export function fakeUi(): Ui & { shown: Shown[]; dropped: number[]; cleared: number[] } {
   const shown: Shown[] = [];
   const dropped: number[] = [];
+  const cleared: number[] = [];
   return {
     shown,
     dropped,
+    cleared,
+    clearChat(_chatId, upTo): Promise<void> {
+      cleared.push(upTo);
+      shown.length = 0;
+      return Promise.resolve();
+    },
     show(chatId, rendered, stepNo, messageId): Promise<void> {
       shown.push({ chatId, rendered, stepNo, messageId });
       return Promise.resolve();

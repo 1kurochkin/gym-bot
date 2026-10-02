@@ -12,7 +12,7 @@ import {
 import type { View } from '../../core/session/types.ts';
 import { type Language, LanguageSchema } from '../../core/settings/settings.ts';
 import type { Button, Rendered } from '../../ports/ui.ts';
-import { chunk, num, zone } from '../i18n/format.ts';
+import { chunk, column, num, zone } from '../i18n/format.ts';
 
 export type SettingsView = Extract<
   View,
@@ -119,10 +119,14 @@ export function renderSettingsView(view: SettingsView, lang: Language): Rendered
       return {
         text: lines.join('\n'),
         keyboard: [
-          [section(t.timezone, SECTION.timezone), section(t.bar, SECTION.bar)],
-          [section(t.plates, SECTION.plates), section(t.steps, SECTION.steps)],
-          [section(t.language, SECTION.language)],
-          [{ label: t.done, action: { type: 'settings_close' } }],
+          ...column<Button>([
+            section(t.timezone, SECTION.timezone),
+            section(t.bar, SECTION.bar),
+            section(t.plates, SECTION.plates),
+            section(t.steps, SECTION.steps),
+            section(t.language, SECTION.language),
+            { label: t.done, action: { type: 'settings_close' } },
+          ]),
         ],
         replyKeyboard: null,
       };
@@ -154,7 +158,7 @@ export function renderSettingsView(view: SettingsView, lang: Language): Rendered
             })),
             4,
           ),
-          [{ label: t.save, action: { type: 'plates_save' } } satisfies Button, back],
+          ...column<Button>([{ label: t.save, action: { type: 'plates_save' } }, back]),
         ],
         replyKeyboard: null,
       };
@@ -184,9 +188,10 @@ export function renderSettingsView(view: SettingsView, lang: Language): Rendered
             label: `${w === view.stepLb ? '✓ ' : ''}${n(w)}`,
             action: { type: 'step_set', lb: w },
           })),
-          view.source === SOURCE.override
-            ? [{ label: t.stepReset, action: { type: 'step_reset' } } satisfies Button, back]
-            : [back],
+          ...(view.source === SOURCE.override
+            ? [[{ label: t.stepReset, action: { type: 'step_reset' } } satisfies Button]]
+            : []),
+          [back],
         ],
         replyKeyboard: null,
       };
@@ -194,10 +199,10 @@ export function renderSettingsView(view: SettingsView, lang: Language): Rendered
       return {
         text: t.languageAsk,
         keyboard: [
-          LanguageSchema.options.map((l): Button => ({
+          ...column(LanguageSchema.options.map((l): Button => ({
             label: `${l === view.selected ? '✓ ' : ''}${LANGUAGE_NAMES[l]}`,
             action: { type: 'lang_set', language: l },
-          })),
+          }))),
           [back],
         ],
         replyKeyboard: null,

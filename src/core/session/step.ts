@@ -96,6 +96,13 @@ function transition(state: Session, event: BotEvent, ctx: StepContext): StepResu
       return ctx.settings.timezone === null
         ? askTime(state, null)
         : home(state, ctx.settings.timezone, ctx);
+    case 'clear_requested': {
+      // Данные не трогаются: только переписка; начатая тренировка — через /workout.
+      const screen = ctx.settings.timezone === null
+        ? askTime(state, null)
+        : home(state, ctx.settings.timezone, ctx);
+      return { ...screen, effects: [{ type: 'clear_chat' }, ...screen.effects] };
+    }
     case 'tz_chosen':
       return isOnboarding(state.step) ? saveTimezone(state, event.zone, ctx) : unchanged(state);
     case 'tz_located':

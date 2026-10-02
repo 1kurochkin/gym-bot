@@ -102,7 +102,7 @@ Deno.test('[← Назад] с подходов — просмотр прошл�
   await w.type('5');
   await w.press({ type: 'back' });
   assertEquals(body(w), ['Подход №3: 195 × 5']);
-  assertEquals(w.buttons(), ['✏️ Изменить', '🗑 Удалить', '← Подход 2', '➡️ К подходу 4']);
+  assertEquals(w.buttons(), ['✏️ Изменить', '🗑 Удалить', '➡️ К подходу 4', '← Подход 2']);
   await w.press({ type: 'back' });
   assertEquals(body(w), ['Подход №2: 195 × 6']);
   assertEquals(workSets(w), ['195x7', '195x6', '195x5'], '«Назад» ничего не удалил');
@@ -130,7 +130,7 @@ Deno.test('[← Назад] с подходов — просмотр прошл�
 
   await w.press({ type: 'back' });
   await w.press({ type: 'back' });
-  assertEquals(w.buttons().slice(2), ['← В меню', '➡️ К подходу 3']);
+  assertEquals(w.buttons().slice(2), ['➡️ К подходу 3', '← В меню']);
   await w.press({ type: 'back' });
   assert(w.last().includes('◐ Жим на наклонной — 195 × 7, 185 × 8'), 'с подхода №1 — в меню');
 });
