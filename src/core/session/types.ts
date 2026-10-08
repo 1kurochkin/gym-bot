@@ -8,7 +8,6 @@ import {
 
 export type { Person } from '../access/schema.ts';
 import { LastResultSchema, ManualResultSchema, WarmupVariantSchema } from '../history/schema.ts';
-import { IntensityLogSchema } from '../schedule/intensity.ts';
 import { LocalDateSchema } from '../schedule/calendar.ts';
 import { WarmupLineSchema } from '../workout/plan.ts';
 import {
@@ -24,7 +23,7 @@ import {
 } from '../workout/schema.ts';
 import { SetInputErrorSchema } from '../input/set-input.ts';
 import { ProgramIssueSchema, ProgramSummarySchema } from '../program/program.ts';
-import { IntensitySchema, ProgramSchema } from '../program/schema.ts';
+import { ProgramSchema } from '../program/schema.ts';
 import { SettingsSectionSchema, StepSourceSchema } from '../settings/options.ts';
 import { LanguageSchema, SettingsSchema } from '../settings/settings.ts';
 import { LbSchema } from '../units/lb.ts';
@@ -48,7 +47,6 @@ export const SessionStepSchema = z.enum([
   'workout_menu',
   'workout_add',
   'workout_menu_comment',
-  'workout_intensity',
   'workout_card',
   'workout_warmup',
   'workout_warmup_mark',
@@ -102,8 +100,6 @@ export const SessionContextSchema = z.discriminatedUnion('kind', [
     localDate: LocalDateSchema,
     /** Открытое упражнение (id упражнения программы); null — в меню дня. */
     exerciseId: z.string().nullable().default(null),
-    /** Интенсивность, выбранная пользователем для текущего упражнения (иначе — по правилам §6.4). */
-    intensity: IntensitySchema.nullable(),
     /** «Изменить» в разминке: номер подхода разминки (с 0), который отмечаем сейчас. */
     warmupStep: z.number().int().nonnegative().nullable().default(null),
     /** Просмотр рабочего подхода: его номер (с 1) среди рабочих подходов упражнения. */
@@ -196,7 +192,6 @@ export const BotEventSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('menu_exercise_picked'), exerciseId: z.string() }).readonly(),
   z.object({ type: z.literal('menu_add_requested') }).readonly(),
   z.object({ type: z.literal('add_exercise_chosen'), exerciseId: z.string() }).readonly(),
-  z.object({ type: z.literal('intensity_chosen'), intensity: IntensitySchema }).readonly(),
   z.object({ type: z.literal('weight_chosen'), lb: LbSchema }).readonly(),
   z.object({ type: z.literal('warmup_done'), variant: WarmupVariantSchema }).readonly(),
   z.object({ type: z.literal('warmup_diff_started') }).readonly(),
@@ -385,17 +380,11 @@ export const ViewSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('workout_add'), options: z.array(DayRefSchema).readonly() })
     .readonly(),
   z.object({
-    type: z.literal('workout_intensity'),
-    exerciseName: z.string(),
-    pairNames: z.tuple([z.string(), z.string()]).readonly(),
-  }).readonly(),
-  z.object({
     type: z.literal('workout_card'),
     exerciseName: z.string(),
     workSets: RangeViewSchema,
     repRange: RangeViewSchema.nullable(),
     last: LastResultSchema.nullable(),
-    intensity: z.object({ value: IntensitySchema, summary: z.string() }).readonly().nullable(),
     notes: z.array(z.string()).readonly(),
     addedWeight: z.boolean(),
     noWeight: z.boolean(),
@@ -606,10 +595,6 @@ export const StepContextSchema = z.object({
   /** Незавершённая тренировка с записанным; null — нет. */
   activeWorkout: ActiveWorkoutSchema.nullable(),
   lastWorkout: LastWorkoutSchema.nullable(),
-  /** История интенсивности упражнений из пар 100/70 (по ISO-неделям). */
-  intensityLogs: z.array(IntensityLogSchema).readonly(),
-  /** Последний рабочий вес на 100% по упражнениям из пар — база для 70%. */
-  lastHighLb: z.record(z.string(), LbSchema).readonly(),
   /** Владелец (из конфигурации): ему доступны /invite и /users. */
   isOwner: z.boolean(),
   /** /history: подгружается, только когда пользователь в истории (historyQuery). */

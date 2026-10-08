@@ -1,6 +1,5 @@
 import { assertNever } from '../../shared/result.ts';
 import type { LastResult } from '../../core/history/schema.ts';
-import { IntensitySchema } from '../../core/program/schema.ts';
 import {
   type MenuMark,
   MenuMarkSchema,
@@ -16,7 +15,6 @@ import { MESSAGES } from './messages.ts';
 
 export type WorkoutView = Extract<View, { type: `workout_${string}` }>;
 
-const { high, low } = IntensitySchema.enum;
 const MARK = WarmupMarkSchema.enum;
 const MENU = MenuMarkSchema.enum;
 const MENU_ICON: Record<MenuMark, string> = {
@@ -129,13 +127,6 @@ export function renderWorkoutView(view: WorkoutView, lang: Language): Rendered {
         ),
         [back],
       ]);
-    case 'workout_intensity':
-      return exerciseScreen(view.exerciseName, [
-        t.intensityAsk(view.pairNames[0], view.pairNames[1]),
-      ], [[
-        { label: '100%', action: { type: 'intensity_set', intensity: high } },
-        { label: '70%', action: { type: 'intensity_set', intensity: low } },
-      ], [back]]);
     case 'workout_card': {
       const reps = view.repRange ? ` × ${view.repRange.min}–${view.repRange.max}` : '';
       const base = view.options[0];
@@ -147,15 +138,8 @@ export function renderWorkoutView(view: WorkoutView, lang: Language): Rendered {
           })`,
         action: { type: 'weight_set', lb: w },
       }));
-      const toggle: Button[] = view.intensity
-        ? [{
-          label: view.intensity.value === high ? t.make70 : t.make100,
-          action: { type: 'intensity_set', intensity: view.intensity.value === high ? low : high },
-        }]
-        : [];
       return exerciseScreen(view.exerciseName, [
         `${t.goal}: ${t.workSets(view.workSets.min, view.workSets.max)}${reps}`,
-        view.intensity ? `${t.thisWeek}: ${view.intensity.summary}` : null,
         view.last
           ? lastLine(view.last, view.addedWeight, view.repRange?.max ?? null, lang)
           : t.noLast,
@@ -165,7 +149,7 @@ export function renderWorkoutView(view: WorkoutView, lang: Language): Rendered {
         view.invalidWeight ? t.invalidWeight : null,
         view.addedWeight ? t.askAdded : t.askWeight,
         t.typeWeight,
-      ], [...(options.length ? [options] : []), ...column([...toggle, back])]);
+      ], [...(options.length ? [options] : []), [back]]);
     }
     case 'workout_warmup': {
       const reps = view.repRange ? ` × ${view.repRange.min}–${view.repRange.max}` : '';

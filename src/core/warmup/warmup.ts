@@ -10,8 +10,6 @@ import {
 import {
   type AddedWeightTiers,
   AfterWorkSchema,
-  type Intensity,
-  IntensitySchema,
   type OverloadSingle,
   type WarmupStep,
   type WarmupTiers,
@@ -38,7 +36,6 @@ export const WarmupPlanSchema = z.object({
 }).readonly();
 export type WarmupPlan = z.infer<typeof WarmupPlanSchema>;
 
-const { low } = IntensitySchema.enum;
 const { regular, empty_bar, overload } = WarmupLabelSchema.enum;
 
 /** Ступень по рабочему весу: последняя, чей порог ≤ W. Номер — с 1. */
@@ -53,33 +50,26 @@ export function selectTier(
   return { tier: index + 1, steps: tiers.byWorkWeight[index]?.steps ?? [] };
 }
 
-/** Применяется ли перегрузочный сингл (ADR-0003): только базовые, не в день на 70%. */
-export function singleApplies(
-  single: OverloadSingle | undefined,
-  isBase: boolean,
-  intensity: Intensity,
-): boolean {
+/** Применяется ли перегрузочный сингл (ADR-0003): только базовые. */
+export function singleApplies(single: OverloadSingle | undefined, isBase: boolean): boolean {
   if (!single) return false;
-  if (single.onlyBase && !isBase) return false;
-  return !(intensity === low && single.skipOnLowIntensity);
+  return !(single.onlyBase && !isBase);
 }
 
 /**
  * Разминочная лесенка к рабочему весу W по шагам в процентах (§6.2, правила 2–7):
  * округление к сетке весов, пустой гриф снизу, шаги ≥ W выбрасываются, сингл — выше W,
- * дубли схлопываются, в день на 70% шаги выше 100% пропускаются.
+ * дубли схлопываются.
  */
 export function buildLadder(
   workLb: Lb,
   steps: readonly WarmupStep[],
   single: OverloadSingle | null,
-  intensity: Intensity,
   grid: WeightGrid,
 ): readonly WarmupSet[] {
   const all = single ? [...steps, { pct: single.pct, reps: single.reps }] : steps;
   const sets: WarmupSet[] = [];
   for (const s of all) {
-    if (s.pct > 1 && intensity === low) continue;
     let weight = roundToGrid(grid, workLb * s.pct);
     if (s.pct < 1 && weight >= workLb) continue;
     if (s.pct > 1 && weight <= workLb) weight = nextAbove(grid, workLb);
@@ -97,7 +87,6 @@ export function buildLadder(
 export const WorkWeightWarmupInputSchema = z.object({
   workLb: LbSchema,
   isBase: z.boolean(),
-  intensity: IntensitySchema,
 }).readonly();
 export type WorkWeightWarmupInput = z.infer<typeof WorkWeightWarmupInputSchema>;
 
@@ -108,10 +97,10 @@ export function tieredWarmup(
   grid: WeightGrid,
 ): WarmupPlan {
   const { tier, steps } = selectTier(tiers, input.workLb);
-  const single = singleApplies(tiers.overloadSingle, input.isBase, input.intensity)
+  const single = singleApplies(tiers.overloadSingle, input.isBase)
     ? tiers.overloadSingle ?? null
     : null;
-  return { tier, sets: buildLadder(input.workLb, steps, single, input.intensity, grid) };
+  return { tier, sets: buildLadder(input.workLb, steps, single, grid) };
 }
 
 /** Разминка по фиксированной схеме упражнения (икры: 50%×10 · 80%×10) — вместо ступеней. */
@@ -121,16 +110,9 @@ export function fixedWarmup(
   single: OverloadSingle | undefined,
   grid: WeightGrid,
 ): WarmupPlan {
-  const applied = singleApplies(single, input.isBase, input.intensity) ? single ?? null : null;
-  return { tier: null, sets: buildLadder(input.workLb, steps, applied, input.intensity, grid) };
+  const applied = singleApplies(single, input.isBase) ? single ?? null : null;
+  return { tier: null, sets: buildLadder(input.workLb, steps, applied, grid) };
 }
-
-/**
- * Рабочий вес по умолчанию для дня на 70% (§6.4, правило 5):
- * доля от последнего веса с intensity = high, округлённая к сетке.
- */
-export const lowIntensityWorkLb = (lastHighLb: Lb, lowPct: number, grid: WeightGrid): Lb =>
-  roundToGrid(grid, lastHighLb * lowPct);
 
 // ---------------------------------------------------------------- допвес (§6.3)
 

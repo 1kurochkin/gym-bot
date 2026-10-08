@@ -20,8 +20,6 @@ export function toEvent(input: Incoming): BotEvent | null {
       return { type: 'menu_add_requested' };
     case 'add_pick':
       return { type: 'add_exercise_chosen', exerciseId: a.exerciseId };
-    case 'intensity_set':
-      return { type: 'intensity_chosen', intensity: a.intensity };
     case 'weight_set':
       return { type: 'weight_chosen', lb: a.lb };
     case 'warmup':

@@ -54,7 +54,6 @@ const PARAM_CODES = {
   day_pick: 'dp',
   menu_pick: 'mn',
   add_pick: 'ad',
-  intensity_set: 'is',
   weight_set: 'ws',
   warmup: 'wu',
   reps_set: 'rp',
@@ -101,8 +100,6 @@ function encodeAction(a: Action): string {
     case 'menu_pick':
     case 'add_pick':
       return `${PARAM_CODES[a.type]}:${a.exerciseId}`;
-    case 'intensity_set':
-      return `${PARAM_CODES[a.type]}:${a.intensity}`;
     case 'weight_set':
       return `${PARAM_CODES[a.type]}:${a.lb}`;
     case 'warmup':
@@ -162,8 +159,6 @@ function rawAction(code: string): Record<string, unknown> | null {
       return { type, exerciseId: value };
     case 'day_pick':
       return { type, dayId: value };
-    case 'intensity_set':
-      return { type, intensity: value };
     case 'warmup':
       return { type, variant: value };
     case 'reps_set':

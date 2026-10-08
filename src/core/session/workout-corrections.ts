@@ -18,7 +18,6 @@ import {
   answerCancel,
   atExercise,
   card,
-  cardIntensity,
   currentExercise,
   enterExercise,
   idsOf,
@@ -209,7 +208,6 @@ export function goBack(state: Session, ctx: StepContext): StepResult {
 
   switch (state.step) {
     case S.workout_card:
-    case S.workout_intensity:
       return menuScreen(state, ctx, active, false);
     case S.workout_comment:
       return repsPrompt(state, ctx, c, ex);
@@ -280,7 +278,7 @@ function backToCard(
 ): StepResult {
   if (!c.log) return unchanged(state);
   const fresh: WorkoutContext = { ...c, log: null, warmupStep: null };
-  return withEffects(card(state, ctx, fresh, ex, cardIntensity(ctx, fresh, ex), false), [
+  return withEffects(card(state, ctx, fresh, ex, false), [
     { type: 'delete_exercise_log', id: c.log.id },
   ]);
 }
@@ -372,7 +370,6 @@ export function forwardToInput(state: Session, ctx: StepContext): StepResult {
 const UNDO_STEPS: ReadonlySet<string> = new Set([
   S.workout_menu,
   S.workout_add,
-  S.workout_intensity,
   S.workout_card,
   S.workout_warmup,
   S.workout_warmup_mark,

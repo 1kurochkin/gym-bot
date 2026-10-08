@@ -12,8 +12,6 @@ import { parseTimeZone, type TimeZone } from '../../../src/core/schedule/timezon
 const noWorkout = {
   activeWorkout: null,
   lastWorkout: null,
-  intensityLogs: [],
-  lastHighLb: {},
   isOwner: false,
   members: [],
   history: { page: null, workout: null },

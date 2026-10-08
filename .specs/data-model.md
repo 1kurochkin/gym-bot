@@ -55,7 +55,7 @@ updated: 2026-10-01
 ```ts
 { id, workoutId?, programId, exerciseId, exerciseName, order,
   status: 'done' | 'skipped' | 'substituted', substitutedFor?,
-  intensity?: 'high' | 'low',
+  intensity?: 'high' | 'low',          // только в записях до 08.10: чередование 100/70 убрано
   plannedWorkWeightLb?, stepLbUsed,
   warmupTier?: number, warmupVariant: 'full' | 'short' | 'custom' | 'none',
   warmupComment?, comment?, finishedAt?,   // finishedAt — нажато «Завершить упражнение» (✅ в меню)

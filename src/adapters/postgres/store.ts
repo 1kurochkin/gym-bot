@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gt, inArray, isNotNull, isNull, max, ne, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, inArray, isNull, max, ne, or, sql } from 'drizzle-orm';
 import { drizzle, type PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 import {
@@ -25,9 +25,6 @@ import {
 } from '../../core/session/types.ts';
 import { lb } from '../../core/units/lb.ts';
 import type { Commit, Store, UserState, WorkoutWrite } from '../../ports/store.ts';
-import { type IntensityLog, IntensityLogSchema } from '../../core/schedule/intensity.ts';
-import { IntensitySchema } from '../../core/program/schema.ts';
-import type { Lb } from '../../core/units/lb.ts';
 import {
   type ActiveWorkout,
   ActiveWorkoutSchema,
@@ -79,12 +76,7 @@ export function createPostgresStore(db: Db): Store {
       const activeWorkout = await loadActiveWorkout(db, userId);
       const lastWorkout = await loadLastWorkout(db, userId);
       const exerciseIds = activeProgram ? [...exerciseIndex(activeProgram).keys()] : [];
-      const pairIds = activeProgram
-        ? activeProgram.intensityPairs.flatMap((p) => [...p.exercises])
-        : [];
       const lastResults = await loadLastResults(db, userId, exerciseIds, activeWorkout?.id ?? null);
-      const intensityLogs = await loadIntensityLogs(db, userId, pairIds);
-      const lastHighLb = await loadLastHigh(db, userId, pairIds);
       const members = opts.withMembers ? await loadMembers(db) : [];
       return {
         session: s[0] ? toSession(s[0]) : initialSession(userId),
@@ -93,8 +85,6 @@ export function createPostgresStore(db: Db): Store {
         lastResults,
         activeWorkout,
         lastWorkout,
-        intensityLogs,
-        lastHighLb,
         members,
       };
     },
@@ -366,70 +356,6 @@ async function loadLastWorkout(db: Db, userId: number): Promise<LastWorkout | nu
   )).orderBy(desc(schema.workouts.startedAt)).limit(1);
   const parsed = LastWorkoutSchema.safeParse(w);
   return parsed.success ? parsed.data : null;
-}
-
-/** История 100/70: выполненные записи упражнений из пар с интенсивностью и ISO-неделей тренировки. */
-async function loadIntensityLogs(
-  db: Db,
-  userId: number,
-  pairIds: readonly string[],
-): Promise<IntensityLog[]> {
-  if (pairIds.length === 0) return [];
-  const rows = await db.select({
-    exerciseId: schema.exerciseLogs.exerciseId,
-    isoWeek: schema.workouts.isoWeek,
-    intensity: schema.exerciseLogs.intensity,
-  }).from(schema.exerciseLogs)
-    .innerJoin(schema.workouts, eq(schema.workouts.id, schema.exerciseLogs.workoutId))
-    .where(and(
-      eq(schema.exerciseLogs.userId, userId),
-      eq(schema.exerciseLogs.status, done),
-      inArray(schema.exerciseLogs.exerciseId, [...pairIds]),
-      isNotNull(schema.exerciseLogs.intensity),
-    )).orderBy(asc(schema.exerciseLogs.createdAt));
-  return rows.flatMap((r) => {
-    const parsed = IntensityLogSchema.safeParse(r);
-    return parsed.success ? [parsed.data] : [];
-  });
-}
-
-/** Последний рабочий вес на 100% — база для веса на 70% (§6.4, правило 5). */
-async function loadLastHigh(
-  db: Db,
-  userId: number,
-  pairIds: readonly string[],
-): Promise<Record<string, Lb>> {
-  if (pairIds.length === 0) return {};
-  const logs = await db.selectDistinctOn([schema.exerciseLogs.exerciseId], {
-    id: schema.exerciseLogs.id,
-    exerciseId: schema.exerciseLogs.exerciseId,
-  }).from(schema.exerciseLogs).where(and(
-    eq(schema.exerciseLogs.userId, userId),
-    eq(schema.exerciseLogs.status, done),
-    eq(schema.exerciseLogs.intensity, IntensitySchema.enum.high),
-    inArray(schema.exerciseLogs.exerciseId, [...pairIds]),
-  )).orderBy(schema.exerciseLogs.exerciseId, desc(schema.exerciseLogs.createdAt));
-  if (logs.length === 0) return {};
-  const sets = await db.select({
-    logId: schema.sets.exerciseLogId,
-    weightLb: schema.sets.weightLb,
-    reps: schema.sets.reps,
-  })
-    .from(schema.sets).where(and(
-      inArray(schema.sets.exerciseLogId, logs.map((l) => l.id)),
-      eq(schema.sets.kind, work),
-    ));
-  const result: Record<string, Lb> = {};
-  for (const log of logs) {
-    const best = topSet(
-      sets.filter((x) => x.logId === log.id).map((x) => ({
-        weightLb: x.weightLb === null ? null : lb(x.weightLb),
-        reps: x.reps,
-      })),
-    );
-    if (best && best.weightLb !== null) result[log.exerciseId] = best.weightLb;
-  }
-  return result;
 }
 
 /** Запись тренировки: эффекты автомата применяются в порядке, в каком он их выдал. */

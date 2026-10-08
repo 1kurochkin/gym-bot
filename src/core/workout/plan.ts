@@ -1,52 +1,20 @@
 import { z } from 'zod';
 import type { LastResult } from '../history/schema.ts';
-import {
-  type Exercise,
-  type Intensity,
-  IntensitySchema,
-  LoadTypeSchema,
-  type Program,
-} from '../program/schema.ts';
+import { type Exercise, LoadTypeSchema, type Program } from '../program/schema.ts';
 import { weightGrid } from '../program/weight-step.ts';
 import type { Settings } from '../settings/settings.ts';
 import { type Lb, LbSchema } from '../units/lb.ts';
 import { nearbyWeights, nextAbove, type WeightGrid } from '../units/weight-grid.ts';
-import {
-  addedWeightWarmup,
-  fixedWarmup,
-  lowIntensityWorkLb,
-  tieredWarmup,
-} from '../warmup/warmup.ts';
+import { addedWeightWarmup, fixedWarmup, tieredWarmup } from '../warmup/warmup.ts';
 
 /** Как упражнение подаётся на тренировке: вес, кнопки, разминка (.specs/product.md → US-3). */
 
-/** Пара 100/70, в которую входит упражнение. */
-export const pairOf = (
-  program: Program,
-  exerciseId: string,
-): Program['intensityPairs'][number] | undefined =>
-  program.intensityPairs.find((p) => p.exercises.includes(exerciseId));
-
-/**
- * Предложенный рабочий вес. Для пары 100/70: на 100% — последний вес на 100%, на 70% —
- * 70% от него с округлением (§6.4, правило 5). Иначе — прошлый раз. Истории нет — null.
- */
 export function suggestedWeight(
   exercise: Exercise,
-  program: Program,
   settings: Settings,
   last: LastResult | null,
-  lastHighLb: Lb | null,
-  intensity: Intensity | null,
 ): Lb | null {
-  const grid = weightGrid(exercise, settings);
-  if (grid === null) return null;
-  const pair = pairOf(program, exercise.id);
-  if (pair && intensity !== null && lastHighLb !== null) {
-    return intensity === IntensitySchema.enum.low
-      ? lowIntensityWorkLb(lastHighLb, pair.lowPct, grid)
-      : lastHighLb;
-  }
+  if (weightGrid(exercise, settings) === null) return null;
   return last?.weightLb ?? null;
 }
 
@@ -104,15 +72,10 @@ export function warmupFor(
   program: Program,
   settings: Settings,
   workLb: Lb,
-  intensity: Intensity | null,
 ): WarmupForExercise | null {
   const grid = weightGrid(exercise, settings);
   if (grid === null || exercise.warmup === null) return null;
-  const input = {
-    workLb,
-    isBase: exercise.isBase,
-    intensity: intensity ?? IntensitySchema.enum.high,
-  };
+  const input = { workLb, isBase: exercise.isBase };
 
   if (exercise.loadType === LoadTypeSchema.enum.weighted_bodyweight) {
     if (!program.addedWeightTiers || grid.kind !== 'step') return null;
