@@ -24,6 +24,42 @@ const ru = {
   describe: (name: string, days: number, exercises: number, dayNames: string) =>
     `«${name}» — ${pluralRu(days, 'день', 'дня', 'дней')}, ` +
     `${pluralRu(exercises, 'упражнение', 'упражнения', 'упражнений')}. Дни: ${dayNames}.`,
+  editor: '📅 Дни и упражнения',
+  editorDays: 'Дни программы:',
+  back: '← Назад',
+  newExercise: '➕ Новое упражнение',
+  fromProgram: '➕ Из программы',
+  rename: '✏️ Переименовать',
+  remove: '🗑 Убрать из дня',
+  removeYes: 'Убрать',
+  removeNo: 'Отмена',
+  goalLine: (type: string, goal: string) => `Тип: ${type} · Цель: ${goal}`,
+  setsOnly: (min: number, max: number) =>
+    `${min === max ? '' : `${min}–`}${pluralRu(max, 'подход', 'подхода', 'подходов')}`,
+  notice: {
+    saved: '✅ Сохранено',
+    removed: '✅ Убрано',
+    added: '✅ Добавлено',
+    failed: '⚠️ Не получилось сохранить — программа не изменилась.',
+  },
+  types: {
+    barbell: 'Штанга',
+    machine: 'Тренажёр / гантели',
+    weighted_bodyweight: 'Свой вес + допвес',
+    reps_only: 'Только повторения',
+    light_load: 'Лёгкий вес',
+  },
+  renameAsk: (name: string) => `Новое название для «${name}» (до 60 символов):`,
+  nameInvalid: 'Название — от 1 до 60 символов.',
+  removeAsk: (exercise: string, day: string) =>
+    `Убрать «${exercise}» из дня «${day}»? История упражнения сохранится.`,
+  newNameAsk: 'Название нового упражнения (до 60 символов):',
+  newTypeAsk: (name: string) => `Какой тип у «${name}»?`,
+  goalAsk: 'Подходы × повторения, например 3×8–12 или 1×6',
+  setsAsk: 'Сколько подходов? Например 3 или 2–3',
+  notUnderstood: 'Не понял.',
+  pickAsk: 'Какое упражнение добавить в этот день?',
+  pickNone: 'Все упражнения программы уже в этом дне.',
   root: '(корень)',
   problem: (p: ProgramProblem): string => {
     switch (p.code) {
@@ -112,6 +148,42 @@ const en: typeof ru = {
   describe: (name: string, days: number, exercises: number, dayNames: string) =>
     `“${name}” — ${pluralEn(days, 'day', 'days')}, ` +
     `${pluralEn(exercises, 'exercise', 'exercises')}. Days: ${dayNames}.`,
+  editor: '📅 Days and exercises',
+  editorDays: 'Program days:',
+  back: '← Back',
+  newExercise: '➕ New exercise',
+  fromProgram: '➕ From the program',
+  rename: '✏️ Rename',
+  remove: '🗑 Remove from day',
+  removeYes: 'Remove',
+  removeNo: 'Cancel',
+  goalLine: (type: string, goal: string) => `Type: ${type} · Goal: ${goal}`,
+  setsOnly: (min: number, max: number) =>
+    min === max ? pluralEn(max, 'set', 'sets') : `${min}–${max} sets`,
+  notice: {
+    saved: '✅ Saved',
+    removed: '✅ Removed',
+    added: '✅ Added',
+    failed: '⚠️ Couldn’t save — the program is unchanged.',
+  },
+  types: {
+    barbell: 'Barbell',
+    machine: 'Machine / dumbbells',
+    weighted_bodyweight: 'Bodyweight + added weight',
+    reps_only: 'Reps only',
+    light_load: 'Light load',
+  },
+  renameAsk: (name: string) => `New name for “${name}” (up to 60 characters):`,
+  nameInvalid: 'The name must be 1 to 60 characters.',
+  removeAsk: (exercise: string, day: string) =>
+    `Remove “${exercise}” from “${day}”? Its history is kept.`,
+  newNameAsk: 'Name of the new exercise (up to 60 characters):',
+  newTypeAsk: (name: string) => `What type is “${name}”?`,
+  goalAsk: 'Sets × reps, e.g. 3×8–12 or 1×6',
+  setsAsk: 'How many sets? E.g. 3 or 2–3',
+  notUnderstood: 'Didn’t get that.',
+  pickAsk: 'Which exercise to add to this day?',
+  pickNone: 'Every exercise of the program is already in this day.',
   root: '(root)',
   problem: (p: ProgramProblem): string => {
     switch (p.code) {

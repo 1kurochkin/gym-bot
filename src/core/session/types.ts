@@ -23,7 +23,8 @@ import {
 } from '../workout/schema.ts';
 import { SetInputErrorSchema } from '../input/set-input.ts';
 import { ProgramIssueSchema, ProgramSummarySchema } from '../program/program.ts';
-import { ProgramSchema } from '../program/schema.ts';
+import { NewExerciseTypeSchema } from '../program/edit.ts';
+import { IdSchema, LoadTypeSchema, ProgramSchema } from '../program/schema.ts';
 import { SettingsSectionSchema, StepSourceSchema } from '../settings/options.ts';
 import { LanguageSchema, SettingsSchema } from '../settings/settings.ts';
 import { LbSchema } from '../units/lb.ts';
@@ -35,6 +36,15 @@ export const SessionStepSchema = z.enum([
   'onboarding_tz_pick',
   'program_upload',
   'program_confirm',
+  'program_days',
+  'program_day',
+  'program_exercise',
+  'program_rename',
+  'program_remove_confirm',
+  'program_new_name',
+  'program_new_type',
+  'program_new_goal',
+  'program_pick',
   'seed',
   'settings',
   'settings_bar',
@@ -76,6 +86,13 @@ export type FileProblem = z.infer<typeof FileProblemSchema>;
 export const SessionContextSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('none') }).readonly(),
   z.object({ kind: z.literal('program_pending'), program: ProgramSchema }).readonly(),
+  z.object({
+    kind: z.literal('program_edit'),
+    dayId: z.string().nullable(),
+    exerciseId: z.string().nullable(),
+    draftName: z.string().nullable(),
+    draftType: NewExerciseTypeSchema.nullable(),
+  }).readonly(),
   z.object({
     kind: z.literal('seed'),
     index: z.number().int().nonnegative(),
@@ -148,6 +165,16 @@ export const BotEventSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('program_file'), text: z.string() }).readonly(),
   z.object({ type: z.literal('program_file_rejected'), reason: FileProblemSchema }).readonly(),
   z.object({ type: z.literal('program_confirmed') }).readonly(),
+  z.object({ type: z.literal('editor_opened') }).readonly(),
+  z.object({ type: z.literal('editor_day_picked'), dayId: IdSchema }).readonly(),
+  z.object({ type: z.literal('editor_exercise_picked'), exerciseId: IdSchema }).readonly(),
+  z.object({ type: z.literal('editor_rename_requested') }).readonly(),
+  z.object({ type: z.literal('editor_remove_requested') }).readonly(),
+  z.object({ type: z.literal('editor_remove_answered'), confirm: z.boolean() }).readonly(),
+  z.object({ type: z.literal('editor_new_requested') }).readonly(),
+  z.object({ type: z.literal('editor_type_chosen'), loadType: NewExerciseTypeSchema }).readonly(),
+  z.object({ type: z.literal('editor_from_requested') }).readonly(),
+  z.object({ type: z.literal('editor_from_picked'), exerciseId: IdSchema }).readonly(),
   z.object({ type: z.literal('program_cancelled') }).readonly(),
   z.object({ type: z.literal('seed_requested') }).readonly(),
   z.object({ type: z.literal('seed_next') }).readonly(),
@@ -234,6 +261,17 @@ const SummaryItemSchema = z.object({
 export type SummaryItem = z.infer<typeof SummaryItemSchema>;
 
 export const HistoryNoticeSchema = z.enum(['fixed', 'added', 'deleted']);
+export const EditorNoticeSchema = z.enum(['saved', 'removed', 'added', 'failed']);
+export type EditorNotice = z.infer<typeof EditorNoticeSchema>;
+
+export const EditorExerciseSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  loadType: LoadTypeSchema,
+  workSets: RangeViewSchema,
+  repRange: RangeViewSchema.nullable(),
+}).readonly();
+export type EditorExercise = z.infer<typeof EditorExerciseSchema>;
 export type HistoryNotice = z.infer<typeof HistoryNoticeSchema>;
 
 export const ViewSchema = z.discriminatedUnion('type', [
@@ -259,6 +297,36 @@ export const ViewSchema = z.discriminatedUnion('type', [
   }).readonly(),
   z.object({ type: z.literal('program_saved'), summary: ProgramSummarySchema }).readonly(),
   z.object({ type: z.literal('program_unchanged') }).readonly(),
+  z.object({ type: z.literal('program_days'), days: z.array(DayRefSchema).readonly() }).readonly(),
+  z.object({
+    type: z.literal('program_day'),
+    dayName: z.string(),
+    exercises: z.array(EditorExerciseSchema).readonly(),
+    notice: EditorNoticeSchema.nullable(),
+  }).readonly(),
+  z.object({
+    type: z.literal('program_exercise'),
+    exercise: EditorExerciseSchema,
+    removable: z.boolean(),
+    notice: EditorNoticeSchema.nullable(),
+  }).readonly(),
+  z.object({ type: z.literal('program_rename'), current: z.string(), invalid: z.boolean() })
+    .readonly(),
+  z.object({
+    type: z.literal('program_remove_confirm'),
+    exerciseName: z.string(),
+    dayName: z.string(),
+  }).readonly(),
+  z.object({ type: z.literal('program_new_name'), invalid: z.boolean() }).readonly(),
+  z.object({ type: z.literal('program_new_type'), name: z.string() }).readonly(),
+  z.object({
+    type: z.literal('program_new_goal'),
+    name: z.string(),
+    repsOnly: z.boolean(),
+    invalid: z.boolean(),
+  }).readonly(),
+  z.object({ type: z.literal('program_pick'), options: z.array(DayRefSchema).readonly() })
+    .readonly(),
   z.object({ type: z.literal('program_cancelled') }).readonly(),
   z.object({
     type: z.literal('program_file_rejected'),

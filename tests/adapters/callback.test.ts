@@ -44,3 +44,24 @@ Deno.test('мусор в callback_data не декодируется', () => {
   assertEquals(decodeCallback('1|tz:Europe/Moscow;drop'), null);
   assertEquals(decodeCallback('1|tz:Mars/Base'), null, 'несуществующая зона отсекается схемой');
 });
+
+Deno.test('кодек: кнопки редактора программы', () => {
+  const actions = [
+    { type: 'editor_open' },
+    { type: 'editor_day', dayId: 'tue' },
+    { type: 'editor_exercise', exerciseId: 'neck_flex' },
+    { type: 'editor_rename' },
+    { type: 'editor_remove' },
+    { type: 'editor_remove_answer', confirm: true },
+    { type: 'editor_remove_answer', confirm: false },
+    { type: 'editor_new' },
+    { type: 'editor_type', loadType: 'weighted_bodyweight' },
+    { type: 'editor_from' },
+    { type: 'editor_from_pick', exerciseId: 'ex_12' },
+  ] as const;
+  for (const a of actions) {
+    const decoded = decodeCallback(encodeCallback(ActionSchema.parse(a), 999999));
+    assertEquals(decoded, { stepNo: 999999, action: a } as unknown);
+  }
+  assertEquals(decodeCallback('3|et:light_load'), null, 'создать можно только 4 типа');
+});

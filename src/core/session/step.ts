@@ -8,6 +8,21 @@ import {
   rejectProgramFile,
   requestProgram,
 } from './program.ts';
+import {
+  answerRemove,
+  chooseNewType,
+  editorBack,
+  editorText,
+  isEditor,
+  openEditor,
+  pickEditorDay,
+  pickEditorExercise,
+  pickFromProgram,
+  requestFromProgram,
+  requestNew,
+  requestRemove,
+  requestRename,
+} from './program-editor.ts';
 import { requestSeed, seedText, skipSeed, stopSeed } from './seed.ts';
 import {
   answerCancel,
@@ -113,6 +128,26 @@ function transition(state: Session, event: BotEvent, ctx: StepContext): StepResu
       return confirmProgram(state);
     case 'program_cancelled':
       return state.step === S.program_confirm ? cancelProgram(state) : unchanged(state);
+    case 'editor_opened':
+      return openEditor(state, ctx);
+    case 'editor_day_picked':
+      return pickEditorDay(state, ctx, event.dayId);
+    case 'editor_exercise_picked':
+      return pickEditorExercise(state, ctx, event.exerciseId);
+    case 'editor_rename_requested':
+      return requestRename(state, ctx);
+    case 'editor_remove_requested':
+      return requestRemove(state, ctx);
+    case 'editor_remove_answered':
+      return answerRemove(state, ctx, event.confirm);
+    case 'editor_new_requested':
+      return requestNew(state);
+    case 'editor_type_chosen':
+      return chooseNewType(state, event.loadType);
+    case 'editor_from_requested':
+      return requestFromProgram(state, ctx);
+    case 'editor_from_picked':
+      return pickFromProgram(state, ctx, event.exerciseId);
     case 'seed_requested':
       return requestSeed(state, ctx);
     case 'seed_next':
@@ -162,6 +197,7 @@ function transition(state: Session, event: BotEvent, ctx: StepContext): StepResu
     case 'warmup_comment_requested':
       return requestWarmupComment(state, ctx);
     case 'back_pressed':
+      if (isEditor(state)) return editorBack(state, ctx);
       return isHistory(state) ? historyBack(state, ctx) : goBack(state, ctx);
     case 'history_requested':
       return openHistory(state, ctx);
@@ -224,6 +260,16 @@ function onText(state: Session, text: string, ctx: StepContext): StepResult {
     case S.program_upload:
     case S.program_confirm:
       return receiveProgram(state, text, ctx);
+    case S.program_days:
+    case S.program_day:
+    case S.program_exercise:
+    case S.program_rename:
+    case S.program_remove_confirm:
+    case S.program_new_name:
+    case S.program_new_type:
+    case S.program_new_goal:
+    case S.program_pick:
+      return editorText(state, ctx, text);
     case S.seed:
       return seedText(state, text, ctx);
     case S.settings:

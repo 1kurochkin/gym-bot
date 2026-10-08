@@ -49,6 +49,15 @@ export function render(view: View, lang: Language, env: RenderEnv): Rendered {
     case 'program_unchanged':
     case 'program_cancelled':
     case 'program_file_rejected':
+    case 'program_days':
+    case 'program_day':
+    case 'program_exercise':
+    case 'program_rename':
+    case 'program_remove_confirm':
+    case 'program_new_name':
+    case 'program_new_type':
+    case 'program_new_goal':
+    case 'program_pick':
       return renderProgramView(view, lang);
     case 'seed_prompt':
     case 'seed_done':
