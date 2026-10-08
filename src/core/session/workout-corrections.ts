@@ -32,26 +32,16 @@ import {
   workSetsOf,
 } from './workout.ts';
 
-/**
- * Исправления по ходу тренировки (.specs/product.md → US-3, US-4): «Изменить» в разминке,
- * комментарий к разминке, [← Назад] (ничего не удаляет из записанного), просмотр, правка и
- * удаление рабочего подхода, /undo.
- */
-
 const S = SessionStepSchema.enum;
 const { warmup } = SetKindSchema.enum;
 const { full, custom, none } = WarmupVariantSchema.enum;
 
-/** Запись текущего упражнения в том виде, в каком она в БД (до этого апдейта). */
 const currentLog = (ctx: StepContext, c: WorkoutContext): WorkoutLog | undefined =>
   c.exerciseId === null ? undefined : logOf(ctx.activeWorkout, c.exerciseId);
 
 const asView = (sets: WorkoutLog['sets']): SetView[] =>
   sets.map((s) => ({ weightLb: s.weightLb, reps: s.reps }));
 
-// ---------------------------------------------------------------- «Изменить» в разминке
-
-/** [✏️ Изменить]: идём по подходам разминки с первого. */
 export function startWarmupDiff(state: Session, ctx: StepContext): StepResult {
   const c = workoutContext(state);
   const ex = c && currentExercise(ctx, c);
@@ -85,7 +75,6 @@ function markScreen(
 
 const MARK_STEPS: ReadonlySet<string> = new Set([S.workout_warmup_mark, S.workout_warmup_edit]);
 
-/** [✅ Готово] / [⏭ Пропустить] записывают подход по плану; [✏️ Изменить] ждёт текст. */
 export function markWarmup(state: Session, ctx: StepContext, mark: WarmupMark): StepResult {
   const c = workoutContext(state);
   const ex = c && currentExercise(ctx, c);
@@ -103,7 +92,6 @@ export function markWarmup(state: Session, ctx: StepContext, mark: WarmupMark): 
   }
 }
 
-/** Текст на шаге отметки: «4» — повторения с плановым весом, «135/4» — вес и повторения. */
 export function warmupMarkText(state: Session, ctx: StepContext, text: string): StepResult {
   const c = workoutContext(state);
   const ex = c && currentExercise(ctx, c);
@@ -150,7 +138,6 @@ function recordWarmup(
   if (step + 1 < lines.length) {
     return withEffects(markScreen(state, ctx, c, ex, step + 1, false, null), [record]);
   }
-  // Последний подход: вариант — custom, если хоть один отличался от плана.
   const earlier = (currentLog(ctx, c)?.sets ?? []).filter((s) => s.kind === warmup);
   const differs = skipped || weightLb !== line.weightLb || reps !== line.reps ||
     earlier.some((s) => {
@@ -164,9 +151,6 @@ function recordWarmup(
   }]);
 }
 
-// ---------------------------------------------------------------- комментарий к разминке
-
-/** [💬 Комментарий] на экране разминки. */
 export function requestWarmupComment(state: Session, ctx: StepContext): StepResult {
   const c = workoutContext(state);
   const ex = c && currentExercise(ctx, c);
@@ -187,9 +171,6 @@ export function warmupCommentText(state: Session, ctx: StepContext, text: string
   ]);
 }
 
-// ---------------------------------------------------------------- [← Назад]
-
-/** [← Назад] на любом экране тренировки: на предыдущий экран, записанное не удаляется (US-4). */
 export function goBack(state: Session, ctx: StepContext): StepResult {
   const active = ctx.activeWorkout;
   switch (state.step) {
@@ -237,7 +218,6 @@ export function goBack(state: Session, ctx: StepContext): StepResult {
   if (state.step !== S.workout_reps) return unchanged(state);
   const works = workSetsOf(log);
   if (works.length > 0) return setView(state, ctx, c, ex, works.length, false, null);
-  // Подходов нет: reps_only — в меню (пустая запись удаляется); иначе — к разминке или весу.
   if (ex.loadType === LoadTypeSchema.enum.reps_only) return leaveExercise(state, ctx, c);
   const effects: Effect[] = [];
   if (warmupSets.length > 0) {
@@ -256,7 +236,6 @@ function toHome(state: Session, ctx: StepContext): StepResult {
   return zone ? home(state, zone, ctx) : unchanged(state);
 }
 
-/** Из упражнения — в меню; пустая запись (ничего не записано) удаляется. */
 function leaveExercise(state: Session, ctx: StepContext, c: WorkoutContext): StepResult {
   const active = ctx.activeWorkout;
   if (!active) return unchanged(state);
@@ -269,7 +248,6 @@ function leaveExercise(state: Session, ctx: StepContext, c: WorkoutContext): Ste
   );
 }
 
-/** К выбору рабочего веса: запись упражнения (пока без подходов) удаляется. */
 function backToCard(
   state: Session,
   ctx: StepContext,
@@ -282,8 +260,6 @@ function backToCard(
     { type: 'delete_exercise_log', id: c.log.id },
   ]);
 }
-
-// ---------------------------------------------------------------- просмотр подхода
 
 function setView(
   state: Session,
@@ -311,7 +287,6 @@ function setView(
 
 const VIEW_STEPS: ReadonlySet<string> = new Set([S.workout_set_view, S.workout_set_edit]);
 
-/** [✏️ Изменить]: ждём текст «7» или «185/7». */
 export function requestSetEdit(state: Session, ctx: StepContext): StepResult {
   const c = workoutContext(state);
   const ex = c && currentExercise(ctx, c);
@@ -319,7 +294,6 @@ export function requestSetEdit(state: Session, ctx: StepContext): StepResult {
   return setView(state, ctx, c, ex, c.viewSet, true, null);
 }
 
-/** Текст на просмотре подхода: перезаписать его и вернуться к вводу. */
 export function setEditText(state: Session, ctx: StepContext, text: string): StepResult {
   const c = workoutContext(state);
   const ex = c && currentExercise(ctx, c);
@@ -339,7 +313,6 @@ export function setEditText(state: Session, ctx: StepContext, text: string): Ste
   );
 }
 
-/** [🗑 Удалить]: подход удаляется, бот возвращается к вводу. */
 export function deleteViewedSet(state: Session, ctx: StepContext): StepResult {
   const c = workoutContext(state);
   const ex = c && currentExercise(ctx, c);
@@ -356,7 +329,6 @@ export function deleteViewedSet(state: Session, ctx: StepContext): StepResult {
   );
 }
 
-/** [➡️ К подходу N]: обратно к вводу. */
 export function forwardToInput(state: Session, ctx: StepContext): StepResult {
   const c = workoutContext(state);
   const ex = c && currentExercise(ctx, c);
@@ -364,9 +336,6 @@ export function forwardToInput(state: Session, ctx: StepContext): StepResult {
   return repsPrompt(state, ctx, c, ex);
 }
 
-// ---------------------------------------------------------------- /undo
-
-/** Шаги, на которых /undo имеет смысл: тренировка идёт, сводки ещё нет. */
 const UNDO_STEPS: ReadonlySet<string> = new Set([
   S.workout_menu,
   S.workout_add,
@@ -381,10 +350,6 @@ const UNDO_STEPS: ReadonlySet<string> = new Set([
   S.workout_comment,
 ]);
 
-/**
- * /undo: удалить последний рабочий подход тренировки и вернуться к его вводу. Если у последнего
- * упражнения рабочих подходов нет, но отмечена разминка — удаляется разминка, бот показывает её.
- */
 export function undo(state: Session, ctx: StepContext): StepResult {
   const active = ctx.activeWorkout;
   const nothing = moveTo(state, state.step, { type: 'workout_undo_nothing' }, state.context);

@@ -8,12 +8,6 @@ import { WarmupVariantSchema } from '../core/history/schema.ts';
 import { FileProblemSchema, WarmupMarkSchema } from '../core/session/types.ts';
 import { LbSchema } from '../core/units/lb.ts';
 
-/**
- * Граница между Telegram и приложением. Адаптер telegram переводит апдейт в Incoming,
- * а Rendered — в сообщение с клавиатурой. Фичи не знают про grammY.
- */
-
-/** Действие кнопки. Кодируется в callback_data адаптером (лимит 64 байта) и проверяется при декодировании. */
 export const ActionSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('tz'), zone: TimeZoneSchema }).readonly(),
   z.object({ type: z.literal('program_confirm') }).readonly(),
@@ -65,7 +59,6 @@ export type Action = z.infer<typeof ActionSchema>;
 export const IncomingSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('command'), name: z.string(), args: z.string() }).readonly(),
   z.object({ kind: z.literal('text'), text: z.string() }).readonly(),
-  /** Файл уже скачан адаптером: текст или причина отказа (размер, тип, загрузка). */
   z.object({
     kind: z.literal('document'),
     fileName: z.string(),
@@ -89,14 +82,8 @@ export const IncomingUpdateSchema = z.object({
   updateId: z.number().int(),
   userId: z.number().int().positive(),
   chatId: z.number().int(),
-  /**
-   * Сообщение апдейта: у кнопки — сообщение с кнопкой (его редактируем вместо отправки нового),
-   * у текста и команды — само сообщение (с него /clear удаляет переписку назад).
-   */
   messageId: z.number().int().nullable(),
-  /** language_code пользователя из Telegram. */
   languageCode: z.string().nullable(),
-  /** Имя и @username из Telegram: запоминаются при входе по приглашению. */
   person: PersonSchema,
   input: IncomingSchema,
 }).readonly();
@@ -105,10 +92,6 @@ export type IncomingUpdate = z.infer<typeof IncomingUpdateSchema>;
 export const ButtonSchema = z.object({ label: z.string(), action: ActionSchema }).readonly();
 export type Button = z.infer<typeof ButtonSchema>;
 
-/**
- * Нижняя (reply) клавиатура: кнопка «отправить геопозицию» или её удаление.
- * Такое сообщение всегда отправляется новым: reply-клавиатуру нельзя повесить при редактировании.
- */
 export const ReplyKeyboardSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('request_location'), label: z.string() }).readonly(),
   z.object({ kind: z.literal('remove') }).readonly(),
@@ -117,28 +100,22 @@ export type ReplyKeyboard = z.infer<typeof ReplyKeyboardSchema>;
 
 export const RenderedSchema = z.object({
   text: z.string(),
-  /** Фрагменты text, которые показать жирным (первое вхождение каждого); без разметки в тексте. */
   bold: z.array(z.string()).readonly().optional(),
   keyboard: z.array(z.array(ButtonSchema).readonly()).readonly(),
   replyKeyboard: ReplyKeyboardSchema.nullable(),
 }).readonly();
 export type Rendered = z.infer<typeof RenderedSchema>;
 
-/** Порт с поведением — обычный TS-тип: zod-схема функции ничего бы не проверяла. */
-/** Что знает только оболочка, но нужно экрану: имя бота для ссылки-приглашения. */
 export const RenderEnvSchema = z.object({ botUsername: z.string() }).readonly();
 export type RenderEnv = z.infer<typeof RenderEnvSchema>;
 
 export type Ui = {
-  /** Показать экран: отредактировать messageId, если он есть, иначе отправить новое сообщение. */
   readonly show: (
     chatId: number,
     rendered: Rendered,
     stepNo: number,
     messageId: number | null,
   ) => Promise<void>;
-  /** Убрать клавиатуру у сообщения с устаревшими кнопками. */
   readonly dropKeyboard: (chatId: number, messageId: number) => Promise<void>;
-  /** /clear: удалить сообщения чата от upToMessageId назад, сколько Telegram позволит (48 ч). */
   readonly clearChat: (chatId: number, upToMessageId: number) => Promise<void>;
 };

@@ -16,12 +16,9 @@ import { type Lb, lb } from '../units/lb.ts';
 import { home, moveTo, unchanged, withEffects } from './flow.ts';
 import { type Session, SessionStepSchema, type StepContext, type StepResult } from './types.ts';
 
-/** /settings — US-8 (.specs/product.md). */
-
 const S = SessionStepSchema.enum;
 const SECTION = SettingsSectionSchema.enum;
 
-/** Экран настроек; `settings` — уже с изменениями, если они только что сохранены. */
 export function settingsMenu(
   state: Session,
   ctx: StepContext,
@@ -42,7 +39,6 @@ export function settingsMenu(
   });
 }
 
-/** Сохранить и вернуться к экрану настроек с отметкой «Сохранено». */
 const save = (state: Session, ctx: StepContext, settings: Settings): StepResult =>
   withEffects(settingsMenu(state, ctx, settings, true), [{ type: 'save_settings', settings }]);
 
@@ -86,8 +82,6 @@ export function closeSettings(state: Session, ctx: StepContext): StepResult {
     : moveTo(state, S.onboarding_tz, { type: 'ask_time', error: null });
 }
 
-// ---------------------------------------------------------------- гриф
-
 const barScreen = (state: Session, currentLb: Lb, invalid: boolean): StepResult =>
   moveTo(state, S.settings_bar, { type: 'settings_bar', currentLb, invalid });
 
@@ -98,8 +92,6 @@ export function chooseBar(state: Session, ctx: StepContext, value: number): Step
   }
   return save(state, ctx, { ...ctx.settings, barWeightLb: lb(value) });
 }
-
-// ---------------------------------------------------------------- блины
 
 const platesScreen = (state: Session, selected: readonly Lb[], empty: boolean): StepResult =>
   moveTo(
@@ -125,16 +117,11 @@ export function savePlates(state: Session, ctx: StepContext): StepResult {
   return save(state, ctx, { ...ctx.settings, platesLb: c.selected });
 }
 
-// ---------------------------------------------------------------- язык
-
 export function chooseLanguage(state: Session, ctx: StepContext, language: Language): StepResult {
   if (state.step !== S.settings_language) return unchanged(state);
   return save(state, ctx, { ...ctx.settings, language });
 }
 
-// ---------------------------------------------------------------- шаг по упражнениям
-
-/** Упражнения активной программы с весом, кроме штанги: у неё шаг задают блины. */
 type StepItem = { readonly exercise: Exercise; readonly stepLb: Lb; readonly source: StepSource };
 
 function stepExercises(ctx: StepContext): StepItem[] {
@@ -186,7 +173,6 @@ function stepEditScreen(
   );
 }
 
-/** Новый шаг (кнопкой или числом) или null — убрать переопределение. */
 export function setStep(state: Session, ctx: StepContext, value: number | null): StepResult {
   const c = state.context;
   if (state.step !== S.settings_step_edit || c.kind !== 'step_edit') return unchanged(state);
@@ -200,7 +186,6 @@ export function setStep(state: Session, ctx: StepContext, value: number | null):
   return withEffects(result, [{ type: 'save_settings', settings }]);
 }
 
-/** Число, введённое текстом в разделе «Гриф» или «Шаг». */
 export function settingsText(state: Session, ctx: StepContext, text: string): StepResult {
   const value = parseLbNumber(text) ?? Number.NaN;
   if (state.step === S.settings_bar) return chooseBar(state, ctx, value);

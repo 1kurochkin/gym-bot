@@ -3,8 +3,6 @@ import type { ProgramIssue, ProgramProblem } from '../../core/program/program.ts
 import type { Language } from '../../core/settings/settings.ts';
 import { pluralEn, pluralRu } from '../i18n/format.ts';
 
-/** Тексты /program на языках пользователя. Ключи en проверяет typeof ru. */
-
 const ru = {
   howToSend:
     'Пришли JSON программы файлом (.json). Небольшую программу можно прислать текстом одним сообщением.',
@@ -183,7 +181,6 @@ const en: typeof ru = {
 
 export const MESSAGES: Record<Language, typeof ru> = { ru, en };
 
-/** «days[2].exercises[0].repRange.min: обязательное поле». */
 export function issueText(issue: ProgramIssue, lang: Language): string {
   const t = MESSAGES[lang];
   const where = issue.path || (issue.problem.code === 'invalid_json' ? '(JSON)' : t.root);

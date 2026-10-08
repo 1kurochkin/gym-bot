@@ -30,7 +30,6 @@ export type SettingsView = Extract<
 const SECTION = SettingsSectionSchema.enum;
 const SOURCE = StepSourceSchema.enum;
 
-/** Название языка — всегда на нём самом: так его найдёт и тот, кто не читает текущий. */
 const LANGUAGE_NAMES: Record<Language, string> = { ru: 'Русский', en: 'English' };
 
 const ru = {

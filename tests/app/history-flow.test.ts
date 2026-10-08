@@ -2,11 +2,8 @@ import { assert, assertEquals } from '@std/assert';
 import { LocalDateSchema } from '../../src/core/schedule/calendar.ts';
 import { workout, type World, world } from '../support/world.ts';
 
-/** US-10 (.specs/product.md): /history — просмотр, правка подходов, удаление тренировки. */
-
 const history = { kind: 'command', name: 'history', args: '' } as const;
 
-/** Вторник: жим 195 × 7, пресс 20/18/15, шея пропущена. */
 async function tuesday(w: World): Promise<void> {
   await w.send(workout);
   await w.press({ type: 'day_pick', dayId: 'tue' });
@@ -85,7 +82,6 @@ Deno.test('список → тренировка → упражнение: ис�
   await w.press({ type: 'back' });
   assertEquals(w.last(), 'Тренировки:');
 
-  // Правка видна там, где история считается: «прошлый раз» в карточке.
   w.setNow('2026-10-06T22:40:00Z');
   await w.send(workout);
   await w.press({ type: 'day_pick', dayId: 'tue' });
@@ -147,7 +143,7 @@ Deno.test('текущая тренировка в истории не видна
     });
   }
   await w.send(workout);
-  await w.press({ type: 'day_pick', dayId: 'tue' }); // начатая — не в истории
+  await w.press({ type: 'day_pick', dayId: 'tue' });
 
   await w.send(history);
   assertEquals(w.buttons().length, 8 + 1);

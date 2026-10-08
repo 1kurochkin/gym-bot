@@ -1,14 +1,11 @@
 import { type SetInputError, SetInputErrorSchema } from '../../core/input/set-input.ts';
 import type { Language } from '../../core/settings/settings.ts';
 
-/** Тексты тренировки на языках пользователя. Ключи en проверяет typeof ru. */
-
 const E = SetInputErrorSchema.enum;
 
 const ru = {
   bodyweight: 'свой вес',
   back: '← Назад',
-  // день и меню
   lastWorkout: (weekday: string, date: string, day: string) =>
     `Прошлая тренировка: ${weekday}, ${date} — ${day}.`,
   pickDay: 'Выбери день:',
@@ -18,7 +15,6 @@ const ru = {
   addNone: 'Все упражнения программы уже в меню.',
   finishWorkout: '🏁 Завершить тренировку',
   emptyDeleted: 'Подходов не было — тренировку не сохранял. Начать — /workout',
-  // упражнение: вес
   workSets: (min: number, max: number) =>
     min === max ? `${min} ${min === 1 ? 'рабочий' : 'рабочих'}` : `${min}–${max} рабочих`,
   goal: 'Цель',
@@ -27,7 +23,6 @@ const ru = {
   askAdded: 'Допвес сегодня? (0 — свой вес)',
   askWeight: 'Рабочий вес сегодня?',
   typeWeight: '✍️ Или напиши свой вес.',
-  // разминка
   warmupFor: (work: string) => `Разминка под ${work}`,
   orWorkSet: '✍️ Или сразу напиши рабочий подход.',
   warmupDone: '✅ Готово',
@@ -39,7 +34,6 @@ const ru = {
   markAsk: 'Напиши, что сделал: 4 — повторения, 135/4 — вес и повторения.',
   warmupCommentAsk:
     'Комментарий к разминке — напиши текстом. Покажу его перед разминкой в следующий раз.',
-  // подходы
   recordedList: (sets: string) => `Записал: ${sets}`,
   setTarget: (i: number, target: string) => `Подход №${i} — ${target}`,
   workSet: (i: number) => `Рабочий подход №${i} —`,
@@ -53,7 +47,6 @@ const ru = {
   fixed: (i: number) => `✅ Исправил подход №${i}.`,
   deleted: (i: number) => `🗑 Удалил подход №${i}.`,
   undoNothing: 'Нечего отменять.',
-  // просмотр подхода
   setHead: (i: number, set: string) => `Подход №${i}: ${set}`,
   setEditAsk: 'Напиши, как было: 7 — повторения, 185/7 — вес и повторения.',
   setEdit: '✏️ Изменить',
@@ -61,7 +54,6 @@ const ru = {
   toSet: (i: number) => `← Подход ${i}`,
   toMenu: '← В меню',
   forward: (i: number) => `➡️ К подходу ${i}`,
-  // комментарии и завершение
   workoutCommentAsk: 'Комментарий к тренировке (самочувствие, сон и т. п.) — напиши текстом.',
   exerciseCommentAsk: (name: string) =>
     `Комментарий к «${name}» — напиши текстом. Покажу его в карточке в следующий раз.`,

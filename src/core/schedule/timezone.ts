@@ -10,11 +10,9 @@ const isIanaZone = (value: string): boolean => {
   }
 };
 
-/** IANA-зона (America/New_York). Храним её, а не смещение: смещение меняется при переходе на зимнее время. */
 export const TimeZoneSchema = z.string().min(1).refine(isIanaZone).brand<'TimeZone'>();
 export type TimeZone = z.infer<typeof TimeZoneSchema>;
 
-/** Ошибки разбора пользовательского ввода: зона и время суток. */
 export const TimeInputErrorSchema = z.enum(['unknown_zone', 'not_time']);
 export type TimeInputError = z.infer<typeof TimeInputErrorSchema>;
 const { unknown_zone, not_time } = TimeInputErrorSchema.enum;
@@ -24,7 +22,6 @@ export function parseTimeZone(value: string): Result<TimeZone, typeof unknown_zo
   return r.success ? ok(r.data) : err(unknown_zone);
 }
 
-/** Смещение зоны на момент `at` в минутах (New York летом: −240, зимой: −300). */
 export function utcOffsetMinutes(zone: TimeZone, at: Date): number {
   const name = new Intl.DateTimeFormat('en-US', { timeZone: zone, timeZoneName: 'longOffset' })
     .formatToParts(at)
@@ -35,7 +32,6 @@ export function utcOffsetMinutes(zone: TimeZone, at: Date): number {
   return sign * (Number(m[2]) * 60 + Number(m[3]));
 }
 
-/** «UTC−4», «UTC+5:30», «UTC». Минус — типографский (U+2212). */
 export function formatOffset(minutes: number): string {
   if (minutes === 0) return 'UTC';
   const abs = Math.abs(minutes);
@@ -49,7 +45,6 @@ export function cityName(zone: TimeZone): string {
   return last.replaceAll('_', ' ');
 }
 
-/** Подпись зоны: смещение на текущий момент и город; city = null — фиксированное смещение (Etc/). */
 export const ZoneLabelSchema = z.object({ offset: z.string(), city: z.string().nullable() })
   .readonly();
 export type ZoneLabel = z.infer<typeof ZoneLabelSchema>;
@@ -61,7 +56,6 @@ export function zoneLabel(zone: TimeZone, at: Date): ZoneLabel {
   };
 }
 
-/** Время суток, которое написал пользователь, в минутах от полуночи: «18:40», «6.40 pm», «1840», «7». */
 export function parseClockTime(text: string): Result<number, typeof not_time> {
   const m = /^\s*(\d{1,2})(?:[:.\s]?(\d{2}))?\s*(am|pm|a\.m\.|p\.m\.)?\s*$/i.exec(text);
   if (!m) return err(not_time);
@@ -78,10 +72,6 @@ export function parseClockTime(text: string): Result<number, typeof not_time> {
   return ok(h * 60 + min);
 }
 
-/**
- * Смещение от UTC по местному времени пользователя. Округление до 15 минут
- * (часы пользователя могут расходиться на пару минут), диапазон реальных зон — от −12 до +14 ч.
- */
 export function offsetFromLocalTime(localMinutes: number, now: Date): number {
   const utcMinutes = now.getUTCHours() * 60 + now.getUTCMinutes();
   let diff = localMinutes - utcMinutes;
@@ -90,7 +80,6 @@ export function offsetFromLocalTime(localMinutes: number, now: Date): number {
   return Math.round(diff / 15) * 15;
 }
 
-/** Крупные города по одному на регион; порядок — приоритет показа. */
 const POPULAR_ZONES: readonly string[] = [
   'America/New_York',
   'America/Chicago',
@@ -166,7 +155,6 @@ const POPULAR_ZONES: readonly string[] = [
   'Pacific/Auckland',
 ];
 
-/** Зоны, которые показываем первыми для языка интерфейса Telegram. */
 const LANGUAGE_ZONES: Readonly<Record<string, readonly string[]>> = {
   ru: [
     'Europe/Moscow',
@@ -205,14 +193,11 @@ const LANGUAGE_ZONES: Readonly<Record<string, readonly string[]>> = {
 };
 
 export const ZoneCandidatesSchema = z.object({
-  /** Города с таким смещением сейчас, не больше `limit`, подходящие по языку — первыми. */
   cities: z.array(TimeZoneSchema).readonly(),
-  /** Фиксированное смещение без летнего времени (Etc/GMT±N); только для целых часов. */
   fixed: TimeZoneSchema.nullable(),
 }).readonly();
 export type ZoneCandidates = z.infer<typeof ZoneCandidatesSchema>;
 
-/** Зоны, у которых в момент `now` смещение равно `offset`. */
 export function candidateZones(
   offset: number,
   now: Date,
@@ -230,7 +215,6 @@ export function candidateZones(
   return { cities, fixed: fixedOffsetZone(offset) };
 }
 
-/** Etc/GMT+4 — это UTC−4: у зон Etc знак обратный (POSIX). */
 function fixedOffsetZone(offset: number): TimeZone | null {
   if (offset % 60 !== 0) return null;
   const h = -offset / 60;

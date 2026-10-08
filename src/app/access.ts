@@ -4,11 +4,6 @@ import type { IncomingUpdate } from '../ports/ui.ts';
 import type { UpdateDeps } from './handle-update.ts';
 import { render } from './route.ts';
 
-/**
- * Кто может пользоваться ботом (.specs/product.md → US-9): владельцы из конфигурации,
- * участники из БД и тот, кто пришёл по действующему приглашению (/start <код>).
- * Остальным — тишина; единственный ответ чужому — «приглашение недействительно».
- */
 export async function admit(deps: UpdateDeps, update: IncomingUpdate): Promise<boolean> {
   if (deps.owners.has(update.userId)) return true;
   if (await deps.store.isMember(update.userId)) return true;
@@ -28,7 +23,6 @@ export async function admit(deps: UpdateDeps, update: IncomingUpdate): Promise<b
     return false;
   }
 
-  // Пригласившему — на его языке; в личном чате с ботом chat id совпадает с user id.
   const inviter = await deps.store.load(joined.invitedBy);
   const inviterLang = languageFor(inviter.settings.language, null);
   const note = render({ type: 'member_joined', person: update.person }, inviterLang, env);

@@ -15,8 +15,6 @@ import {
   type WarmupTiers,
 } from '../program/schema.ts';
 
-/** Разминка от рабочего веса — штанга и тренажёры (.specs/warmup.md §6.2). */
-
 export const WarmupLabelSchema = z.enum(['regular', 'empty_bar', 'overload']);
 export type WarmupLabel = z.infer<typeof WarmupLabelSchema>;
 
@@ -24,13 +22,11 @@ export const WarmupSetSchema = z.object({
   weightLb: LbSchema,
   reps: z.number().int().positive(),
   label: WarmupLabelSchema,
-  /** Вес на сторону грифа; для тренажёра — null. */
   perSideLb: LbSchema.nullable(),
 }).readonly();
 export type WarmupSet = z.infer<typeof WarmupSetSchema>;
 
 export const WarmupPlanSchema = z.object({
-  /** Номер ступени с 1 (пишется в лог как warmupTier); null — фиксированная схема. */
   tier: z.number().int().positive().nullable(),
   sets: z.array(WarmupSetSchema).readonly(),
 }).readonly();
@@ -38,7 +34,6 @@ export type WarmupPlan = z.infer<typeof WarmupPlanSchema>;
 
 const { regular, empty_bar, overload } = WarmupLabelSchema.enum;
 
-/** Ступень по рабочему весу: последняя, чей порог ≤ W. Номер — с 1. */
 export function selectTier(
   tiers: WarmupTiers,
   workLb: Lb,
@@ -50,17 +45,11 @@ export function selectTier(
   return { tier: index + 1, steps: tiers.byWorkWeight[index]?.steps ?? [] };
 }
 
-/** Применяется ли перегрузочный сингл (ADR-0003): только базовые. */
 export function singleApplies(single: OverloadSingle | undefined, isBase: boolean): boolean {
   if (!single) return false;
   return !(single.onlyBase && !isBase);
 }
 
-/**
- * Разминочная лесенка к рабочему весу W по шагам в процентах (§6.2, правила 2–7):
- * округление к сетке весов, пустой гриф снизу, шаги ≥ W выбрасываются, сингл — выше W,
- * дубли схлопываются.
- */
 export function buildLadder(
   workLb: Lb,
   steps: readonly WarmupStep[],
@@ -90,7 +79,6 @@ export const WorkWeightWarmupInputSchema = z.object({
 }).readonly();
 export type WorkWeightWarmupInput = z.infer<typeof WorkWeightWarmupInputSchema>;
 
-/** Разминка по ступеням программы. */
 export function tieredWarmup(
   input: WorkWeightWarmupInput,
   tiers: WarmupTiers,
@@ -103,7 +91,6 @@ export function tieredWarmup(
   return { tier, sets: buildLadder(input.workLb, steps, single, grid) };
 }
 
-/** Разминка по фиксированной схеме упражнения (икры: 50%×10 · 80%×10) — вместо ступеней. */
 export function fixedWarmup(
   input: WorkWeightWarmupInput,
   steps: readonly WarmupStep[],
@@ -114,13 +101,10 @@ export function fixedWarmup(
   return { tier: null, sets: buildLadder(input.workLb, steps, applied, grid) };
 }
 
-// ---------------------------------------------------------------- допвес (§6.3)
-
 export const AddedWarmupLabelSchema = z.enum(['assisted', 'bodyweight', 'regular', 'overload']);
 export type AddedWarmupLabel = z.infer<typeof AddedWarmupLabelSchema>;
 
 export const AddedWarmupSetSchema = z.object({
-  /** Допвес на поясе; 0 — свой вес. */
   addedLb: LbSchema,
   reps: z.number().int().positive(),
   label: AddedWarmupLabelSchema,
@@ -128,20 +112,14 @@ export const AddedWarmupSetSchema = z.object({
 export type AddedWarmupSet = z.infer<typeof AddedWarmupSetSchema>;
 
 export const AddedWarmupPlanSchema = z.object({
-  /** 0 — ступень «без допвеса», дальше номера с 1. */
   tier: z.number().int().nonnegative(),
   sets: z.array(AddedWarmupSetSchema).readonly(),
-  /** Подход со своим весом после рабочего; null — не нужен. */
   afterWork: AfterWorkSchema.nullable(),
 }).readonly();
 export type AddedWarmupPlan = z.infer<typeof AddedWarmupPlanSchema>;
 
 const added = AddedWarmupLabelSchema.enum;
 
-/**
- * Разминка для брусьев и подтягиваний: первая ступень — свой вес, проценты — от допвеса A,
- * округление до шага. Сингл — от minAddedLb и только в базовых.
- */
 export function addedWeightWarmup(
   addedLb: Lb,
   tiers: AddedWeightTiers,

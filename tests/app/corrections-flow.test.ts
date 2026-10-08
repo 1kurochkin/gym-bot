@@ -1,12 +1,6 @@
 import { assert, assertEquals } from '@std/assert';
 import { workout, type World, world } from '../support/world.ts';
 
-/**
- * US-3, US-4 (.specs/product.md): «Изменить» в разминке, комментарий к разминке, [← Назад] без
- * удаления записанного, просмотр, правка и удаление подхода, /undo.
- */
-
-/** Вторник, жим 195: разминка из 4 подходов. */
 async function pressAt195(w: World): Promise<void> {
   await w.send(workout);
   await w.press({ type: 'day_pick', dayId: 'tue' });

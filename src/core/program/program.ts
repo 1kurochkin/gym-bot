@@ -2,10 +2,6 @@ import { z } from 'zod';
 import { err, ok, type Result } from '../../shared/result.ts';
 import { type Exercise, LoadTypeSchema, type Program, ProgramSchema } from './schema.ts';
 
-/**
- * Что не так в программе: код и параметры, без текста — текст на языке пользователя строит view.
- * Первая группа — нарушения схемы (из zod), вторая — перекрёстные проверки.
- */
 export const ProgramProblemSchema = z.discriminatedUnion('code', [
   z.object({ code: z.literal('invalid_json'), reason: z.string() }).readonly(),
   z.object({ code: z.literal('required') }).readonly(),
@@ -28,7 +24,6 @@ export const ProgramProblemSchema = z.discriminatedUnion('code', [
   z.object({ code: z.literal('not_integer') }).readonly(),
   z.object({ code: z.literal('not_positive') }).readonly(),
   z.object({ code: z.literal('min_gt_max') }).readonly(),
-  /** Нарушение, для которого нет своего кода: текст zod как есть. */
   z.object({ code: z.literal('other'), detail: z.string() }).readonly(),
   z.object({ code: z.literal('duplicate_day'), id: z.string() }).readonly(),
   z.object({ code: z.literal('unknown_day'), id: z.string() }).readonly(),
@@ -51,14 +46,10 @@ export const ProgramProblemSchema = z.discriminatedUnion('code', [
 ]);
 export type ProgramProblem = z.infer<typeof ProgramProblemSchema>;
 
-/** Проблема в программе: путь поля («days[2].exercises[0].repRange.min»; пустой — корень) и что не так. */
 export const ProgramIssueSchema = z.object({ path: z.string(), problem: ProgramProblemSchema })
   .readonly();
 export type ProgramIssue = z.infer<typeof ProgramIssueSchema>;
 
-/**
- * Разбор программы из JSON (.specs/program-format.md). Ошибки — списком, каждая с путём.
- */
 export function parseProgram(input: unknown): Result<Program, readonly ProgramIssue[]> {
   const parsed = ProgramSchema.safeParse(input);
   if (!parsed.success) return err(formatIssues(parsed.error.issues, input, []));
@@ -66,7 +57,6 @@ export function parseProgram(input: unknown): Result<Program, readonly ProgramIs
   return issues.length ? err(issues) : ok(parsed.data);
 }
 
-/** Разбор программы из текста (файл или сообщение): сначала JSON, затем схема. */
 export function parseProgramText(text: string): Result<Program, readonly ProgramIssue[]> {
   let json: unknown;
   try {
@@ -78,7 +68,6 @@ export function parseProgramText(text: string): Result<Program, readonly Program
   return parseProgram(json);
 }
 
-/** Краткая сводка для ответа бота: «5 дней, 10 упражнений. Дни: …». */
 export const ProgramSummarySchema = z.object({
   name: z.string(),
   days: z.number().int().nonnegative(),
@@ -97,7 +86,6 @@ export function programSummary(program: Program): ProgramSummary {
   };
 }
 
-/** Та же программа по содержанию: сравнение без учёта порядка ключей. */
 export const sameProgram = (a: Program, b: Program): boolean => canonical(a) === canonical(b);
 
 function canonical(value: unknown): string {
@@ -111,9 +99,6 @@ function canonical(value: unknown): string {
   return JSON.stringify(value);
 }
 
-/**
- * Упражнения для /seed: по дням в порядке rotation, каждое один раз, без reps_only (US-6).
- */
 export function seedExercises(program: Program): readonly Exercise[] {
   const seen = new Set<string>();
   const result: Exercise[] = [];
@@ -127,7 +112,6 @@ export function seedExercises(program: Program): readonly Exercise[] {
   return result;
 }
 
-/** Все упражнения программы по id (описание, а не ссылки). */
 export function exerciseIndex(program: Program): ReadonlyMap<string, Exercise> {
   const index = new Map<string, Exercise>();
   for (const day of program.days) {
@@ -136,7 +120,6 @@ export function exerciseIndex(program: Program): ReadonlyMap<string, Exercise> {
   return index;
 }
 
-/** Упражнения дня по порядку, со ссылками, заменёнными на описания. */
 export function dayExercises(program: Program, dayId: string): readonly Exercise[] {
   const index = exerciseIndex(program);
   const day = program.days.find((d) => d.id === dayId);
@@ -145,8 +128,6 @@ export function dayExercises(program: Program, dayId: string): readonly Exercise
     return found ? [found] : [];
   });
 }
-
-// ---------------------------------------------------------------- ошибки схемы
 
 type Key = PropertyKey;
 
@@ -173,7 +154,6 @@ function formatIssues(
 ): ProgramIssue[] {
   return issues.flatMap((issue) => {
     const path = [...prefix, ...issue.path];
-    // Ссылка {id, ref: true} или полное упражнение: показываем ошибки той ветки, которую имели в виду.
     if (issue.code === 'invalid_union' && issue.errors.length === 2) {
       const value = valueAt(input, path);
       const isRef = value !== null && typeof value === 'object' && 'ref' in value;
@@ -203,7 +183,6 @@ function problemOf(issue: z.core.$ZodIssue): ProgramProblem {
     case 'invalid_value':
       return { code: 'not_one_of', values: issue.values.map((v) => JSON.stringify(v)) };
     case 'invalid_union':
-      // Неизвестное значение дискриминатора (loadType): zod перечисляет допустимые.
       return 'options' in issue && issue.options?.length
         ? { code: 'not_one_of', values: issue.options.map((v) => JSON.stringify(v)) }
         : { code: 'other', detail: issue.message };
@@ -221,8 +200,6 @@ function problemOf(issue: z.core.$ZodIssue): ProgramProblem {
       return { code: 'other', detail: issue.message };
   }
 }
-
-// ---------------------------------------------------------------- перекрёстные проверки
 
 function crossCheck(p: Program): ProgramIssue[] {
   const issues: ProgramIssue[] = [];

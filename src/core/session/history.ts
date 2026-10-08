@@ -16,8 +16,6 @@ import {
   type SummaryItem,
 } from './types.ts';
 
-/** /history — US-10 (.specs/product.md): прошлые тренировки, правка рабочих подходов, удаление. */
-
 const S = SessionStepSchema.enum;
 const { work } = SetKindSchema.enum;
 const { skipped } = ExerciseLogStatusSchema.enum;
@@ -46,10 +44,6 @@ const listContext = (offset: number): HistoryContext => ({
   setId: null,
 });
 
-/**
- * Что подгрузить для этого события: оболочка читает историю только в /history,
- * остальные апдейты лишних запросов не делают. null — история не нужна.
- */
 export function historyQuery(state: Session, event: BotEvent): HistoryQuery | null {
   const c = state.context.kind === 'history' ? state.context : null;
   switch (event.type) {
@@ -63,8 +57,6 @@ export function historyQuery(state: Session, event: BotEvent): HistoryQuery | nu
       return c && isHistory(state) ? { offset: c.offset, workoutId: c.workoutId } : null;
   }
 }
-
-// ---------------------------------------------------------------- список
 
 export function openHistory(state: Session, ctx: StepContext, offset = 0): StepResult {
   return listScreen(state, ctx, offset, false);
@@ -90,8 +82,6 @@ export function turnPage(state: Session, ctx: StepContext, offset: number): Step
   return state.step === S.history_list ? listScreen(state, ctx, offset, false) : unchanged(state);
 }
 
-// ---------------------------------------------------------------- тренировка
-
 export function pickWorkout(state: Session, ctx: StepContext, workoutId: string): StepResult {
   const c = historyContext(state);
   if (!c || state.step !== S.history_list) return unchanged(state);
@@ -101,7 +91,6 @@ export function pickWorkout(state: Session, ctx: StepContext, workoutId: string)
 function workoutScreen(state: Session, ctx: StepContext, c: HistoryContext): StepResult {
   const w = ctx.history.workout;
   if (!w || w.id !== c.workoutId) return listScreen(state, ctx, c.offset, false);
-  // Порядок записей задаёт хранилище: по месту в дне, затем по времени записи.
   const logs = w.logs;
   return moveTo(state, S.history_workout, {
     type: 'history_workout',
@@ -132,7 +121,6 @@ function summaryItem(ctx: StepContext, log: WorkoutLog): SummaryItem {
 const workSets = (log: WorkoutLog): WorkoutLog['sets'] =>
   log.sets.filter((s) => s.kind === work && !s.skipped);
 
-/** Тип нагрузки — из активной программы; упражнения, которого там уже нет, — по подходам. */
 function loadTypeOf(ctx: StepContext, log: WorkoutLog): LoadType {
   const ex = ctx.activeProgram && exerciseIndex(ctx.activeProgram).get(log.exerciseId);
   if (ex) return ex.loadType;
@@ -140,8 +128,6 @@ function loadTypeOf(ctx: StepContext, log: WorkoutLog): LoadType {
     ? LoadTypeSchema.enum.reps_only
     : LoadTypeSchema.enum.machine;
 }
-
-// ---------------------------------------------------------------- упражнение и подход
 
 export function pickExercise(state: Session, ctx: StepContext, logId: string): StepResult {
   const c = historyContext(state);
@@ -158,7 +144,6 @@ function exerciseScreen(
   ctx: StepContext,
   c: HistoryContext,
   notice: HistoryNotice | null,
-  /** Подходы с учётом правки в этом же апдейте (в БД она ещё не попала). */
   sets?: WorkoutLog['sets'],
 ): StepResult {
   const log = currentLog(ctx, c);
@@ -214,7 +199,6 @@ function setScreen(
   }, c);
 }
 
-/** Текст на экране подхода: исправить или добавить. «7» — повторения с весом подхода. */
 export function historyText(state: Session, ctx: StepContext, text: string): StepResult {
   const c = historyContext(state);
   if (!c || (state.step !== S.history_set && state.step !== S.history_add)) return unchanged(state);
@@ -248,9 +232,6 @@ export function historyText(state: Session, ctx: StepContext, text: string): Ste
   );
 }
 
-// ---------------------------------------------------------------- удаление
-
-/** [🗑] на экране подхода — подход, на экране тренировки — тренировка; с подтверждением. */
 export function requestDelete(state: Session, ctx: StepContext): StepResult {
   const c = historyContext(state);
   if (!c) return unchanged(state);
@@ -293,7 +274,6 @@ export function answerDelete(state: Session, ctx: StepContext, confirm: boolean)
   if (state.step === S.history_delete_workout) {
     if (!confirm || c.workoutId === null) return workoutScreen(state, ctx, c);
     const id = c.workoutId;
-    // Удалённую тренировку убираем из страницы сразу: в БД она ещё есть до конца апдейта.
     const page = ctx.history.page;
     const ctxAfter: StepContext = {
       ...ctx,
@@ -308,8 +288,6 @@ export function answerDelete(state: Session, ctx: StepContext, confirm: boolean)
   }
   return unchanged(state);
 }
-
-// ---------------------------------------------------------------- [← Назад]
 
 export function historyBack(state: Session, ctx: StepContext): StepResult {
   const c = historyContext(state);

@@ -19,15 +19,12 @@ import {
   type StepResult,
 } from './types.ts';
 
-/** Онбординг часового пояса (.specs/data-model.md → «Часовой пояс»). */
-
 const { onboarding_tz, onboarding_tz_pick } = SessionStepSchema.enum;
 const { not_time } = AskTimeErrorSchema.enum;
 const ONBOARDING: ReadonlySet<SessionStep> = new Set([onboarding_tz, onboarding_tz_pick]);
 
 export const isOnboarding = (s: SessionStep): boolean => ONBOARDING.has(s);
 
-/** Смену пояса начали из /settings: контекст возврата сохраняется на всех шагах онбординга. */
 const keepReturn = (state: Session): Session['context'] =>
   state.context.kind === 'settings_return' ? state.context : { kind: 'none' };
 
@@ -45,10 +42,6 @@ export function saveTimezone(state: Session, zone: TimeZone, ctx: StepContext): 
   return withEffects(home(state, zone, ctx), [{ type: 'save_settings', settings }]);
 }
 
-/**
- * Пользователь написал, сколько у него сейчас времени: считаем смещение и предлагаем зоны
- * с таким смещением. Единственный город сохраняется сразу. IANA-имя тоже принимается.
- */
 export function onTimeEntered(state: Session, text: string, ctx: StepContext): StepResult {
   if (text.includes('/')) {
     const zone = parseTimeZone(text.trim());

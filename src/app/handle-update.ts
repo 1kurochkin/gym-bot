@@ -8,7 +8,6 @@ import type { IncomingUpdate, Ui } from '../ports/ui.ts';
 import { admit } from './access.ts';
 import { render, routeEvent } from './route.ts';
 
-/** Свежих id на апдейт: тренировка, запись упражнения, до ~10 подходов разминки и рабочий. */
 const IDS_PER_UPDATE = 16;
 
 export type UpdateDeps = {
@@ -16,31 +15,22 @@ export type UpdateDeps = {
   readonly ui: Ui;
   readonly clock: Clock;
   readonly zoneAt: ZoneLocator;
-  /** Новый id для записи (программы и т. п.): в тестах — предсказуемый. */
   readonly newId: () => string;
-  /** Владельцы из конфигурации: всегда с доступом, им доступны /invite и /users. */
   readonly owners: ReadonlySet<number>;
-  /** @username бота для ссылки-приглашения. */
   readonly botUsername: () => string;
 };
 
-/**
- * Цикл обработки апдейта (docs/architecture.md §13.2). На нажатие кнопки адаптер telegram ответит после.
- * Здесь: доступ → идемпотентность → событие → step() → одна транзакция → отрисовка.
- */
 export async function handleUpdate(deps: UpdateDeps, update: IncomingUpdate): Promise<void> {
   const timing = phaseTimer();
   try {
     await processUpdate(deps, update, timing.mark);
   } finally {
-    // Только номер апдейта и миллисекунды по этапам: никаких данных пользователя.
     console.log(JSON.stringify({ update: update.updateId, ms: timing.result() }));
   }
 }
 
 type Mark = (phase: string) => void;
 
-/** Время этапов обработки: этап → мс от предыдущей отметки. */
 function phaseTimer(): { mark: Mark; result: () => Record<string, number> } {
   const start = performance.now();
   let last = start;
@@ -64,13 +54,11 @@ async function processUpdate(deps: UpdateDeps, update: IncomingUpdate, mark: Mar
   mark('load');
   const { session, settings, activeProgram, lastResults } = loaded;
 
-  // Telegram повторяет webhook при таймауте: уже обработанный update_id игнорируем.
   if (update.updateId <= session.lastUpdateId) return;
   const seen = { ...session, lastUpdateId: update.updateId };
 
   const input = update.input;
   if (input.kind === 'callback' && input.stepNo !== session.stepNo) {
-    // Кнопка от устаревшего шага: не создаём дубль, убираем старую клавиатуру.
     await deps.store.commit(update.userId, { session: seen });
     if (update.messageId !== null) await deps.ui.dropKeyboard(update.chatId, update.messageId);
     return;
@@ -83,7 +71,6 @@ async function processUpdate(deps: UpdateDeps, update: IncomingUpdate, mark: Mar
     return;
   }
 
-  // История — отдельным запросом и только в /history: обычные апдейты её не читают.
   const query = historyQuery(seen, event);
   const history = query
     ? await deps.store.loadHistory(update.userId, query)
@@ -104,7 +91,6 @@ async function processUpdate(deps: UpdateDeps, update: IncomingUpdate, mark: Mar
   });
 
   mark('step');
-  // Все эффекты записи — одной транзакцией вместе с новым состоянием сессии.
   let newSettings: Settings | undefined;
   let newProgram: Commit['newProgram'];
   let newInvite: Commit['newInvite'];
@@ -135,16 +121,12 @@ async function processUpdate(deps: UpdateDeps, update: IncomingUpdate, mark: Mar
     newInvite,
     revokeMember,
     manualResults,
-    // programId нужен только новым записям тренировки (они бывают лишь при активной программе);
-    // правки истории (/history) его не используют.
     workout: writes.length ? { programId: settings.activeProgramId ?? '', writes } : undefined,
   });
 
   mark('commit');
-  // Язык — по настройкам после шага: выбор языка в /settings сразу виден на ответе.
   const lang = languageFor((newSettings ?? settings).language, update.languageCode);
   const env = { botUsername: deps.botUsername() };
-  // /clear: сначала удаляем переписку, потом показываем экран — новое сообщение остаётся.
   if (result.effects.some((e) => e.type === 'clear_chat') && update.messageId !== null) {
     await deps.ui.clearChat(update.chatId, update.messageId);
   }

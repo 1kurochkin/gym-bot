@@ -7,8 +7,6 @@ import type { Action, Incoming } from '../../src/ports/ui.ts';
 import { fakeUi, memoryStore, OWNERS, TESTER } from '../support/fakes.ts';
 import { specProgramJson } from '../support/spec.ts';
 
-/** US-8 (.specs/product.md): /settings через весь цикл апдейта. */
-
 async function setup(): Promise<{
   store: ReturnType<typeof memoryStore>;
   ui: ReturnType<typeof fakeUi>;

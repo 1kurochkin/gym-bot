@@ -26,11 +26,8 @@ import {
 } from '../../src/core/workout/schema.ts';
 import type { Rendered, Ui } from '../../src/ports/ui.ts';
 
-/** Пользователь 1 в тестах — владелец (ALLOWED_USER_IDS). */
 export const OWNERS: ReadonlySet<number> = new Set([1]);
 export const TESTER: Person = { name: 'Tester', username: null };
-
-/** Хранилище в памяти с теми же таблицами и выборками, что адаптер Postgres. */
 
 type WorkoutRow = NewWorkout & {
   status: WorkoutStatus;
@@ -52,7 +49,6 @@ export type MemoryStore = Store & {
   readonly sessions: Map<number, Session>;
   readonly settings: Map<number, Settings>;
   readonly programs: Map<string, { program: Program; version: number; active: boolean }>;
-  /** Результаты /seed в порядке записи. */
   readonly manual: ManualResult[];
   readonly workouts: Map<string, WorkoutRow>;
   readonly logs: LogRow[];

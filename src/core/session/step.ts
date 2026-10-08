@@ -78,11 +78,6 @@ import {
 const S = SessionStepSchema.enum;
 const { location_unknown } = AskTimeErrorSchema.enum;
 
-/**
- * Автомат диалога: step(state, event, ctx) → { state, effects }. Чистая функция:
- * ничего не читает и не пишет сама, всё нужное приходит в ctx (docs/architecture.md §13.2).
- * Потоки диалога — в соседних модулях; здесь только диспетчер.
- */
 export function step(state: Session, event: BotEvent, ctx: StepContext): StepResult {
   const result = transition(state, event, ctx);
   const renders = result.effects.some((e) => e.type === 'render');
@@ -96,7 +91,6 @@ function transition(state: Session, event: BotEvent, ctx: StepContext): StepResu
         ? askTime(state, null)
         : home(state, ctx.settings.timezone, ctx);
     case 'clear_requested': {
-      // Данные не трогаются: только переписка; начатая тренировка — через /workout.
       const screen = ctx.settings.timezone === null
         ? askTime(state, null)
         : home(state, ctx.settings.timezone, ctx);

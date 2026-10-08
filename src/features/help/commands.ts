@@ -1,13 +1,8 @@
 import type { Language } from '../../core/settings/settings.ts';
 
-/**
- * Команды, которые бот уже понимает: одно место для ответа на неизвестную команду
- * и меню команд Telegram (setMyCommands). Новая команда — строка здесь, с описанием на всех языках.
- */
 const COMMANDS: readonly {
   readonly command: string;
   readonly description: Readonly<Record<Language, string>>;
-  /** Только для владельца (US-9): участникам не показывается. */
   readonly ownerOnly?: true;
 }[] = [
   {
@@ -58,7 +53,6 @@ const COMMANDS: readonly {
   },
 ];
 
-/** Меню команд на языке: для setMyCommands и ответа на неизвестную команду; owner — с командами владельца. */
 export const commandsFor = (
   lang: Language,
   owner: boolean,

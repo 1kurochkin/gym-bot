@@ -1,11 +1,6 @@
 import { z } from 'zod';
 import { LbSchema } from '../units/lb.ts';
 
-/**
- * Формат программы (.specs/program-format.md). Объекты строгие: неизвестный ключ — ошибка,
- * так ловятся опечатки вроде «repRang». Перекрёстные ссылки проверяет parseProgram.
- */
-
 export const IdSchema = z.string().regex(/^[a-z][a-z0-9_]*$/);
 
 export const LoadTypeSchema = z.enum([
@@ -20,7 +15,6 @@ export type LoadType = z.infer<typeof LoadTypeSchema>;
 export const IntensitySchema = z.enum(['high', 'low']);
 export type Intensity = z.infer<typeof IntensitySchema>;
 
-/** Своя проверка: код проблемы в params, текст строит view (ProgramProblem). */
 const PositiveLbSchema = LbSchema.refine((v) => v > 0, { params: { problem: 'not_positive' } });
 const RepsSchema = z.number().int().min(1);
 
@@ -28,7 +22,6 @@ export const RangeSchema = z.strictObject({ min: RepsSchema, max: RepsSchema })
   .refine((r) => r.min <= r.max, { params: { problem: 'min_gt_max' }, path: ['min'] })
   .readonly();
 
-/** Шаг разминки в процентах от рабочего веса. pct > 1 — перегрузочный сингл. */
 export const WarmupStepSchema = z.strictObject({ pct: z.number().gt(0).max(2), reps: RepsSchema })
   .readonly();
 export type WarmupStep = z.infer<typeof WarmupStepSchema>;
@@ -47,27 +40,23 @@ export const OverloadSingleSchema = z.strictObject({
 }).readonly();
 export type OverloadSingle = z.infer<typeof OverloadSingleSchema>;
 
-/** Ступени от рабочего веса (§6.2): порог minLb по возрастанию, первый — 0. */
 export const WarmupTiersSchema = z.strictObject({
   byWorkWeight: z.array(WarmupTierSchema).min(1).readonly(),
   overloadSingle: OverloadSingleSchema.optional(),
 }).readonly();
 export type WarmupTiers = z.infer<typeof WarmupTiersSchema>;
 
-/** После рабочего подхода — подход со своим весом (§6.3). */
 export const AfterWorkSchema = z.strictObject({
   bodyweight: z.literal(true),
   reps: z.union([z.literal('max'), RepsSchema]),
 }).readonly();
 export type AfterWork = z.infer<typeof AfterWorkSchema>;
 
-/** Шаг разминки с допвесом: pct от допвеса, 0 — свой вес. */
 export const AddedStepSchema = z.strictObject({ pct: z.number().min(0).lt(1), reps: RepsSchema })
   .readonly();
 export type AddedStep = z.infer<typeof AddedStepSchema>;
 
 export const AddedWeightTiersSchema = z.strictObject({
-  /** Допвес 0: подход с помощью (блок, резина). */
   zero: z.strictObject({
     steps: z.array(z.strictObject({ assist: z.literal(true), reps: RepsSchema }).readonly()).min(1)
       .readonly(),
@@ -93,7 +82,6 @@ export const FixedSchemeSchema = z.strictObject({
 }).readonly();
 export type FixedScheme = z.infer<typeof FixedSchemeSchema>;
 
-/** "tiers" — ступени программы, id — фиксированная схема, null — без разминки. */
 export const WarmupRefSchema = z.union([z.literal('tiers'), IdSchema]).nullable();
 
 const common = {
@@ -129,7 +117,6 @@ export const ExerciseSchema = z.discriminatedUnion('loadType', [
     ...common,
     loadType: z.literal(LoadTypeSchema.enum.reps_only),
     warmup: z.null().default(null),
-    /** Подписи подходов: «80% от отказа». */
     setTargets: z.array(z.string().min(1)).min(1).readonly().optional(),
   }).readonly(),
   z.strictObject({
@@ -141,7 +128,6 @@ export const ExerciseSchema = z.discriminatedUnion('loadType', [
 ]);
 export type Exercise = z.infer<typeof ExerciseSchema>;
 
-/** Повтор упражнения, описанного в другом дне: история общая, по id. */
 export const ExerciseRefSchema = z.strictObject({ id: IdSchema, ref: z.literal(true) }).readonly();
 export type ExerciseRef = z.infer<typeof ExerciseRefSchema>;
 

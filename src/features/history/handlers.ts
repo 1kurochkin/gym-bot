@@ -1,7 +1,6 @@
 import type { BotEvent } from '../../core/session/types.ts';
 import type { Incoming } from '../../ports/ui.ts';
 
-/** Апдейт → событие /history; ввод подхода — общий text_entered, «Назад» — общий back. */
 export function toEvent(input: Incoming): BotEvent | null {
   if (input.kind === 'command') {
     return input.name === 'history' ? { type: 'history_requested' } : null;

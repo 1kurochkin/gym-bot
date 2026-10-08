@@ -9,18 +9,14 @@ import {
   type StepResult,
 } from './types.ts';
 
-/** Загрузка программы, US-1 (.specs/product.md). */
-
 const { idle, program_upload, program_confirm } = SessionStepSchema.enum;
 
-/** /program: показать текущую программу и ждать JSON. */
 export const requestProgram = (state: Session, ctx: StepContext): StepResult =>
   moveTo(state, program_upload, {
     type: 'program_status',
     current: ctx.activeProgram ? programSummary(ctx.activeProgram) : null,
   });
 
-/** Пришёл текст программы — файлом (в любой момент) или сообщением (после /program). */
 export function receiveProgram(state: Session, text: string, ctx: StepContext): StepResult {
   const parsed = parseProgramText(text);
   if (!parsed.ok) {
@@ -41,7 +37,6 @@ export function receiveProgram(state: Session, text: string, ctx: StepContext): 
 export const rejectProgramFile = (state: Session, reason: FileProblem): StepResult =>
   moveTo(state, program_upload, { type: 'program_file_rejected', reason });
 
-/** [Заменить]: сохраняем программу, которая ждала подтверждения. */
 export function confirmProgram(state: Session): StepResult {
   const ctx = state.context;
   if (state.step !== program_confirm || ctx.kind !== 'program_pending') {

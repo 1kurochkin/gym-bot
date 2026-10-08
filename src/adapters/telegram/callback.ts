@@ -1,9 +1,5 @@
 import { type Action, ActionSchema } from '../../ports/ui.ts';
 
-/**
- * Кодек callback_data: «<stepNo>|<код>». JSON в кнопки не кладём — лимит Telegram 64 байта.
- * stepNo нужен, чтобы нажатие на кнопку от устаревшего шага не создавало дубль.
- */
 export function encodeCallback(action: Action, stepNo: number): string {
   const data = `${stepNo}|${encodeAction(action)}`;
   if (new TextEncoder().encode(data).length > 64) {
@@ -19,7 +15,6 @@ export function decodeCallback(data: string): { stepNo: number; action: Action }
   return action ? { stepNo: Number(m[1]), action } : null;
 }
 
-/** Короткие коды действий без параметров. */
 const SIMPLE_CODES = {
   program_confirm: 'pc',
   program_cancel: 'px',
@@ -44,7 +39,6 @@ const SIMPLE_CODES = {
   history_delete: 'hd',
 } as const;
 
-/** Коды действий с одним параметром: «bs:45», «sp:calves». */
 const PARAM_CODES = {
   settings_section: 'se',
   bar_set: 'bs',
@@ -134,13 +128,11 @@ function encodeAction(a: Action): string {
   }
 }
 
-/** Код → сырой объект → ActionSchema: в приложение попадает только проверенное действие. */
 function decodeAction(code: string): Action | null {
   const r = ActionSchema.safeParse(rawAction(code));
   return r.success ? r.data : null;
 }
 
-/** Код → сырой объект; проверку типов и значений делает ActionSchema. */
 function rawAction(code: string): Record<string, unknown> | null {
   const tz = /^tz:([A-Za-z0-9_+\-/]+)$/.exec(code);
   if (tz) return { type: 'tz', zone: tz[1] };

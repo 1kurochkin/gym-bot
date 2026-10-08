@@ -18,7 +18,6 @@ const noWorkout = {
   newIds: [],
 };
 
-/** 22:40 UTC = 18:40 в Нью-Йорке. */
 const now = new Date('2026-09-28T22:40:00Z');
 const zone = (name: string): TimeZone => {
   const r = parseTimeZone(name);
@@ -26,7 +25,6 @@ const zone = (name: string): TimeZone => {
   return r.value;
 };
 
-/** Прогон последовательности событий: сценарии тестируются без Telegram. */
 function run(
   events: BotEvent[],
   settings: Settings = defaultSettings(1),

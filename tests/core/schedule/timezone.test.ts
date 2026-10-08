@@ -15,7 +15,6 @@ const zone = (name: string): TimeZone => {
   return r.value;
 };
 const ny = zone('America/New_York');
-/** 22:40 UTC = 18:40 в Нью-Йорке (летнее время). */
 const now = new Date('2026-09-28T22:40:00Z');
 
 Deno.test('New York: летом UTC−4, зимой UTC−5 (IANA-зона, а не фиксированное смещение)', () => {
