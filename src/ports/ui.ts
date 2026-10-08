@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { PersonSchema } from '../core/access/schema.ts';
 import { TimeZoneSchema } from '../core/schedule/timezone.ts';
+import { NewExerciseTypeSchema } from '../core/program/edit.ts';
 import { IdSchema } from '../core/program/schema.ts';
 import { SettingsSectionSchema } from '../core/settings/options.ts';
 import { LanguageSchema } from '../core/settings/settings.ts';
@@ -12,6 +13,16 @@ export const ActionSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('tz'), zone: TimeZoneSchema }).readonly(),
   z.object({ type: z.literal('program_confirm') }).readonly(),
   z.object({ type: z.literal('program_cancel') }).readonly(),
+  z.object({ type: z.literal('editor_open') }).readonly(),
+  z.object({ type: z.literal('editor_day'), dayId: IdSchema }).readonly(),
+  z.object({ type: z.literal('editor_exercise'), exerciseId: IdSchema }).readonly(),
+  z.object({ type: z.literal('editor_rename') }).readonly(),
+  z.object({ type: z.literal('editor_remove') }).readonly(),
+  z.object({ type: z.literal('editor_remove_answer'), confirm: z.boolean() }).readonly(),
+  z.object({ type: z.literal('editor_new') }).readonly(),
+  z.object({ type: z.literal('editor_type'), loadType: NewExerciseTypeSchema }).readonly(),
+  z.object({ type: z.literal('editor_from') }).readonly(),
+  z.object({ type: z.literal('editor_from_pick'), exerciseId: IdSchema }).readonly(),
   z.object({ type: z.literal('seed_next') }).readonly(),
   z.object({ type: z.literal('seed_stop') }).readonly(),
   z.object({ type: z.literal('settings_section'), section: SettingsSectionSchema }).readonly(),

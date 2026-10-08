@@ -18,6 +18,11 @@ export function decodeCallback(data: string): { stepNo: number; action: Action }
 const SIMPLE_CODES = {
   program_confirm: 'pc',
   program_cancel: 'px',
+  editor_open: 'eo',
+  editor_rename: 'er',
+  editor_remove: 'ev',
+  editor_new: 'en',
+  editor_from: 'ei',
   seed_next: 'sn',
   seed_stop: 'ss',
   settings_back: 'sb',
@@ -61,6 +66,11 @@ const PARAM_CODES = {
   history_log: 'hl',
   history_set: 'hs',
   history_confirm: 'hc',
+  editor_day: 'ey',
+  editor_exercise: 'ex',
+  editor_remove_answer: 'ec',
+  editor_type: 'et',
+  editor_from_pick: 'ea',
 } as const;
 
 function encodeAction(a: Action): string {
@@ -69,6 +79,11 @@ function encodeAction(a: Action): string {
       return `tz:${a.zone}`;
     case 'program_confirm':
     case 'program_cancel':
+    case 'editor_open':
+    case 'editor_rename':
+    case 'editor_remove':
+    case 'editor_new':
+    case 'editor_from':
     case 'seed_next':
     case 'seed_stop':
     case 'settings_back':
@@ -90,7 +105,15 @@ function encodeAction(a: Action): string {
     case 'history_delete':
       return SIMPLE_CODES[a.type];
     case 'day_pick':
+    case 'editor_day':
       return `${PARAM_CODES[a.type]}:${a.dayId}`;
+    case 'editor_exercise':
+    case 'editor_from_pick':
+      return `${PARAM_CODES[a.type]}:${a.exerciseId}`;
+    case 'editor_remove_answer':
+      return `${PARAM_CODES[a.type]}:${a.confirm ? 1 : 0}`;
+    case 'editor_type':
+      return `${PARAM_CODES[a.type]}:${a.loadType}`;
     case 'menu_pick':
     case 'add_pick':
       return `${PARAM_CODES[a.type]}:${a.exerciseId}`;
@@ -150,7 +173,15 @@ function rawAction(code: string): Record<string, unknown> | null {
     case 'add_pick':
       return { type, exerciseId: value };
     case 'day_pick':
+    case 'editor_day':
       return { type, dayId: value };
+    case 'editor_exercise':
+    case 'editor_from_pick':
+      return { type, exerciseId: value };
+    case 'editor_remove_answer':
+      return { type, confirm: value === '1' };
+    case 'editor_type':
+      return { type, loadType: value };
     case 'warmup':
       return { type, variant: value };
     case 'reps_set':
