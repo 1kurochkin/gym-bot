@@ -44,23 +44,13 @@ import * as schema from './schema.ts';
 type Db = PostgresJsDatabase<typeof schema>;
 type Tx = Parameters<Parameters<Db['transaction']>[0]>[0];
 
-/**
- * Подключение через пулер Supavisor в режиме transaction: prepared statements не поддерживаются.
- * Запросы — строго по одному (без Promise.all): параллельные запросы postgres.js шлёт пачкой
- * по одному соединению (pipelining), и пулер терял ответ — апдейт висел до таймаута.
- * Опция max_pipeline: 0 не подходит — с ней ломаются транзакции (docs/architecture.md §3).
- */
 export function connect(databaseUrl: string): Db {
   return drizzle(postgres(databaseUrl, { prepare: false, max: 1 }), { schema });
 }
 
-/** Шаг, которого больше нет в автомате (после рефакторинга), сбрасывается в idle. */
 const StoredStepSchema = SessionStepSchema.catch(SessionStepSchema.enum.idle);
-/** Битая зона в БД — пользователь пройдёт онбординг заново, а не получит ошибку. */
 const StoredZoneSchema = TimeZoneSchema.nullable().catch(null);
-/** Контекст старого формата или битый — шаг начнётся заново. */
 const StoredContextSchema = SessionContextSchema.catch(emptyContext);
-/** Программа, которая больше не проходит схему (схема ужесточилась), не ломает бота. */
 const StoredProgramSchema = ProgramSchema.nullable().catch(null);
 
 const { active, archived } = ProgramStatusSchema.enum;
@@ -68,7 +58,6 @@ const { active, archived } = ProgramStatusSchema.enum;
 export function createPostgresStore(db: Db): Store {
   return {
     async load(userId: number, opts = { withMembers: false }): Promise<UserState> {
-      // Последовательно, не Promise.all: см. connect().
       const s = await db.select().from(schema.session).where(eq(schema.session.userId, userId));
       const st = await db.select().from(schema.settings).where(eq(schema.settings.userId, userId));
       const settings = st[0] ? toSettings(st[0]) : defaultSettings(userId);
@@ -149,7 +138,6 @@ export function createPostgresStore(db: Db): Store {
       now: Date,
     ): Promise<{ invitedBy: number } | null> {
       return db.transaction(async (tx) => {
-        // Условие в UPDATE — гарантия одноразовости: второй вход тем же кодом ничего не обновит.
         const [invite] = await tx.update(schema.invites).set({ usedBy: userId, usedAt: now })
           .where(and(
             eq(schema.invites.code, code),
@@ -198,15 +186,10 @@ async function loadProgram(db: Db, id: string | null): Promise<Program | null> {
 const { done } = ExerciseLogStatusSchema.enum;
 const { work } = SetKindSchema.enum;
 
-/**
- * «Прошлый раз» (.specs/product.md → US-6): последняя выполненная запись каждого упражнения
- * (любой источник, по всем программам) и лучший её рабочий подход.
- */
 async function loadLastResults(
   db: Db,
   userId: number,
   exerciseIds: readonly string[],
-  /** Текущая незавершённая тренировка: её подходы — не «прошлый раз». */
   excludeWorkoutId: string | null,
 ): Promise<Record<string, LastResult>> {
   if (exerciseIds.length === 0) return {};
@@ -257,7 +240,6 @@ async function loadLastResults(
 
 const { in_progress, completed } = WorkoutStatusSchema.enum;
 
-/** Незавершённая тренировка и всё, что в ней уже записано. */
 async function loadActiveWorkout(db: Db, userId: number): Promise<ActiveWorkout | null> {
   const [w] = await db.select().from(schema.workouts).where(and(
     eq(schema.workouts.userId, userId),
@@ -275,10 +257,6 @@ async function loadActiveWorkout(db: Db, userId: number): Promise<ActiveWorkout 
   return parsed.success ? parsed.data : null;
 }
 
-/**
- * Записи тренировки с подходами (и пропущенными подходами разминки: «Назад» и /undo снимают
- * и их отметку). Порядок: как записывались (продолжение, /undo) или, byDay, по месту в дне.
- */
 async function loadWorkoutLogs(
   db: Db,
   workoutId: string,
@@ -312,7 +290,6 @@ async function loadWorkoutLogs(
   }));
 }
 
-/** /history: страница завершённых и прерванных тренировок, новые сверху, и выбранная тренировка. */
 async function loadHistory(db: Db, userId: number, query: HistoryQuery): Promise<HistoryData> {
   const finished = and(
     eq(schema.workouts.userId, userId),
@@ -358,7 +335,6 @@ async function loadLastWorkout(db: Db, userId: number): Promise<LastWorkout | nu
   return parsed.success ? parsed.data : null;
 }
 
-/** Запись тренировки: эффекты автомата применяются в порядке, в каком он их выдал. */
 async function saveWorkoutWrite(
   tx: Tx,
   userId: number,
@@ -431,7 +407,6 @@ async function saveWorkoutWrite(
       return;
     }
     case 'delete_workout':
-      // Подходы удаляются каскадом вместе с записями упражнений.
       await tx.delete(schema.exerciseLogs).where(and(
         eq(schema.exerciseLogs.workoutId, w.id),
         eq(schema.exerciseLogs.userId, userId),
@@ -440,14 +415,12 @@ async function saveWorkoutWrite(
         .where(and(eq(schema.workouts.id, w.id), eq(schema.workouts.userId, userId)));
       return;
     case 'delete_exercise_log':
-      // Подходы удаляются каскадом (sets.exercise_log_id → on delete cascade).
       await tx.delete(schema.exerciseLogs)
         .where(and(eq(schema.exerciseLogs.id, w.id), eq(schema.exerciseLogs.userId, userId)));
       return;
   }
 }
 
-/** Результат /seed: запись manual_import без тренировки и один рабочий подход. */
 async function saveManualResult(
   tx: Tx,
   userId: number,
@@ -483,7 +456,6 @@ async function saveManualResult(
   });
 }
 
-/** Архивировать активную программу и сохранить новую следующей версией того же program_key. */
 async function saveProgram(
   tx: Tx,
   userId: number,
@@ -506,7 +478,6 @@ async function saveProgram(
   });
 }
 
-/** Строки БД проверяются теми же zod-схемами, что и доменные типы. */
 function toSession(row: typeof schema.session.$inferSelect): Session {
   return SessionSchema.parse({
     userId: row.userId,

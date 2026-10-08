@@ -5,8 +5,6 @@ import { defaultSettings } from '../../src/core/settings/settings.ts';
 import type { Action, Incoming } from '../../src/ports/ui.ts';
 import { fakeUi, memoryStore, OWNERS } from '../support/fakes.ts';
 
-/** US-9 (.specs/product.md): приглашения и доступ. Пользователь 1 — владелец, 2 и 3 — знакомые. */
-
 const OWNER = 1;
 const FRIEND = 2;
 const STRANGER = 3;
@@ -23,7 +21,7 @@ function world(): {
   const ui = fakeUi();
   let n = 0;
   let updateId = 1;
-  let now = new Date('2026-10-01T16:00:00Z'); // чт, 01.10, 12:00 в Нью-Йорке
+  let now = new Date('2026-10-01T16:00:00Z');
   const deps: UpdateDeps = {
     store,
     ui,
@@ -64,7 +62,6 @@ function world(): {
 
 const cmd = (name: string, args = ''): Incoming => ({ kind: 'command', name, args });
 
-/** /invite от владельца → код из ссылки. */
 async function invite(w: ReturnType<typeof world>): Promise<string> {
   await w.as(OWNER, cmd('invite'));
   const code = /start=([0-9a-f]{32})/.exec(w.shownTo(OWNER).at(-1) ?? '')?.[1];

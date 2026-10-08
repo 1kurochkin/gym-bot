@@ -53,7 +53,6 @@ const en: typeof ru = {
 
 const MESSAGES: Record<Language, typeof ru> = { ru, en };
 
-/** «Иван (@ivan)». */
 const who = (p: Person): string => (p.username ? `${p.name} (@${p.username})` : p.name);
 
 const text = (value: string, keyboard: Button[][] = []): Rendered => ({

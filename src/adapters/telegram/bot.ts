@@ -7,24 +7,16 @@ import { decodeCallback, encodeCallback } from './callback.ts';
 export type BotOptions = {
   readonly token: string;
   readonly onUpdate: (update: IncomingUpdate) => Promise<void>;
-  /** Для тестов: без него grammY при первом апдейте вызывает getMe. */
   readonly botInfo?: UserFromGetMe;
 };
 
-/**
- * grammY-бот: только личные чаты, answerCallbackQuery после обработки, перевод апдейта в IncomingUpdate.
- * Кому отвечать (владелец, участник, приглашение) решает приложение: app/access.ts.
- */
 export function createBot(opts: BotOptions): Bot {
   const bot = new Bot(opts.token, opts.botInfo ? { botInfo: opts.botInfo } : {});
 
-  // Только личные чаты: группы и каналы бот не обслуживает.
   bot.use(async (ctx, next) => {
     if (ctx.chat?.type === 'private' && ctx.from !== undefined) await next();
   });
 
-  // Ответ на нажатие — после обработки: пока бот работает, Telegram крутит индикатор на кнопке
-  // (.specs/decisions.md, 01.10). Двойное нажатие отсекает номер шага в кнопке, а не этот ответ.
   bot.on('callback_query', async (ctx, next) => {
     try {
       await next();
@@ -41,13 +33,11 @@ export function createBot(opts: BotOptions): Bot {
   return bot;
 }
 
-/** Файл программы: не больше 100 КБ, расширение .json или тип application/json. */
 const MAX_FILE_BYTES = 100 * 1024;
 const { too_large, not_json, download_failed } = FileProblemSchema.enum;
 
 type Download = (fileId: string) => Promise<string | null>;
 
-/** Скачать файл из Telegram как текст; null — не получилось. */
 async function downloadText(bot: Bot, fileId: string): Promise<string | null> {
   try {
     const file = await bot.api.getFile(fileId);
@@ -125,7 +115,6 @@ export function createTelegramUi(bot: Bot): Ui {
   return {
     async show(chatId, rendered, stepNo, messageId): Promise<void> {
       if (rendered.replyKeyboard !== null) {
-        // Reply-клавиатуру можно только отправить новым сообщением; старые кнопки убираем.
         if (messageId !== null) {
           await bot.api.editMessageReplyMarkup(chatId, messageId).catch(() => {});
         }
@@ -147,7 +136,6 @@ export function createTelegramUi(bot: Bot): Ui {
           });
           return;
         } catch (e) {
-          // Тот же текст — редактировать нечего; иначе сообщение слишком старое, отправим новое.
           if (String(e).includes('message is not modified')) return;
         }
       }
@@ -157,7 +145,6 @@ export function createTelegramUi(bot: Bot): Ui {
       await bot.api.editMessageReplyMarkup(chatId, messageId).catch(() => {});
     },
     async clearChat(chatId, upToMessageId): Promise<void> {
-      // От свежих к старым; первый отказ — дальше сообщения старше 48 часов, удалить нельзя.
       for (const ids of clearBatches(upToMessageId)) {
         const ok = await bot.api.deleteMessages(chatId, ids).catch(() => false);
         if (!ok) return;
@@ -166,12 +153,9 @@ export function createTelegramUi(bot: Bot): Ui {
   };
 }
 
-/** Сколько последних сообщений чата пытается удалить /clear: id в личном чате идут подряд. */
 const CLEAR_DEPTH = 2000;
-/** deleteMessages принимает до 100 id за раз. */
 const CLEAR_BATCH = 100;
 
-/** Пачки id для /clear: от upTo назад, по 100, новые первыми. */
 export function clearBatches(upTo: number): number[][] {
   const from = Math.max(1, upTo - CLEAR_DEPTH + 1);
   const batches: number[][] = [];
@@ -182,10 +166,6 @@ export function clearBatches(upTo: number): number[][] {
   return batches;
 }
 
-/**
- * Жирные фрагменты — разметкой Telegram (entities), а не HTML: тексту из программы не нужно
- * экранирование. Смещения в UTF-16, как и индексы строк JS.
- */
 export function bold(rendered: Rendered): MessageEntity[] {
   return (rendered.bold ?? []).flatMap((part) => {
     const offset = part ? rendered.text.indexOf(part) : -1;

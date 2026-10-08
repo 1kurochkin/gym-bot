@@ -9,11 +9,8 @@ import {
   type StepResult,
 } from './types.ts';
 
-/** /invite и /users — US-9 (.specs/product.md). Только владелец; остальным — как неизвестная команда. */
-
 const S = SessionStepSchema.enum;
 
-/** Подсказка про неизвестную команду поверх текущего шага: шаг и его данные не теряются. */
 export const unknownCommand = (state: Session, ctx: StepContext, name: string): StepResult => ({
   state,
   effects: [{ type: 'render', view: { type: 'unknown_command', name, owner: ctx.isOwner } }],

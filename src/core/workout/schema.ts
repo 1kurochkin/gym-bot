@@ -4,12 +4,9 @@ import { IntensitySchema } from '../program/schema.ts';
 import { IsoWeekSchema, LocalDateSchema } from '../schedule/calendar.ts';
 import { LbSchema } from '../units/lb.ts';
 
-/** Тренировка и её записи (.specs/data-model.md → workouts, exercise_logs, sets). */
-
 export const WorkoutStatusSchema = z.enum(['in_progress', 'completed', 'aborted']);
 export type WorkoutStatus = z.infer<typeof WorkoutStatusSchema>;
 
-/** Записанный подход в порядке записи; skipped — разминочный подход, отмеченный «Пропустить». */
 export const LoggedSetSchema = z.object({
   id: z.string(),
   kind: SetKindSchema,
@@ -24,17 +21,14 @@ export const WorkoutLogSchema = z.object({
   id: z.string(),
   exerciseId: z.string(),
   exerciseName: z.string(),
-  /** Замена (до меню дня): id упражнения программы, вместо которого сделано это. */
   substitutedFor: z.string().nullable(),
   status: ExerciseLogStatusSchema,
-  /** Нажато «Завершить упражнение» (✅ в меню дня). */
   finishedAt: z.date().nullable(),
   plannedWorkWeightLb: LbSchema.nullable(),
   sets: z.array(LoggedSetSchema).readonly(),
 }).readonly();
 export type WorkoutLog = z.infer<typeof WorkoutLogSchema>;
 
-/** Незавершённая тренировка с тем, что уже записано: для продолжения и сводки. */
 export const ActiveWorkoutSchema = z.object({
   id: z.string(),
   dayId: z.string(),
@@ -45,7 +39,6 @@ export const ActiveWorkoutSchema = z.object({
 }).readonly();
 export type ActiveWorkout = z.infer<typeof ActiveWorkoutSchema>;
 
-/** Последняя завершённая тренировка — для «Прошлая тренировка: …» и следующего дня. */
 export const LastWorkoutSchema = z.object({
   dayId: z.string(),
   dayName: z.string(),
@@ -53,7 +46,6 @@ export const LastWorkoutSchema = z.object({
 }).readonly();
 export type LastWorkout = z.infer<typeof LastWorkoutSchema>;
 
-/** Новая тренировка (эффект start_workout). */
 export const NewWorkoutSchema = z.object({
   id: z.string(),
   dayId: z.string(),
@@ -65,13 +57,11 @@ export const NewWorkoutSchema = z.object({
 }).readonly();
 export type NewWorkout = z.infer<typeof NewWorkoutSchema>;
 
-/** Запись упражнения в тренировке (эффект open_exercise_log). */
 export const NewExerciseLogSchema = z.object({
   id: z.string(),
   workoutId: z.string(),
   exerciseId: z.string(),
   exerciseName: z.string(),
-  /** Замена: id заменённого упражнения программы; null — упражнение по программе. */
   substitutedFor: z.string().nullable(),
   order: z.number().int().nonnegative(),
   status: ExerciseLogStatusSchema,
@@ -88,7 +78,6 @@ export const ExerciseLogPatchSchema = z.object({
   warmupVariant: WarmupVariantSchema.optional(),
   warmupComment: z.string().optional(),
   comment: z.string().optional(),
-  /** «Завершить упражнение» (✅ в меню дня). */
   finishedAt: z.date().optional(),
 }).readonly();
 
@@ -105,12 +94,10 @@ export const NewSetSchema = z.object({
   plannedReps: z.number().int().positive().nullable(),
   weightLb: LbSchema.nullable(),
   reps: z.number().int().positive(),
-  /** Разминочный подход отмечен «Пропустить»: записан для анализа, в подходы не входит. */
   skipped: z.boolean(),
 }).readonly();
 export type NewSet = z.infer<typeof NewSetSchema>;
 
-/** /history (.specs/product.md → US-10): тренировка в списке. */
 export const HistoryItemSchema = z.object({
   id: z.string(),
   dayName: z.string(),
@@ -118,7 +105,6 @@ export const HistoryItemSchema = z.object({
 }).readonly();
 export type HistoryItem = z.infer<typeof HistoryItemSchema>;
 
-/** Страница истории: новые сверху; hasMore — есть тренировки раньше. */
 export const HistoryPageSchema = z.object({
   offset: z.number().int().nonnegative(),
   items: z.array(HistoryItemSchema).readonly(),
@@ -126,7 +112,6 @@ export const HistoryPageSchema = z.object({
 }).readonly();
 export type HistoryPage = z.infer<typeof HistoryPageSchema>;
 
-/** Завершённая или прерванная тренировка с записями и подходами — для просмотра и правки. */
 export const PastWorkoutSchema = z.object({
   id: z.string(),
   dayName: z.string(),
@@ -135,7 +120,6 @@ export const PastWorkoutSchema = z.object({
 }).readonly();
 export type PastWorkout = z.infer<typeof PastWorkoutSchema>;
 
-/** Что подгрузить для /history: страницу списка и, если выбрана, тренировку. */
 export const HistoryQuerySchema = z.object({
   offset: z.number().int().nonnegative(),
   workoutId: z.string().nullable(),

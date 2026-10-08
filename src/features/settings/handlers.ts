@@ -1,7 +1,6 @@
 import type { BotEvent } from '../../core/session/types.ts';
 import type { Incoming } from '../../ports/ui.ts';
 
-/** Апдейт → событие /settings; числа, введённые текстом, — общий text_entered. */
 export function toEvent(input: Incoming): BotEvent | null {
   if (input.kind === 'command') {
     return input.name === 'settings' ? { type: 'settings_requested' } : null;

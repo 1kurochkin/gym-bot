@@ -3,11 +3,6 @@ import { walk } from '@std/fs';
 import { dirname, relative, resolve } from '@std/path';
 import { parse } from '@std/yaml';
 
-/**
- * Невалидный YAML GitHub молча не запускает: workflow пропадает из Actions,
- * а ручной запуск недоступен. Ловим это до push.
- */
-
 const ROOT = resolve(dirname(new URL(import.meta.url).pathname), '..');
 const WORKFLOWS = resolve(ROOT, '.github/workflows');
 

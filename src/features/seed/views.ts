@@ -87,7 +87,6 @@ export function renderSeedView(view: SeedView, lang: Language): Rendered {
   }
 }
 
-/** «185 × 8 (22.09)», для допвеса «+25 × 8», без веса — «× 20». */
 function formatResult(r: LastResult, addedWeight: boolean, lang: Language): string {
   const w = r.weightLb === null
     ? ''

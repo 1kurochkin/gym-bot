@@ -23,7 +23,6 @@ const MENU_ICON: Record<MenuMark, string> = {
   [MENU.todo]: '▫️',
 };
 
-/** bold — фрагменты текста жирным: название упражнения на его экранах. */
 const text = (value: string, keyboard: Button[][] = [], bold: string[] = []): Rendered => ({
   text: value,
   keyboard,
@@ -31,7 +30,6 @@ const text = (value: string, keyboard: Button[][] = [], bold: string[] = []): Re
   ...(bold.length ? { bold } : {}),
 });
 
-/** Экран упражнения: «🏋️ **Название** 🏋️», пустая строка, тело (US-3). */
 const exerciseScreen = (name: string, lines: (string | null)[], keyboard: Button[][]): Rendered =>
   text(
     [`🏋️ ${name} 🏋️`, '', ...lines.filter((l) => l !== null)].join('\n'),
@@ -39,7 +37,6 @@ const exerciseScreen = (name: string, lines: (string | null)[], keyboard: Button
     [name],
   );
 
-/** Вес подхода: «195», допвес «+25», свой вес «свой вес», без веса — пусто. */
 const weightIn = (lang: Language, w: number | null, added: boolean): string =>
   w === null
     ? ''
@@ -49,7 +46,6 @@ const weightIn = (lang: Language, w: number | null, added: boolean): string =>
 export const setIn = (lang: Language, w: number | null, reps: number, added: boolean): string =>
   w === null ? `× ${reps}` : `${weightIn(lang, w, added)} × ${reps}`;
 
-/** Подходы через запятую, без веса — через « / ». */
 const setsLine = (
   lang: Language,
   sets: readonly { weightLb: number | null; reps: number }[],
@@ -285,7 +281,6 @@ export function renderWorkoutView(view: WorkoutView, lang: Language): Rendered {
   }
 }
 
-/** «Жим на наклонной: 195 × 7, 195 × 6 (прошлый 185 × 9)», пресс — «20 / 18 / 15». */
 export function summaryLine(i: SummaryItem, lang: Language): string {
   const t = MESSAGES[lang];
   const name = i.replaces ? `${i.name} (${t.insteadOf(i.replaces)})` : i.name;
@@ -296,7 +291,6 @@ export function summaryLine(i: SummaryItem, lang: Language): string {
   return `${name}: ${setsLine(lang, i.sets, i.addedWeight) || '—'}${last}`;
 }
 
-/** «Прошлый раз (15.09): 185 × 9 — выше диапазона». */
 function lastLine(last: LastResult, added: boolean, max: number | null, lang: Language): string {
   const t = MESSAGES[lang];
   const above = max !== null && last.reps > max ? t.aboveRange : '';

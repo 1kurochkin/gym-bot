@@ -4,8 +4,6 @@ import type { Incoming, IncomingUpdate } from '../../src/ports/ui.ts';
 import { fakeUi, memoryStore, OWNERS, TESTER } from '../support/fakes.ts';
 import { specProgramJson } from '../support/spec.ts';
 
-/** US-1 (.specs/product.md): загрузка программы через весь цикл апдейта, без Telegram. */
-
 function setup(): {
   deps: UpdateDeps;
   store: ReturnType<typeof memoryStore>;

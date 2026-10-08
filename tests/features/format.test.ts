@@ -1,8 +1,6 @@
 import { assertEquals } from '@std/assert';
 import { date, num, pluralRu, weekday, zone } from '../../src/features/i18n/format.ts';
 
-/** Примеры из .specs/product.md → «Язык интерфейса». */
-
 Deno.test('числа и даты по языку: «2,5» и «01.10» / «2.5» и «Oct 1»', () => {
   assertEquals([num(2.5, 'ru'), num(2.5, 'en'), num(185, 'en')], ['2,5', '2.5', '185']);
   assertEquals([date('2026-10-01', 'ru'), date('2026-10-01', 'en')], ['01.10', 'Oct 1']);

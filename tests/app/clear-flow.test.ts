@@ -2,8 +2,6 @@ import { assert, assertEquals } from '@std/assert';
 import { clearBatches } from '../../src/adapters/telegram/bot.ts';
 import { workout, world } from '../support/world.ts';
 
-/** /clear (.specs/product.md → «Кнопки и очистка чата»): переписка — да, данные — нет. */
-
 Deno.test('/clear: сначала удаление переписки, потом главный экран; тренировка остаётся', async () => {
   const w = await world();
   await w.send(workout);

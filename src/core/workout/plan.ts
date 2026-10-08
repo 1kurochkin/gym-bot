@@ -7,8 +7,6 @@ import { type Lb, LbSchema } from '../units/lb.ts';
 import { nearbyWeights, nextAbove, type WeightGrid } from '../units/weight-grid.ts';
 import { addedWeightWarmup, fixedWarmup, tieredWarmup } from '../warmup/warmup.ts';
 
-/** Как упражнение подаётся на тренировке: вес, кнопки, разминка (.specs/product.md → US-3). */
-
 export function suggestedWeight(
   exercise: Exercise,
   settings: Settings,
@@ -18,7 +16,6 @@ export function suggestedWeight(
   return last?.weightLb ?? null;
 }
 
-/** Кнопки веса: предложенный, +шаг, −шаг (US-3, шаг 1). */
 export function weightOptions(grid: WeightGrid, base: Lb): readonly Lb[] {
   const up = nextAbove(grid, base);
   const below = nearbyWeights(grid, base - 1e-6).lower;
@@ -27,13 +24,8 @@ export function weightOptions(grid: WeightGrid, base: Lb): readonly Lb[] {
   return options;
 }
 
-/** Сколько кнопок повторений показывать (US-3, шаг 3). */
 const REP_BUTTONS = 8;
 
-/**
- * Кнопки повторений — 8 чисел подряд, без пропусков: от ориентира −3. Ориентир — прошлый подход
- * в этой тренировке, для первого — прошлый результат, без истории — начало диапазона.
- */
 export function repOptions(
   range: { readonly min: number; readonly max: number } | null,
   anchor: number | null,
@@ -51,7 +43,6 @@ export const WarmupLineLabelSchema = z.enum([
   'assisted',
 ]);
 
-/** Строка разминки для экрана и записи: вес (для допвеса — допвес), повторения, вес на сторону. */
 export const WarmupLineSchema = z.object({
   weightLb: LbSchema,
   reps: z.number().int().positive(),
@@ -66,7 +57,6 @@ export const WarmupForExerciseSchema = z.object({
 }).readonly();
 export type WarmupForExercise = z.infer<typeof WarmupForExerciseSchema>;
 
-/** Разминка к рабочему весу; null — у упражнения разминки нет (пресс, шея, warmup: null). */
 export function warmupFor(
   exercise: Exercise,
   program: Program,

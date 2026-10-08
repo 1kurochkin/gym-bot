@@ -7,8 +7,6 @@ import { moveTo, unchanged, withEffects } from './flow.ts';
 import { askTime } from './onboarding.ts';
 import { type Session, SessionStepSchema, type StepContext, type StepResult } from './types.ts';
 
-/** /seed — ввод последнего рабочего результата по упражнениям, US-6 (.specs/product.md). */
-
 const { idle, seed } = SessionStepSchema.enum;
 
 export function requestSeed(state: Session, ctx: StepContext): StepResult {
@@ -17,21 +15,18 @@ export function requestSeed(state: Session, ctx: StepContext): StepResult {
   return prompt(state, ctx, 0, 0, null);
 }
 
-/** [Нет данных], [Оставить]: к следующему упражнению без записи. */
 export function skipSeed(state: Session, ctx: StepContext): StepResult {
   const c = state.context;
   if (state.step !== seed || c.kind !== 'seed') return unchanged(state);
   return prompt(state, ctx, c.index + 1, c.filled, null);
 }
 
-/** [Закончить]: выйти, сохранённое остаётся. */
 export function stopSeed(state: Session, ctx: StepContext): StepResult {
   const c = state.context;
   if (state.step !== seed || c.kind !== 'seed') return unchanged(state);
   return done(state, c.filled, total(ctx));
 }
 
-/** Введён результат: разбор как рабочий подход без предложенного веса, запись сразу. */
 export function seedText(state: Session, text: string, ctx: StepContext): StepResult {
   const c = state.context;
   const exercise = ctx.activeProgram

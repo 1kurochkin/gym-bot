@@ -1,7 +1,6 @@
 import type { BotEvent } from '../../core/session/types.ts';
 import type { Incoming } from '../../ports/ui.ts';
 
-/** Апдейт → событие /invite и /users. Владелец ли это — решает автомат по контексту. */
 export function toEvent(input: Incoming): BotEvent | null {
   if (input.kind === 'command') {
     if (input.name === 'invite') return { type: 'invite_requested' };

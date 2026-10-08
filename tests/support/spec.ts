@@ -4,7 +4,6 @@ import type { Program } from '../../src/core/program/schema.ts';
 
 const ROOT = resolve(dirname(new URL(import.meta.url).pathname), '../..');
 
-/** JSON программы владельца прямо из спецификации: пример в спеке и тест не могут разойтись. */
 export async function specProgramJson(): Promise<unknown> {
   const md = await Deno.readTextFile(join(ROOT, '.specs/program-format.md'));
   const block = /```json\n([\s\S]*?)```/.exec(md)?.[1];

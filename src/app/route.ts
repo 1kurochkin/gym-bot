@@ -21,13 +21,8 @@ import { assertNever } from '../shared/result.ts';
 import type { ZoneLocator } from '../ports/geo.ts';
 import type { Incoming, Rendered, RenderEnv } from '../ports/ui.ts';
 
-/**
- * Роутинг апдейта по фичам. Фичи с командами, файлами и кнопками — первыми;
- * онбординг последним: он превращает любой текст в text_entered, а шаг решает автомат.
- */
 export async function routeEvent(input: Incoming, zoneAt: ZoneLocator): Promise<BotEvent | null> {
   if (input.kind === 'location') {
-    // Поиск зоны по координатам — I/O-зависимость, поэтому здесь, а не в фиче. Координаты не сохраняем.
     const name = await zoneAt(input.latitude, input.longitude);
     const zone = name === null ? null : parseTimeZone(name);
     return { type: 'tz_located', zone: zone?.ok ? zone.value : null };
@@ -41,7 +36,6 @@ export async function routeEvent(input: Incoming, zoneAt: ZoneLocator): Promise<
     onboardingEvent(input);
 }
 
-/** Экран → текст и кнопки фичи, которой он принадлежит, на языке пользователя. */
 export function render(view: View, lang: Language, env: RenderEnv): Rendered {
   switch (view.type) {
     case 'ask_time':

@@ -3,14 +3,8 @@ import { err, ok, type Result } from '../../shared/result.ts';
 import { LoadTypeSchema } from '../program/schema.ts';
 import { lb, LbSchema } from '../units/lb.ts';
 
-/**
- * Разбор ввода подхода с учётом контекста (.specs/product.md → «Ввод свободным текстом»):
- * бот уже предложил вес, поэтому «7» — это 7 повторений с ним, а «185x6» — свой вес.
- */
-
 export const SetInputContextSchema = z.object({
   loadType: LoadTypeSchema,
-  /** Вес, который бот предложил для подхода; null — пока не знает (нет истории). */
   suggestedLb: LbSchema.nullable(),
 }).readonly();
 export type SetInputContext = z.infer<typeof SetInputContextSchema>;
@@ -18,11 +12,9 @@ export type SetInputContext = z.infer<typeof SetInputContextSchema>;
 export const WeightSourceSchema = z.enum(['suggested', 'entered', 'none']);
 
 export const ParsedSetSchema = z.object({
-  /** Вес подхода; для weighted_bodyweight — допвес; для reps_only — null. */
   weightLb: LbSchema.nullable(),
   reps: z.number().int().min(1).max(100),
   weightSource: WeightSourceSchema,
-  /** Текст после чисел — комментарий к упражнению. */
   comment: z.string().nullable(),
 }).readonly();
 export type ParsedSet = z.infer<typeof ParsedSetSchema>;
@@ -46,11 +38,8 @@ const MAX_WEIGHT_LB = 1500;
 
 const SEP = '[xXхХ×*/]';
 const NUM = String.raw`(\d+(?:[.,]\d+)?)`;
-/** Вес и повторения: «185x6», «185/6», «185 х 6», «+25x8», «185 6». */
 const WEIGHT_REPS = new RegExp(String.raw`^(\+)?${NUM}\s*(?:${SEP}\s*|\s+)(\d+)(?=\s|$)`);
-/** Только повторения, явно: «x7». */
 const X_REPS = new RegExp(String.raw`^${SEP}\s*(\d+)(?=\s|$)`);
-/** Одно число: «7» — повторения; «+25», «182,5» — вес без повторений. */
 const SINGLE = new RegExp(String.raw`^(\+)?${NUM}(?=\s|$)`);
 
 type Raw = { readonly weight: string | null; readonly reps: string; readonly rest: string };
@@ -97,7 +86,6 @@ export function parseSetInput(
   return ok({ weightLb: ctx.suggestedLb, reps, weightSource: W.suggested, comment });
 }
 
-/** Одно число в фунтах: «33», «2,5», «2.5 lb». null — не число. */
 export function parseLbNumber(input: string): number | null {
   const m = /^\s*(\d+(?:[.,]\d+)?)\s*(?:lb|lbs|фунт\S*)?\s*$/i.exec(input);
   return m ? Number((m[1] ?? '').replace(',', '.')) : null;

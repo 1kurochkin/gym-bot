@@ -4,17 +4,14 @@ import { LanguageSchema } from '../../../src/core/settings/settings.ts';
 import { issueText } from '../../../src/features/program/messages.ts';
 import { specProgramJson } from '../../support/spec.ts';
 
-/** Программа как произвольный JSON: тесты намеренно портят её в любом месте. */
 // deno-lint-ignore no-explicit-any
 type AnyJson = any;
 
-/** Глубокая копия программы из спеки с правкой — для негативных случаев. */
 async function variant(edit: (p: AnyJson) => void): Promise<unknown> {
   const p: AnyJson = structuredClone(await specProgramJson());
   edit(p);
   return p;
 }
-/** Ошибки так, как их увидит пользователь с русским интерфейсом. */
 const messages = (r: ReturnType<typeof parseProgram>): string[] =>
   r.ok ? [] : r.error.map((i) => issueText(i, LanguageSchema.enum.ru));
 

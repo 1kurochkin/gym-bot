@@ -9,7 +9,6 @@ import { handleUpdate, type UpdateDeps } from './handle-update.ts';
 
 export type Deps = { readonly bot: Bot; readonly store: Store };
 
-/** Composition root: единственное место, где встречаются адаптеры. */
 export function buildDeps(
   config: Config,
   overrides: { store?: Store; botInfo?: UserFromGetMe } = {},
@@ -20,8 +19,6 @@ export function buildDeps(
   const bot = createBot({
     token: config.botToken,
     botInfo: overrides.botInfo ?? toBotInfo(config.botInfo),
-    // Апдейты воркера — по очереди: одно соединение с БД, и запросы двух апдейтов не должны
-    // уйти пачкой (docs/architecture.md §3).
     onUpdate: (update) => {
       const deps = updateDeps;
       if (!deps) throw new Error('deps not ready');
@@ -30,7 +27,6 @@ export function buildDeps(
       return run;
     },
   });
-  // Время каждого вызова Telegram API — в лог (метод и мс, без содержимого).
   bot.api.config.use(async (prev, method, payload, signal) => {
     const start = performance.now();
     try {
@@ -51,7 +47,6 @@ export function buildDeps(
   return { bot, store };
 }
 
-/** BOT_INFO из окружения: недостающие флаги возможностей бота — false. */
 function toBotInfo(info: Config['botInfo']): UserFromGetMe | undefined {
   if (!info) return undefined;
   return {

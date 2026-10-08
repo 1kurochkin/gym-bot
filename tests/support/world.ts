@@ -5,8 +5,6 @@ import type { Action, Incoming } from '../../src/ports/ui.ts';
 import { fakeUi, memoryStore, OWNERS, TESTER } from './fakes.ts';
 import { specProgramJson } from './spec.ts';
 
-/** Тренировка через весь цикл апдейта: владелец в Нью-Йорке, программа из спеки уже загружена. */
-
 export type World = {
   store: ReturnType<typeof memoryStore>;
   ui: ReturnType<typeof fakeUi>;
@@ -23,7 +21,7 @@ export async function world(): Promise<World> {
   const ui = fakeUi();
   let n = 0;
   let updateId = 1;
-  let now = new Date('2026-09-30T22:40:00Z'); // ср, 30.09, 18:40 в Нью-Йорке
+  let now = new Date('2026-09-30T22:40:00Z');
   const deps: UpdateDeps = {
     store,
     ui,

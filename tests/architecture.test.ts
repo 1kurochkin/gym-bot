@@ -2,13 +2,6 @@ import { assertEquals } from '@std/assert';
 import { walk } from '@std/fs';
 import { dirname, join, relative, resolve } from '@std/path';
 
-/**
- * Правило зависимостей (docs/architecture.md §13.4):
- *   shared ← core ← features ← app;  adapters → ports.
- * Тест проходит по импортам src/ и падает при нарушении, чтобы запрос к БД
- * нельзя было незаметно протащить в расчёт разминки.
- */
-
 const ROOT = resolve(dirname(new URL(import.meta.url).pathname), '..');
 const SRC = join(ROOT, 'src');
 
@@ -23,7 +16,6 @@ const ALLOWED: Record<Layer, readonly Layer[]> = {
   app: ['shared', 'core', 'ports', 'features', 'adapters', 'app'],
 };
 
-/** Внешние пакеты, разрешённые в чистом ядре. */
 const CORE_PACKAGES = ['zod'];
 
 const layerOf = (file: string): Layer | null => {

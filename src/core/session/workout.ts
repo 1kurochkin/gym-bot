@@ -40,19 +40,12 @@ import {
   type View,
 } from './types.ts';
 
-/**
- * Тренировка — меню дня (.specs/product.md → US-2…US-5): выбор дня → меню → упражнение
- * (вес → разминка → подходы до «Завершить упражнение») → меню → «Завершить тренировку».
- * Исправления (разминка «Изменить», «Назад», просмотр подходов, /undo) — workout-corrections.ts.
- */
-
 const S = SessionStepSchema.enum;
 const { warmup, work } = SetKindSchema.enum;
 const { full } = WarmupVariantSchema.enum;
 const { completed, aborted } = WorkoutStatusSchema.enum;
 const MARK = MenuMarkSchema.enum;
 
-/** Незавершённую тренировку старше этого не продолжаем, а закрываем (US-2). */
 const RESUME_WINDOW_MS = 12 * 60 * 60 * 1000;
 const MAX_WEIGHT_LB = 1500;
 
@@ -69,7 +62,6 @@ export const idsOf = (ctx: StepContext): Ids => {
 export const workoutContext = (state: Session): WorkoutContext | null =>
   state.context.kind === 'workout' ? state.context : null;
 
-/** Контекст меню дня: упражнение не открыто. */
 export const menuContext = (
   active: { id: string; dayId: string; localDate: ActiveWorkout['localDate'] },
 ): WorkoutContext => ({
@@ -83,7 +75,6 @@ export const menuContext = (
   log: null,
 });
 
-/** Открыть упражнение: запись — заново. */
 export const atExercise = (c: WorkoutContext, exerciseId: string): WorkoutContext => ({
   ...c,
   exerciseId,
@@ -97,20 +88,17 @@ export function currentExercise(ctx: StepContext, c: WorkoutContext): Exercise |
   return exerciseIndex(ctx.activeProgram).get(c.exerciseId);
 }
 
-/** Запись упражнения в текущей тренировке (как в БД до этого апдейта). */
 export const logOf = (
   active: ActiveWorkout | null,
   exerciseId: string,
 ): WorkoutLog | undefined => active?.logs.find((l) => l.exerciseId === exerciseId);
 
-/** Рабочие подходы записи (пропущенные подходы разминки — не они). */
 export const workSetsOf = (log: WorkoutLog | undefined): WorkoutLog['sets'] =>
   (log?.sets ?? []).filter((s) => s.kind === work && !s.skipped);
 
 const asView = (sets: WorkoutLog['sets']): SetView[] =>
   sets.map((s) => ({ weightLb: s.weightLb, reps: s.reps }));
 
-/** Упражнения меню: дня по порядку программы, затем добавленные (по времени добавления). */
 export function menuExercises(ctx: StepContext, active: ActiveWorkout | null): Exercise[] {
   if (!ctx.activeProgram || !active) return [];
   const day = [...dayExercises(ctx.activeProgram, active.dayId)];
@@ -129,9 +117,6 @@ export function menuExercises(ctx: StepContext, active: ActiveWorkout | null): E
 const markOf = (log: WorkoutLog | undefined): MenuMark =>
   log?.finishedAt ? MARK.done : workSetsOf(log).length > 0 ? MARK.started : MARK.todo;
 
-// ---------------------------------------------------------------- день и меню
-
-/** /workout: меню незавершённой тренировки, старую — закрыть, иначе — выбор дня. */
 export function requestWorkout(state: Session, ctx: StepContext): StepResult {
   if (ctx.activeProgram === null) return moveTo(state, S.idle, { type: 'needs_program' });
   if (ctx.settings.timezone === null) return askTime(state, null);
@@ -157,7 +142,6 @@ export function chooseDayScreen(state: Session, ctx: StepContext): StepResult {
   });
 }
 
-/** Выбран день: тренировка с локальной датой, ISO-неделей и смещением на момент старта; меню. */
 export function chooseDay(state: Session, ctx: StepContext, dayId: string): StepResult {
   const program = ctx.activeProgram;
   const zone = ctx.settings.timezone;
@@ -178,7 +162,6 @@ export function chooseDay(state: Session, ctx: StepContext, dayId: string): Step
   ]);
 }
 
-/** Меню дня; active — снимок тренировки с изменениями этого апдейта. */
 export function menuScreen(
   state: Session,
   ctx: StepContext,
@@ -207,7 +190,6 @@ export function menuScreen(
   }, menuContext(active));
 }
 
-/** Упражнение из меню: ▫️ — заново; ◐ и ✅ — на ввод следующего подхода. */
 export function pickMenuExercise(state: Session, ctx: StepContext, exerciseId: string): StepResult {
   const c = workoutContext(state);
   const active = ctx.activeWorkout;
@@ -216,7 +198,6 @@ export function pickMenuExercise(state: Session, ctx: StepContext, exerciseId: s
   return enterExercise(state, ctx, atExercise(c, exerciseId));
 }
 
-/** Вход в упражнение: с записанным — на ввод подхода, пустая запись — заново. */
 export function enterExercise(state: Session, ctx: StepContext, c: WorkoutContext): StepResult {
   const ex = currentExercise(ctx, c);
   if (!ex) return unchanged(state);
@@ -230,11 +211,9 @@ export function enterExercise(state: Session, ctx: StepContext, c: WorkoutContex
       log: { id: log.id, workLb, workSets: works.length },
     }, ex);
   }
-  // Пустая запись (вес выбран, но ничего не записано) — начинаем заново.
   return withEffects(showExercise(state, ctx, c), [{ type: 'delete_exercise_log', id: log.id }]);
 }
 
-/** [➕ Добавить упражнение]: упражнения программы, которых нет в меню. */
 export function requestAdd(state: Session, ctx: StepContext): StepResult {
   const c = workoutContext(state);
   const program = ctx.activeProgram;
@@ -254,9 +233,6 @@ export function chooseAdd(state: Session, ctx: StepContext, exerciseId: string):
   return showExercise(state, ctx, atExercise(c, exerciseId));
 }
 
-// ---------------------------------------------------------------- вход в упражнение и вес
-
-/** Первый экран упражнения: подходы (reps_only) или выбор веса. */
 export function showExercise(state: Session, ctx: StepContext, c: WorkoutContext): StepResult {
   const program = ctx.activeProgram;
   const ex = currentExercise(ctx, c);
@@ -298,7 +274,6 @@ export function card(
   }, { ...c, log: null });
 }
 
-/** Выбран рабочий вес: открываем запись упражнения и показываем разминку (или сразу подход). */
 export function chooseWeight(state: Session, ctx: StepContext, weightLb: Lb): StepResult {
   const c = workoutContext(state);
   const ex = c && currentExercise(ctx, c);
@@ -311,7 +286,6 @@ export function chooseWeight(state: Session, ctx: StepContext, weightLb: Lb): St
   return withEffects(shown ?? repsPrompt(state, ctx, next, ex, { recorded: [] }), [open]);
 }
 
-/** План разминки текущего упражнения под выбранный рабочий вес; [] — разминки нет. */
 export function warmupLines(
   ctx: StepContext,
   c: WorkoutContext,
@@ -322,7 +296,6 @@ export function warmupLines(
   return warmupFor(ex, ctx.activeProgram, ctx.settings, workLb)?.lines ?? [];
 }
 
-/** Экран разминки; null — у упражнения разминки нет. */
 export function warmupScreen(
   state: Session,
   ctx: StepContext,
@@ -345,7 +318,6 @@ export function warmupScreen(
   }, { ...c, warmupStep: null, viewSet: null });
 }
 
-/** [✅ Готово] — разминка по плану; [⏭ Пропустить] — без разминки. */
 export function finishWarmup(state: Session, ctx: StepContext, variant: WarmupVariant): StepResult {
   const c = workoutContext(state);
   const ex = c && currentExercise(ctx, c);
@@ -382,16 +354,12 @@ export function finishWarmup(state: Session, ctx: StepContext, variant: WarmupVa
   return withEffects(repsPrompt(state, ctx, c, ex), effects);
 }
 
-// ---------------------------------------------------------------- рабочие подходы
-
 type RepsOptions = {
-  /** Рабочие подходы упражнения с изменениями этого апдейта; по умолчанию — из БД. */
   readonly recorded?: readonly SetView[];
   readonly error?: SetInputError | null;
   readonly notice?: RepsView['notice'];
 };
 
-/** Ввод рабочего подхода: записанные, кнопки повторений, ✍️ подсказка. */
 export function repsPrompt(
   state: Session,
   ctx: StepContext,
@@ -427,7 +395,6 @@ export function repsPrompt(
   });
 }
 
-/** Пресс и другие reps_only: без веса и разминки — сразу к подходам. */
 function startRepsOnly(
   state: Session,
   ctx: StepContext,
@@ -443,7 +410,6 @@ function startRepsOnly(
 
 const REPS_STEPS: ReadonlySet<string> = new Set([S.workout_reps, S.workout_warmup]);
 
-/** Повторения кнопкой — с текущим рабочим весом. */
 export function chooseReps(state: Session, ctx: StepContext, reps: number): StepResult {
   const c = workoutContext(state);
   const ex = c && currentExercise(ctx, c);
@@ -491,7 +457,6 @@ export function recordWork(
   );
 }
 
-/** [🏁 Завершить упражнение]: ✅ в меню; без рабочих подходов запись не нужна. */
 export function finishExercise(state: Session, ctx: StepContext): StepResult {
   const c = workoutContext(state);
   const active = ctx.activeWorkout;
@@ -512,9 +477,6 @@ export function finishExercise(state: Session, ctx: StepContext): StepResult {
   return withEffects(menuScreen(state, ctx, after, false), [effect]);
 }
 
-// ---------------------------------------------------------------- комментарии и текст
-
-/** [💬 Комментарий]: на подходе — к упражнению, в меню и на сводке — к тренировке. */
 export function requestComment(state: Session, ctx: StepContext): StepResult {
   const c = workoutContext(state);
   if (!c) return unchanged(state);
@@ -540,14 +502,12 @@ export function requestComment(state: Session, ctx: StepContext): StepResult {
   }
 }
 
-/** Текст во время тренировки: вес в карточке, подход, комментарии. */
 export function workoutText(state: Session, ctx: StepContext, text: string): StepResult {
   const c = workoutContext(state);
   if (!c) return unchanged(state);
   const comment = text.trim();
 
   if (state.step === S.workout_final_comment) {
-    // Тренировка уже завершена — остаёмся на шаге сводки, чтобы «Готово» работало.
     return withEffects(moveTo(state, S.workout_summary, { type: 'workout_commented' }, c), [
       { type: 'comment_workout', workoutId: c.workoutId, comment },
     ]);
@@ -582,7 +542,6 @@ export function workoutText(state: Session, ctx: StepContext, text: string): Ste
   return unchanged(state);
 }
 
-/** В карточке: число — рабочий вес; «185x7» — сразу подход без разминки. */
 function cardText(
   state: Session,
   ctx: StepContext,
@@ -615,9 +574,6 @@ function cardText(
   return withEffects(recorded, logEffects);
 }
 
-// ---------------------------------------------------------------- завершение и отмена
-
-/** [🏁 Завершить тренировку]: сводка; без единого рабочего подхода — тренировка удаляется. */
 export function finishWorkout(state: Session, ctx: StepContext): StepResult {
   const active = ctx.activeWorkout;
   if (!active || state.step !== S.workout_menu) return unchanged(state);
@@ -629,7 +585,6 @@ export function finishWorkout(state: Session, ctx: StepContext): StepResult {
   return summary(state, ctx, active);
 }
 
-/** Сводка: подходы по упражнениям меню, прошлый раз, длительность. */
 function summary(state: Session, ctx: StepContext, active: ActiveWorkout): StepResult {
   const day = new Set(
     ctx.activeProgram ? dayExercises(ctx.activeProgram, active.dayId).map((e) => e.id) : [],
@@ -659,14 +614,12 @@ function summary(state: Session, ctx: StepContext, active: ActiveWorkout): StepR
   );
 }
 
-/** [Готово] на сводке — главный экран. */
 export function closeSummary(state: Session, ctx: StepContext): StepResult {
   if (state.step !== S.workout_summary) return unchanged(state);
   const zone = ctx.settings.timezone;
   return zone ? home(state, zone, ctx) : moveTo(state, S.idle, { type: 'workout_none' });
 }
 
-/** /cancel: подтверждение, данные сохраняются со статусом aborted. */
 export function requestCancel(state: Session, ctx: StepContext): StepResult {
   const active = ctx.activeWorkout;
   if (active === null) return moveTo(state, S.idle, { type: 'workout_none' });
@@ -684,8 +637,6 @@ export function answerCancel(state: Session, ctx: StepContext, confirm: boolean)
     finish(active.id, aborted, ctx),
   ]);
 }
-
-// ---------------------------------------------------------------- общее
 
 const finish = (workoutId: string, status: WorkoutStatus, ctx: StepContext): Effect => ({
   type: 'finish_workout',

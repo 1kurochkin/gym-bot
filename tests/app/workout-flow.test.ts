@@ -4,11 +4,6 @@ import { lb } from '../../src/core/units/lb.ts';
 import type { Incoming } from '../../src/ports/ui.ts';
 import { workout, type World, world } from '../support/world.ts';
 
-/**
- * US-2…US-5 (.specs/product.md): тренировка — меню дня. Программа владельца из спеки;
- * вторник — жим, пресс, шея: сгибания, шея: разгибания.
- */
-
 const open = (w: World, exerciseId: string): Promise<void> =>
   w.press({ type: 'menu_pick', exerciseId });
 const finishExercise = (w: World): Promise<void> => w.press({ type: 'exercise_finish' });
@@ -91,9 +86,9 @@ Deno.test('день → меню; ▶ следующее; ✅ ◐ ▫️; сво
   assert(w.last().includes('Подход №1 — 80% от отказа'), 'пресс — сразу подходы с целью');
   await w.type('20');
   await w.type('18');
-  await w.press({ type: 'back' }); // просмотр подхода №2
-  await w.press({ type: 'back' }); // подход №1
-  await w.press({ type: 'back' }); // меню — пресс начат
+  await w.press({ type: 'back' });
+  await w.press({ type: 'back' });
+  await w.press({ type: 'back' });
   assert(w.last().includes('◐ Пресс — 20 / 18'), w.last());
 
   await w.press({ type: 'workout_finish' });

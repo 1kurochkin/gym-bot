@@ -6,8 +6,6 @@ import type { Incoming } from '../../src/ports/ui.ts';
 import { fakeUi, memoryStore, OWNERS, TESTER } from '../support/fakes.ts';
 import { specProgramJson } from '../support/spec.ts';
 
-/** US-6 (.specs/product.md): /seed через весь цикл апдейта, на программе владельца из спеки. */
-
 async function setup(opts: { program?: boolean; timezone?: boolean } = {}): Promise<{
   deps: UpdateDeps;
   store: ReturnType<typeof memoryStore>;
@@ -21,7 +19,6 @@ async function setup(opts: { program?: boolean; timezone?: boolean } = {}): Prom
   const deps: UpdateDeps = {
     store,
     ui,
-    // 30.09 22:40 UTC = 18:40 в Нью-Йорке
     clock: { now: () => new Date('2026-09-30T22:40:00Z') },
     zoneAt: () => Promise.resolve(null),
     newId: () => `00000000-0000-4000-8000-${String(++n).padStart(12, '0')}`,

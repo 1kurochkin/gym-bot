@@ -1,10 +1,6 @@
 import { z } from 'zod';
 import { type Lb, lb, LbSchema } from './lb.ts';
 
-/**
- * Сетка допустимых весов: штанга собирается из блинов (.specs/warmup.md §6.1),
- * тренажёр и допвес меняются с шагом. Округление к ближайшему, при равенстве — вниз.
- */
 export const WeightGridSchema = z.discriminatedUnion('kind', [
   z.object({
     kind: z.literal('plates'),
@@ -22,16 +18,13 @@ export const NearbyWeightsSchema = z.object({
   .readonly();
 export type NearbyWeights = z.infer<typeof NearbyWeightsSchema>;
 
-/** Предел веса на одну сторону грифа при переборе блинов. */
 const MAX_PER_SIDE_LB = 400;
-/** Веса кратны 0,25 lb: считаем в четвертях фунта, чтобы сравнения были точными. */
 const UNITS_PER_LB = 4;
 const EPS = 1e-9;
 
 const toUnits = (w: number): number => Math.round(w * UNITS_PER_LB);
 const fromUnits = (u: number): Lb => lb(u / UNITS_PER_LB);
 
-/** Все собираемые веса штанги по возрастанию: гриф + 2 × (сумма блинов на сторону). */
 export function barbellWeights(barLb: Lb, platesLb: readonly Lb[]): readonly Lb[] {
   const limit = toUnits(MAX_PER_SIDE_LB);
   const plates = platesLb.map(toUnits);
@@ -48,11 +41,9 @@ export function barbellWeights(barLb: Lb, platesLb: readonly Lb[]): readonly Lb[
   return weights;
 }
 
-/** Минимальный допустимый вес: пустой гриф или один шаг. */
 export const lowestWeight = (grid: WeightGrid): Lb =>
   grid.kind === 'plates' ? grid.barLb : grid.stepLb;
 
-/** Ближайшие допустимые веса снизу и сверху (включительно, если `target` сам допустим). */
 export function nearbyWeights(grid: WeightGrid, target: number): NearbyWeights {
   if (grid.kind === 'step') {
     const q = target / grid.stepLb;
@@ -73,7 +64,6 @@ export function nearbyWeights(grid: WeightGrid, target: number): NearbyWeights {
   return { lower, upper };
 }
 
-/** Округление к ближайшему допустимому весу; при равенстве — вниз; не ниже минимального. */
 export function roundToGrid(grid: WeightGrid, target: number): Lb {
   const { lower, upper } = nearbyWeights(grid, target);
   const floor = lowestWeight(grid);
@@ -83,23 +73,14 @@ export function roundToGrid(grid: WeightGrid, target: number): Lb {
   return nearest < floor ? floor : nearest;
 }
 
-/** Следующий допустимый вес строго больше `weight`. */
 export function nextAbove(grid: WeightGrid, weight: number): Lb {
   const { upper } = nearbyWeights(grid, weight + EPS * 10);
   return upper ?? lb(weight);
 }
 
-/**
- * Вес на одну сторону грифа: «205 (по 80)». Для тренажёра — null; вес легче грифа
- * (EZ-гриф, лёгкая штанга при настройке «гриф 45») — тоже null: на сторону нечего вешать.
- */
 export const perSide = (grid: WeightGrid, weight: Lb): Lb | null =>
   grid.kind === 'plates' && weight >= grid.barLb ? lb((weight - grid.barLb) / 2) : null;
 
-/**
- * Рабочий вес, который нельзя собрать (190 без блинов 2,5), принимается, но бот предупреждает:
- * «190 не собрать, ближайшие: 185 / 195». null — вес собирается.
- */
 export function unachievable(grid: WeightGrid, weight: number): NearbyWeights | null {
   const near = nearbyWeights(grid, weight);
   const exact = near.lower !== null && Math.abs(near.lower - weight) < EPS;

@@ -6,8 +6,6 @@ import type { Action, Incoming } from '../../src/ports/ui.ts';
 import { fakeUi, memoryStore, OWNERS, TESTER } from '../support/fakes.ts';
 import { specProgramJson } from '../support/spec.ts';
 
-/** Язык интерфейса (.specs/product.md → «Язык интерфейса»): по Telegram и по выбору в /settings. */
-
 type World = {
   store: ReturnType<typeof memoryStore>;
   ui: ReturnType<typeof fakeUi>;
@@ -50,7 +48,6 @@ function world(languageCode: string): World {
   return { store, ui, send, press, command, type, last };
 }
 
-/** Все строки программы (названия, заметки, подписи): их бот показывает как есть, без перевода. */
 async function programStrings(): Promise<string[]> {
   const out: string[] = [];
   const walk = (v: unknown): void => {
@@ -107,7 +104,6 @@ Deno.test('английский: ни одного русского слова �
     ...defaultSettings(1),
     timezone: TimeZoneSchema.parse('America/New_York'),
   });
-  // программа: ошибки, загрузка, статус
   await w.send({
     kind: 'document',
     fileName: 'p.json',
@@ -128,12 +124,10 @@ Deno.test('английский: ни одного русского слова �
     problem: null,
   });
   await w.command('program');
-  // /seed с ошибкой ввода
   await w.command('seed');
   await w.type('abc');
   await w.type('185x8');
   await w.press({ type: 'seed_stop' });
-  // настройки по всем разделам
   await w.command('settings');
   for (const section of ['bar', 'plates', 'steps', 'language'] as const) {
     await w.press({ type: 'settings_section', section });
@@ -142,7 +136,6 @@ Deno.test('английский: ни одного русского слова �
   await w.press({ type: 'settings_section', section: 'bar' });
   await w.type('500');
   await w.press({ type: 'settings_close' });
-  // тренировка: карточка, разминка, подходы, комментарии, сводка, прерывание
   await w.command('workout');
   await w.press({ type: 'day_pick', dayId: 'tue' });
   await w.press({ type: 'menu_add' });
@@ -192,7 +185,6 @@ Deno.test('английский: ни одного русского слова �
   await w.command('cancel');
   await w.command('stats');
   await w.command('undo');
-  // история: список, тренировка, упражнение, правка, добавление, удаление
   await w.command('history');
   const done = [...w.store.workouts.values()].find((x) => x.status !== 'in_progress');
   await w.press({ type: 'history_workout', id: done?.id ?? '' });
@@ -208,7 +200,6 @@ Deno.test('английский: ни одного русского слова �
   await w.press({ type: 'history_delete' });
   await w.press({ type: 'history_confirm', confirm: true });
 
-  // Название языка — на нём самом (кнопка «Русский»), это не утечка.
   const known = [...(await programStrings()), 'Русский'];
   const leaks = w.ui.shown.flatMap((s) => {
     const parts = [s.rendered.text, ...s.rendered.keyboard.flat().map((b) => b.label)];

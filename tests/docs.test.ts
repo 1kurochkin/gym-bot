@@ -2,18 +2,11 @@ import { assertEquals } from '@std/assert';
 import { walk } from '@std/fs';
 import { dirname, join, relative, resolve } from '@std/path';
 
-/**
- * Документы не должны тихо устаревать (docs/harness.md §12.1):
- * пути к файлам в .md существуют, а ADR и спецификации не ссылаются на код.
- */
-
 const ROOT = resolve(dirname(new URL(import.meta.url).pathname), '..');
 const SKIP_DIRS = [/node_modules/, /\.git\//, /supabase\/\.temp/];
 
-/** Путь от корня репозитория: src/…, docs/…, .specs/… — в тексте, бэктиках или таблицах. */
 const ROOT_PATH_RE =
   /(?<![\w./-])((?:src|tests|supabase|docs|\.specs|\.claude|\.github)\/[A-Za-z0-9_./-]*)/g;
-/** Относительная markdown-ссылка [текст](путь). */
 const LINK_RE = /\]\(([^)#\s]+)(?:#[^)]*)?\)/g;
 
 async function markdownFiles(): Promise<string[]> {
@@ -24,7 +17,6 @@ async function markdownFiles(): Promise<string[]> {
   return files;
 }
 
-/** Текст без блоков кода: там команды и примеры, а не ссылки. */
 async function prose(file: string): Promise<string> {
   return (await Deno.readTextFile(file)).replace(/```[\s\S]*?```/g, '');
 }
@@ -49,7 +41,7 @@ Deno.test('docs: пути к файлам в документах существ
     }
     for (const m of text.matchAll(LINK_RE)) {
       const link = m[1] ?? '';
-      if (/^[a-z]+:/i.test(link)) continue; // http:, mailto:
+      if (/^[a-z]+:/i.test(link)) continue;
       if (!(await exists(resolve(dirname(file), link)))) broken.push(`${where}: (${link})`);
     }
   }

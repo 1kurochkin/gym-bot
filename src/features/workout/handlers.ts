@@ -1,7 +1,6 @@
 import type { BotEvent } from '../../core/session/types.ts';
 import type { Incoming } from '../../ports/ui.ts';
 
-/** Апдейт → событие тренировки; текст (вес, подход, комментарий) — общий text_entered. */
 export function toEvent(input: Incoming): BotEvent | null {
   if (input.kind === 'command') {
     if (input.name === 'workout') return { type: 'workout_requested' };

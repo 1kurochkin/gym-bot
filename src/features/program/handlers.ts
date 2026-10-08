@@ -1,7 +1,6 @@
 import type { BotEvent } from '../../core/session/types.ts';
 import type { Incoming } from '../../ports/ui.ts';
 
-/** Апдейт → событие загрузки программы; null — не относится к этой фиче. */
 export function toEvent(input: Incoming): BotEvent | null {
   switch (input.kind) {
     case 'command':

@@ -6,7 +6,6 @@ import type { WeightGrid } from '../../../src/core/units/weight-grid.ts';
 import { addedWeightWarmup, fixedWarmup, tieredWarmup } from '../../../src/core/warmup/warmup.ts';
 import { specProgram } from '../../support/spec.ts';
 
-/** Контрольные примеры .specs/warmup.md §6.2–6.3 — данные в tests/fixtures/. */
 const FixtureSchema = z.object({
   barbell: z.array(z.object({
     name: z.string(),

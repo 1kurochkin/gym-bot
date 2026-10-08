@@ -19,7 +19,6 @@ export type ProgramView = Extract<
   }
 >;
 
-/** Сколько ошибок программы показывать списком; остальные — числом. */
 const MAX_ISSUES = 10;
 const { too_large, not_json, download_failed } = FileProblemSchema.enum;
 
