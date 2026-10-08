@@ -110,7 +110,8 @@ case "${1:-}" in
     jq -r --arg want "$want" '.result |
       "url: \(if .url == $want then "OK" elif .url == "" then "NOT_SET" else "MISMATCH (\(.url))" end)",
       "pending: \(.pending_update_count)",
-      "last_error: \(.last_error_message // "none")"' <<<"$info"
+      "last_error: \(.last_error_message // "none")",
+      "last_error_at: \(if .last_error_date then (.last_error_date | todate) else "none" end)"' <<<"$info"
     ;;
   inspect)
     # Только чтение: supabase inspect db <locks|blocking|long-running-queries|…> по MIGRATION_DB_URL.
