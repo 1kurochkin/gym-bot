@@ -298,3 +298,15 @@ Deno.test('завершить тренировку без подходов — �
   assertEquals(w.last(), 'Подходов не было — тренировку не сохранял. Начать — /workout');
   assertEquals(w.store.workouts.size, 0);
 });
+
+Deno.test('штанга легче грифа (40 при грифе 45) — подход записывается, без «по …»', async () => {
+  const w = await world();
+  await tuesday(w);
+  await open(w, 'incline_press');
+  await w.type('40');
+  await w.press({ type: 'warmup', variant: 'none' });
+  assert(w.last().includes('Рабочий подход №1 — 40 × ?'), w.last());
+  assertEquals(w.last().includes('(по'), false);
+  await w.press({ type: 'reps_set', reps: 10 });
+  assert(w.last().includes('Записал: 40 × 10'), w.last());
+});
