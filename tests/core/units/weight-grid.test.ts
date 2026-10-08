@@ -52,6 +52,8 @@ Deno.test('следующий вес выше и вес на сторону', ()
   assertEquals(nextAbove(step5, 40), 45);
   assertEquals(perSide(standard, lb(205)), 80);
   assertEquals(perSide(withSmall, lb(90)), 22.5);
+  assertEquals(perSide(standard, lb(40)), null, 'легче грифа — на сторону нечего, без ошибки');
+  assertEquals(perSide(standard, lb(45)), 0);
   assertEquals(perSide(step5, lb(90)), null);
 });
 

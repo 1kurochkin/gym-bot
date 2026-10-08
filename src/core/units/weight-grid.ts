@@ -89,9 +89,12 @@ export function nextAbove(grid: WeightGrid, weight: number): Lb {
   return upper ?? lb(weight);
 }
 
-/** Вес на одну сторону грифа: «205 (по 80)». Для тренажёра — null. */
+/**
+ * Вес на одну сторону грифа: «205 (по 80)». Для тренажёра — null; вес легче грифа
+ * (EZ-гриф, лёгкая штанга при настройке «гриф 45») — тоже null: на сторону нечего вешать.
+ */
 export const perSide = (grid: WeightGrid, weight: Lb): Lb | null =>
-  grid.kind === 'plates' ? lb((weight - grid.barLb) / 2) : null;
+  grid.kind === 'plates' && weight >= grid.barLb ? lb((weight - grid.barLb) / 2) : null;
 
 /**
  * Рабочий вес, который нельзя собрать (190 без блинов 2,5), принимается, но бот предупреждает:
