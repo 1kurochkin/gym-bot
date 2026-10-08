@@ -5,7 +5,6 @@ import { IdSchema } from '../core/program/schema.ts';
 import { SettingsSectionSchema } from '../core/settings/options.ts';
 import { LanguageSchema } from '../core/settings/settings.ts';
 import { WarmupVariantSchema } from '../core/history/schema.ts';
-import { IntensitySchema } from '../core/program/schema.ts';
 import { FileProblemSchema, WarmupMarkSchema } from '../core/session/types.ts';
 import { LbSchema } from '../core/units/lb.ts';
 
@@ -40,7 +39,6 @@ export const ActionSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('set_delete') }).readonly(),
   z.object({ type: z.literal('set_forward') }).readonly(),
   z.object({ type: z.literal('workout_finish') }).readonly(),
-  z.object({ type: z.literal('intensity_set'), intensity: IntensitySchema }).readonly(),
   z.object({ type: z.literal('weight_set'), lb: LbSchema }).readonly(),
   z.object({ type: z.literal('warmup'), variant: WarmupVariantSchema }).readonly(),
   z.object({ type: z.literal('warmup_diff') }).readonly(),

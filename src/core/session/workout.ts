@@ -6,21 +6,14 @@ import {
 } from '../history/schema.ts';
 import { parseLbNumber, parseSetInput, type SetInputError } from '../input/set-input.ts';
 import { dayExercises, exerciseIndex } from '../program/program.ts';
-import {
-  type Exercise,
-  type Intensity,
-  IntensitySchema,
-  LoadTypeSchema,
-} from '../program/schema.ts';
+import { type Exercise, LoadTypeSchema } from '../program/schema.ts';
 import { weightGrid, weightStep } from '../program/weight-step.ts';
 import { isoWeekOf, localDateOf } from '../schedule/calendar.ts';
-import { activeNotes, pairIntensity, weekIntensities } from '../schedule/intensity.ts';
 import { nextDay } from '../schedule/rotation.ts';
 import { utcOffsetMinutes } from '../schedule/timezone.ts';
 import { type Lb, lb } from '../units/lb.ts';
 import { perSide } from '../units/weight-grid.ts';
 import {
-  pairOf,
   repOptions,
   suggestedWeight,
   warmupFor,
@@ -64,8 +57,6 @@ const RESUME_WINDOW_MS = 12 * 60 * 60 * 1000;
 const MAX_WEIGHT_LB = 1500;
 
 export type WorkoutContext = Extract<SessionContext, { kind: 'workout' }>;
-/** Интенсивность упражнения и всей недели с учётом выбора пользователя. */
-type IntensityInfo = { value: Intensity; byExercise: Readonly<Record<string, Intensity>> };
 type Ids = () => string;
 type RepsView = Extract<View, { type: 'workout_reps' }>;
 export type SetView = RepsView['recorded'][number];
@@ -87,17 +78,15 @@ export const menuContext = (
   dayId: active.dayId,
   localDate: active.localDate,
   exerciseId: null,
-  intensity: null,
   warmupStep: null,
   viewSet: null,
   log: null,
 });
 
-/** Открыть упражнение: запись и интенсивность — заново. */
+/** Открыть упражнение: запись — заново. */
 export const atExercise = (c: WorkoutContext, exerciseId: string): WorkoutContext => ({
   ...c,
   exerciseId,
-  intensity: null,
   warmupStep: null,
   viewSet: null,
   log: null,
@@ -267,36 +256,7 @@ export function chooseAdd(state: Session, ctx: StepContext, exerciseId: string):
 
 // ---------------------------------------------------------------- вход в упражнение и вес
 
-/** Интенсивность упражнения: выбранная кнопкой или по правилам §6.4; null — не из пары. */
-function intensityOf(
-  ctx: StepContext,
-  c: WorkoutContext,
-  ex: Exercise,
-): IntensityInfo | 'unknown' | null {
-  const program = ctx.activeProgram;
-  const pair = program && pairOf(program, ex.id);
-  const zone = ctx.settings.timezone;
-  if (!program || !pair || zone === null) return null;
-  const week = isoWeekOf(localDateOf(ctx.now, zone));
-  const rule = pairIntensity(pair, ctx.intensityLogs, week);
-  const base = rule.kind === 'known' ? rule.byExercise : {};
-  const value = c.intensity ?? base[ex.id];
-  if (value === undefined) return 'unknown';
-  const other = pair.exercises.find((id) => id !== ex.id) ?? ex.id;
-  const flipped = value === IntensitySchema.enum.high
-    ? IntensitySchema.enum.low
-    : IntensitySchema.enum.high;
-  return {
-    value,
-    byExercise: {
-      ...weekIntensities(program, ctx.intensityLogs, week),
-      [ex.id]: value,
-      [other]: flipped,
-    },
-  };
-}
-
-/** Первый экран упражнения: подходы (reps_only), вопрос 100/70 или выбор веса. */
+/** Первый экран упражнения: подходы (reps_only) или выбор веса. */
 export function showExercise(state: Session, ctx: StepContext, c: WorkoutContext): StepResult {
   const program = ctx.activeProgram;
   const ex = currentExercise(ctx, c);
@@ -306,18 +266,7 @@ export function showExercise(state: Session, ctx: StepContext, c: WorkoutContext
       : moveTo(state, S.idle, { type: 'workout_none' });
   }
   if (ex.loadType === LoadTypeSchema.enum.reps_only) return startRepsOnly(state, ctx, c, ex);
-  const intensity = intensityOf(ctx, c, ex);
-  if (intensity === 'unknown') {
-    const pair = pairOf(program, ex.id);
-    const names = exerciseIndex(program);
-    const [a, b] = pair?.exercises ?? [ex.id, ex.id];
-    return moveTo(state, S.workout_intensity, {
-      type: 'workout_intensity',
-      exerciseName: ex.name,
-      pairNames: [names.get(a)?.name ?? a, names.get(b)?.name ?? b],
-    }, c);
-  }
-  return card(state, ctx, c, ex, intensity, false);
+  return card(state, ctx, c, ex, false);
 }
 
 export function card(
@@ -325,64 +274,28 @@ export function card(
   ctx: StepContext,
   c: WorkoutContext,
   ex: Exercise,
-  intensity: IntensityInfo | null,
   invalidWeight: boolean,
 ): StepResult {
   const program = ctx.activeProgram;
   if (!program) return unchanged(state);
   const grid = weightGrid(ex, ctx.settings);
   const last = ctx.lastResults[ex.id] ?? null;
-  const base = suggestedWeight(
-    ex,
-    program,
-    ctx.settings,
-    last,
-    ctx.lastHighLb[ex.id] ?? null,
-    intensity?.value ?? null,
-  );
-  const names = exerciseIndex(program);
-  const pair = pairOf(program, ex.id);
-  const summary = pair && intensity
-    ? pair.exercises.map((id) =>
-      `${names.get(id)?.name ?? id} ${
-        intensity.byExercise[id] === IntensitySchema.enum.low ? Math.round(pair.lowPct * 100) : 100
-      }%`
-    ).join(', ')
-    : '';
+  const base = suggestedWeight(ex, ctx.settings, last);
   return moveTo(state, S.workout_card, {
     type: 'workout_card',
     exerciseName: ex.name,
     workSets: ex.workSets,
     repRange: 'repRange' in ex ? ex.repRange : null,
     last,
-    intensity: intensity ? { value: intensity.value, summary } : null,
     notes: [
       ...(ex.notes ? [ex.notes] : []),
-      ...activeNotes(program, ex.id, intensity?.byExercise ?? currentWeekIntensities(ctx)),
+      ...program.conditionalNotes.filter((n) => n.exercise === ex.id).map((n) => n.text),
     ],
     addedWeight: ex.loadType === LoadTypeSchema.enum.weighted_bodyweight,
     noWeight: false,
     options: grid && base !== null ? weightOptions(grid, base) : [],
     invalidWeight,
-  }, { ...c, intensity: intensity?.value ?? c.intensity, log: null });
-}
-
-export function cardIntensity(
-  ctx: StepContext,
-  c: WorkoutContext,
-  ex: Exercise,
-): IntensityInfo | null {
-  const i = intensityOf(ctx, c, ex);
-  return i === 'unknown' ? null : i;
-}
-
-/** Кнопка 100% / 70% в карточке или ответ на вопрос «кто ведущий на этой неделе». */
-export function chooseIntensity(state: Session, ctx: StepContext, value: Intensity): StepResult {
-  const c = workoutContext(state);
-  if (!c || (state.step !== S.workout_card && state.step !== S.workout_intensity)) {
-    return unchanged(state);
-  }
-  return showExercise(state, ctx, { ...c, intensity: value, log: null });
+  }, { ...c, log: null });
 }
 
 /** Выбран рабочий вес: открываем запись упражнения и показываем разминку (или сразу подход). */
@@ -390,9 +303,9 @@ export function chooseWeight(state: Session, ctx: StepContext, weightLb: Lb): St
   const c = workoutContext(state);
   const ex = c && currentExercise(ctx, c);
   if (!c || !ex || state.step !== S.workout_card || !ctx.activeProgram) return unchanged(state);
-  const plan = warmupFor(ex, ctx.activeProgram, ctx.settings, weightLb, c.intensity);
+  const plan = warmupFor(ex, ctx.activeProgram, ctx.settings, weightLb);
   const logId = idsOf(ctx)();
-  const open = openLog(ctx, c, ex, logId, weightLb, c.intensity, plan?.tier ?? null);
+  const open = openLog(ctx, c, ex, logId, weightLb, plan?.tier ?? null);
   const next: WorkoutContext = { ...c, log: { id: logId, workLb: weightLb, workSets: 0 } };
   const shown = warmupScreen(state, ctx, next, ex, false);
   return withEffects(shown ?? repsPrompt(state, ctx, next, ex, { recorded: [] }), [open]);
@@ -406,7 +319,7 @@ export function warmupLines(
 ): readonly WarmupLine[] {
   const workLb = c.log?.workLb ?? null;
   if (!ctx.activeProgram || workLb === null) return [];
-  return warmupFor(ex, ctx.activeProgram, ctx.settings, workLb, c.intensity)?.lines ?? [];
+  return warmupFor(ex, ctx.activeProgram, ctx.settings, workLb)?.lines ?? [];
 }
 
 /** Экран разминки; null — у упражнения разминки нет. */
@@ -524,7 +437,7 @@ function startRepsOnly(
   const logId = idsOf(ctx)();
   const next: WorkoutContext = { ...c, log: { id: logId, workLb: null, workSets: 0 } };
   return withEffects(repsPrompt(state, ctx, next, ex, { recorded: [] }), [
-    openLog(ctx, c, ex, logId, null, null, null),
+    openLog(ctx, c, ex, logId, null, null),
   ]);
 }
 
@@ -679,12 +592,12 @@ function cardText(
 ): StepResult {
   const weight = parseLbNumber(text.replace(/^\s*\+/, ''));
   if (weight !== null) {
-    if (weight > MAX_WEIGHT_LB) return card(state, ctx, c, ex, cardIntensity(ctx, c, ex), true);
+    if (weight > MAX_WEIGHT_LB) return card(state, ctx, c, ex, true);
     return chooseWeight(state, ctx, lb(weight));
   }
   const parsed = parseSetInput(text, { loadType: ex.loadType, suggestedLb: null });
   if (!parsed.ok || parsed.value.weightLb === null) {
-    return card(state, ctx, c, ex, cardIntensity(ctx, c, ex), true);
+    return card(state, ctx, c, ex, true);
   }
   const opened = chooseWeight(state, ctx, parsed.value.weightLb);
   const cc = workoutContext({ ...state, context: opened.state.context });
@@ -700,17 +613,6 @@ function cardText(
     parsed.value.comment,
   );
   return withEffects(recorded, logEffects);
-}
-
-/** Интенсивности недели по правилам — для условных заметок упражнений не из пары. */
-function currentWeekIntensities(ctx: StepContext): Readonly<Record<string, Intensity>> {
-  const zone = ctx.settings.timezone;
-  if (!ctx.activeProgram || zone === null) return {};
-  return weekIntensities(
-    ctx.activeProgram,
-    ctx.intensityLogs,
-    isoWeekOf(localDateOf(ctx.now, zone)),
-  );
 }
 
 // ---------------------------------------------------------------- завершение и отмена
@@ -798,7 +700,6 @@ export function openLog(
   ex: Exercise,
   id: string,
   plannedWorkWeightLb: Lb | null,
-  intensity: Intensity | null,
   warmupTier: number | null,
 ): Effect {
   const menu = menuExercises(ctx, ctx.activeWorkout);
@@ -813,7 +714,7 @@ export function openLog(
       substitutedFor: null,
       order: (at >= 0 ? at : menu.length) + 1,
       status: ExerciseLogStatusSchema.enum.done,
-      intensity,
+      intensity: null,
       plannedWorkWeightLb,
       stepLbUsed: weightStep(ex, ctx.settings),
       warmupTier,

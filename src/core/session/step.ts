@@ -13,7 +13,6 @@ import {
   answerCancel,
   chooseAdd,
   chooseDay,
-  chooseIntensity,
   chooseReps,
   chooseWeight,
   closeSummary,
@@ -158,8 +157,6 @@ function transition(state: Session, event: BotEvent, ctx: StepContext): StepResu
       return requestAdd(state, ctx);
     case 'add_exercise_chosen':
       return chooseAdd(state, ctx, event.exerciseId);
-    case 'intensity_chosen':
-      return chooseIntensity(state, ctx, event.intensity);
     case 'weight_chosen':
       return chooseWeight(state, ctx, event.lb);
     case 'warmup_done':
@@ -254,7 +251,6 @@ function onText(state: Session, text: string, ctx: StepContext): StepResult {
     case S.workout_menu:
     case S.workout_add:
     case S.workout_menu_comment:
-    case S.workout_intensity:
     case S.workout_card:
     case S.workout_warmup:
     case S.workout_reps:

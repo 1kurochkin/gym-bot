@@ -156,38 +156,29 @@ Deno.test('следующая тренировка: прошлая, следую
   );
 });
 
-Deno.test('100/70: вопрос без истории, правило недели, 70% от последнего 100%, заметка к тяге', async () => {
+Deno.test('пара из intensityPairs: без вопроса 100/70, вес — прошлый раз, заметка всегда', async () => {
   const w = await world();
-  w.setNow('2026-09-23T22:40:00Z'); // неделя 39
+  w.setNow('2026-09-23T22:40:00Z');
   await w.send(workout);
   await w.press({ type: 'day_pick', dayId: 'wed' });
   await open(w, 'deadlift');
-  assert(
-    w.last().includes('ещё не ясно, что из пары «Фронтальный присед / Мёртвая тяга» идёт на 100%'),
-  );
-  await w.press({ type: 'intensity_set', intensity: 'high' });
-  assert(w.last().includes('На этой неделе: Фронтальный присед 70%, Мёртвая тяга 100%'), w.last());
+  assert(w.last().includes('Рабочий вес сегодня?'), w.last());
+  assert(!w.last().includes('На этой неделе'), w.last());
   await w.type('225');
   await w.press({ type: 'warmup', variant: 'none' });
   await w.type('6');
   await finishExercise(w);
   await w.press({ type: 'workout_finish' });
   await w.press({ type: 'workout_done' });
+  assert(w.store.logs.every((l) => l.intensity === null));
 
-  w.setNow('2026-09-29T22:40:00Z'); // неделя 40: становая была на 100% → теперь 70%
+  w.setNow('2026-09-29T22:40:00Z');
   await w.send(workout);
   await w.press({ type: 'day_pick', dayId: 'wed' });
   await open(w, 'deadlift');
-  assert(w.last().includes('На этой неделе: Фронтальный присед 100%, Мёртвая тяга 70%'), w.last());
-  assertEquals(w.buttons().slice(0, 3), ['155', '165 (+10)', '145 (−10)'], '70% от 225 → 155');
-  await w.press({ type: 'intensity_set', intensity: 'high' });
-  assertEquals(w.buttons().slice(0, 4), ['225', '235 (+10)', '215 (−10)', 'Сделать 70%']);
-  await w.type('225');
-  await w.press({ type: 'warmup', variant: 'none' });
-  await w.type('5');
-  await finishExercise(w);
+  assertEquals(w.buttons(), ['225', '235 (+10)', '215 (−10)', '← Назад']);
+  await w.press({ type: 'back' });
   await w.press({ type: 'workout_finish' });
-  await w.press({ type: 'workout_done' });
 
   await w.send(workout);
   await w.press({ type: 'day_pick', dayId: 'fri' });

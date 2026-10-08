@@ -8,7 +8,6 @@ import {
 import type { Member, Person } from '../../src/core/access/schema.ts';
 import { exerciseIndex } from '../../src/core/program/program.ts';
 import type { Program } from '../../src/core/program/schema.ts';
-import type { IntensityLog } from '../../src/core/schedule/intensity.ts';
 import { defaultSettings, type Settings } from '../../src/core/settings/settings.ts';
 import { initialSession, type Session } from '../../src/core/session/types.ts';
 import type { Lb } from '../../src/core/units/lb.ts';
@@ -83,7 +82,6 @@ export function memoryStore(): MemoryStore {
         : null;
       const active =
         [...store.workouts.values()].filter((w) => w.status === 'in_progress').at(-1) ?? null;
-      const pairIds = program?.intensityPairs.flatMap((p) => [...p.exercises]) ?? [];
       return Promise.resolve({
         session: store.sessions.get(userId) ?? initialSession(userId),
         settings,
@@ -93,8 +91,6 @@ export function memoryStore(): MemoryStore {
           : {},
         activeWorkout: active ? snapshot(store, active) : null,
         lastWorkout: lastWorkout(store),
-        intensityLogs: intensityLogs(store, pairIds),
-        lastHighLb: lastHigh(store, pairIds),
         members: opts.withMembers
           ? [...store.members.values()].filter((m) => !m.revoked).map((m) => ({
             userId: m.userId,
@@ -371,25 +367,6 @@ function snapshot(store: MemoryStore, w: WorkoutRow): ActiveWorkout {
 function lastWorkout(store: MemoryStore): UserState['lastWorkout'] {
   const w = [...store.workouts.values()].filter((x) => x.status === 'completed').at(-1);
   return w ? { dayId: w.dayId, dayName: w.dayName, localDate: w.localDate } : null;
-}
-
-function intensityLogs(store: MemoryStore, pairIds: readonly string[]): IntensityLog[] {
-  return store.logs.flatMap((l) => {
-    const w = l.workoutId ? store.workouts.get(l.workoutId) : undefined;
-    return w && l.status === 'done' && l.intensity !== null && pairIds.includes(l.exerciseId)
-      ? [{ exerciseId: l.exerciseId, isoWeek: w.isoWeek, intensity: l.intensity }]
-      : [];
-  });
-}
-
-function lastHigh(store: MemoryStore, pairIds: readonly string[]): Record<string, Lb> {
-  const result: Record<string, Lb> = {};
-  for (const l of store.logs) {
-    if (l.status !== 'done' || l.intensity !== 'high' || !pairIds.includes(l.exerciseId)) continue;
-    const best = topSet(workSets(store, l.id));
-    if (best && best.weightLb !== null) result[l.exerciseId] = best.weightLb;
-  }
-  return result;
 }
 
 export type Shown = {

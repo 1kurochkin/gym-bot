@@ -2,9 +2,7 @@ import { z } from 'zod';
 import { InviteCodeSchema, MemberSchema, type Person } from '../core/access/schema.ts';
 import { LastResultSchema, ManualResultSchema } from '../core/history/schema.ts';
 import { ProgramSchema } from '../core/program/schema.ts';
-import { IntensityLogSchema } from '../core/schedule/intensity.ts';
 import { type Effect, SessionSchema } from '../core/session/types.ts';
-import { LbSchema } from '../core/units/lb.ts';
 import {
   ActiveWorkoutSchema,
   type HistoryData,
@@ -22,8 +20,6 @@ export const UserStateSchema = z.object({
   lastResults: z.record(z.string(), LastResultSchema).readonly(),
   activeWorkout: ActiveWorkoutSchema.nullable(),
   lastWorkout: LastWorkoutSchema.nullable(),
-  intensityLogs: z.array(IntensityLogSchema).readonly(),
-  lastHighLb: z.record(z.string(), LbSchema).readonly(),
   /** Участники с доступом; заполняется только для владельца (load с withMembers). */
   members: z.array(MemberSchema).readonly(),
 }).readonly();

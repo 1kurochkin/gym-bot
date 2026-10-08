@@ -7,7 +7,6 @@
       "platesLb": [5, 10, 25, 35, 45],
       "workLb": 95,
       "isBase": true,
-      "intensity": "high",
       "expected": [
         { "weightLb": 45, "reps": 8, "perSideLb": 0 },
         { "weightLb": 75, "reps": 3, "perSideLb": 15 },
@@ -20,7 +19,6 @@
       "platesLb": [5, 10, 25, 35, 45],
       "workLb": 195,
       "isBase": true,
-      "intensity": "high",
       "expected": [
         { "weightLb": 85, "reps": 8, "perSideLb": 20 },
         { "weightLb": 135, "reps": 5, "perSideLb": 45 },
@@ -34,7 +32,6 @@
       "platesLb": [5, 10, 25, 35, 45],
       "workLb": 225,
       "isBase": true,
-      "intensity": "high",
       "expected": [
         { "weightLb": 85, "reps": 10, "perSideLb": 20 },
         { "weightLb": 135, "reps": 8, "perSideLb": 45 },
@@ -49,7 +46,6 @@
       "platesLb": [5, 10, 25, 35, 45],
       "workLb": 315,
       "isBase": true,
-      "intensity": "high",
       "expected": [
         { "weightLb": 125, "reps": 10, "perSideLb": 40 },
         { "weightLb": 185, "reps": 8, "perSideLb": 70 },
@@ -64,26 +60,11 @@
       "platesLb": [2.5, 5, 10, 25, 35, 45],
       "workLb": 195,
       "isBase": true,
-      "intensity": "high",
       "expected": [
         { "weightLb": 90, "reps": 8, "perSideLb": 22.5 },
         { "weightLb": 135, "reps": 5, "perSideLb": 45 },
         { "weightLb": 165, "reps": 3, "perSideLb": 60 },
         { "weightLb": 205, "reps": 1, "perSideLb": 80 }
-      ]
-    },
-    {
-      "name": "день 70%: 225 → 155, без сингла",
-      "barLb": 45,
-      "platesLb": [5, 10, 25, 35, 45],
-      "lastHighLb": 225,
-      "workLb": 155,
-      "isBase": true,
-      "intensity": "low",
-      "expected": [
-        { "weightLb": 65, "reps": 8, "perSideLb": 10 },
-        { "weightLb": 105, "reps": 5, "perSideLb": 30 },
-        { "weightLb": 135, "reps": 3, "perSideLb": 45 }
       ]
     }
   ],

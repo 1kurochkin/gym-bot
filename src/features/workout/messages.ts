@@ -19,19 +19,14 @@ const ru = {
   finishWorkout: '🏁 Завершить тренировку',
   emptyDeleted: 'Подходов не было — тренировку не сохранял. Начать — /workout',
   // упражнение: вес
-  intensityAsk: (a: string, b: string) =>
-    `На этой неделе ещё не ясно, что из пары «${a} / ${b}» идёт на 100%. Как делаешь сегодня?`,
   workSets: (min: number, max: number) =>
     min === max ? `${min} ${min === 1 ? 'рабочий' : 'рабочих'}` : `${min}–${max} рабочих`,
   goal: 'Цель',
-  thisWeek: 'На этой неделе',
   noLast: 'Прошлого раза нет.',
   invalidWeight: '⚠️ Не понял вес. Напиши число, например 185.',
   askAdded: 'Допвес сегодня? (0 — свой вес)',
   askWeight: 'Рабочий вес сегодня?',
   typeWeight: '✍️ Или напиши свой вес.',
-  make70: 'Сделать 70%',
-  make100: 'Сделать 100%',
   // разминка
   warmupFor: (work: string) => `Разминка под ${work}`,
   orWorkSet: '✍️ Или сразу напиши рабочий подход.',
@@ -112,19 +107,14 @@ const en: typeof ru = {
   addNone: 'All program exercises are already in the menu.',
   finishWorkout: '🏁 Finish workout',
   emptyDeleted: 'No sets were logged — the workout wasn’t saved. Start one — /workout',
-  intensityAsk: (a: string, b: string) =>
-    `It’s not clear yet which of “${a} / ${b}” goes at 100% this week. What are you doing today?`,
   workSets: (min: number, max: number) =>
     min === max ? `${min} working set${min === 1 ? '' : 's'}` : `${min}–${max} working sets`,
   goal: 'Goal',
-  thisWeek: 'This week',
   noLast: 'No previous result.',
   invalidWeight: '⚠️ Didn’t get the weight. Type a number, e.g. 185.',
   askAdded: 'Added weight today? (0 — bodyweight)',
   askWeight: 'Working weight today?',
   typeWeight: '✍️ Or type your weight.',
-  make70: 'Do 70%',
-  make100: 'Do 100%',
   warmupFor: (work: string) => `Warm-up for ${work}`,
   orWorkSet: '✍️ Or type your working set right away.',
   warmupDone: '✅ Done',

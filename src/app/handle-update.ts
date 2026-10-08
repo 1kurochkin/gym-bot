@@ -97,8 +97,6 @@ async function processUpdate(deps: UpdateDeps, update: IncomingUpdate, mark: Mar
     lastResults,
     activeWorkout: loaded.activeWorkout,
     lastWorkout: loaded.lastWorkout,
-    intensityLogs: loaded.intensityLogs,
-    lastHighLb: loaded.lastHighLb,
     isOwner,
     members: loaded.members,
     history,
