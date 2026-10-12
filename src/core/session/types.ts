@@ -190,6 +190,7 @@ export type WarmupMark = z.infer<typeof WarmupMarkSchema>;
 export const BotEventSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('start') }).readonly(),
   z.object({ type: z.literal('clear_requested') }).readonly(),
+  z.object({ type: z.literal('help_requested') }).readonly(),
   z.object({ type: z.literal('text_entered'), text: z.string() }).readonly(),
   z.object({ type: z.literal('tz_chosen'), zone: TimeZoneSchema }).readonly(),
   z.object({ type: z.literal('tz_located'), zone: TimeZoneSchema.nullable() }).readonly(),
@@ -309,6 +310,9 @@ const SummaryItemSchema = z.object({
 }).readonly();
 export type SummaryItem = z.infer<typeof SummaryItemSchema>;
 
+export const GuideSchema = z.object({ owner: z.boolean(), fromText: z.boolean() }).readonly();
+export type Guide = z.infer<typeof GuideSchema>;
+
 export const ConvertRefusalSchema = z.enum([...ConvertFailureSchema.options, 'limit']);
 export type ConvertRefusal = z.infer<typeof ConvertRefusalSchema>;
 
@@ -344,7 +348,9 @@ export const ViewSchema = z.discriminatedUnion('type', [
     type: z.literal('home'),
     zone: ZoneLabelSchema,
     programName: z.string().nullable(),
+    guide: GuideSchema.nullable(),
   }).readonly(),
+  z.object({ type: z.literal('help'), guide: GuideSchema }).readonly(),
   z.object({
     type: z.literal('program_status'),
     current: ProgramSummarySchema.nullable(),
