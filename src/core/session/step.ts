@@ -14,12 +14,19 @@ import {
   editorBack,
   editorText,
   isEditor,
+  moveInEditor,
   openEditor,
   pickEditorDay,
   pickEditorExercise,
   pickFromProgram,
+  requestCreate,
+  requestDayDelete,
+  requestDayRename,
   requestFromProgram,
+  requestGoal,
   requestNew,
+  requestNewDay,
+  requestProgramRename,
   requestRemove,
   requestRename,
 } from './program-editor.ts';
@@ -148,6 +155,20 @@ function transition(state: Session, event: BotEvent, ctx: StepContext): StepResu
       return requestFromProgram(state, ctx);
     case 'editor_from_picked':
       return pickFromProgram(state, ctx, event.exerciseId);
+    case 'editor_day_rename_requested':
+      return requestDayRename(state, ctx);
+    case 'editor_program_rename_requested':
+      return requestProgramRename(state, ctx);
+    case 'editor_goal_requested':
+      return requestGoal(state, ctx);
+    case 'editor_moved':
+      return moveInEditor(state, ctx, event.move);
+    case 'editor_day_new_requested':
+      return requestNewDay(state, ctx);
+    case 'editor_day_delete_requested':
+      return requestDayDelete(state, ctx);
+    case 'editor_create_requested':
+      return requestCreate(state, ctx);
     case 'seed_requested':
       return requestSeed(state, ctx);
     case 'seed_next':
@@ -269,6 +290,11 @@ function onText(state: Session, text: string, ctx: StepContext): StepResult {
     case S.program_new_type:
     case S.program_new_goal:
     case S.program_pick:
+    case S.program_goal:
+    case S.program_day_new:
+    case S.program_first:
+    case S.program_day_delete_confirm:
+    case S.program_create:
       return editorText(state, ctx, text);
     case S.seed:
       return seedText(state, text, ctx);

@@ -58,6 +58,11 @@ export function render(view: View, lang: Language, env: RenderEnv): Rendered {
     case 'program_new_type':
     case 'program_new_goal':
     case 'program_pick':
+    case 'program_goal':
+    case 'program_day_new':
+    case 'program_first':
+    case 'program_day_delete_confirm':
+    case 'program_create':
       return renderProgramView(view, lang);
     case 'seed_prompt':
     case 'seed_done':

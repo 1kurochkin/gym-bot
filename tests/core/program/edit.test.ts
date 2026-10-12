@@ -3,10 +3,18 @@ import {
   addableToDay,
   addFromProgram,
   addNewExercise,
+  BLANK_ADDED_TIERS,
+  BLANK_WARMUP_TIERS,
   canRemove,
+  changeGoal,
+  createProgram,
+  deleteDay,
+  moveDay,
+  moveExercise,
+  nextDayId,
   nextExerciseId,
-  parseExerciseName,
   parseGoal,
+  parseName,
   removeFromDay,
   renameExercise,
 } from '../../../src/core/program/edit.ts';
@@ -43,10 +51,10 @@ Deno.test('цель: подходы × повторения, диапазоны 
 });
 
 Deno.test('название: обрезка, 1–60 символов', () => {
-  assertEquals(parseExerciseName('  Жим гантелей  '), 'Жим гантелей');
-  assertEquals(parseExerciseName('   '), null);
-  assertEquals(parseExerciseName('x'.repeat(60))?.length, 60);
-  assertEquals(parseExerciseName('x'.repeat(61)), null);
+  assertEquals(parseName('  Жим гантелей  '), 'Жим гантелей');
+  assertEquals(parseName('   '), null);
+  assertEquals(parseName('x'.repeat(60))?.length, 60);
+  assertEquals(parseName('x'.repeat(61)), null);
 });
 
 Deno.test('переименование меняет описание; ссылки в других днях видят новое имя', () => {
@@ -109,4 +117,55 @@ Deno.test('последнее упражнение дня не убираетс�
   assert(!canRemove(program, 'wed'));
   assert(!removeFromDay(program, 'wed', 'deadlift').ok);
   assert(canRemove(program, 'mon'));
+});
+
+Deno.test('удалить день: описания переезжают, упражнения только этого дня уходят с парами и заметками', () => {
+  const p = value(deleteDay(program, 'mon'));
+  assertEquals(p.rotation, ['tue', 'wed', 'thu', 'fri']);
+  assert(!p.days.some((d) => d.id === 'mon'));
+  assert(!exerciseIndex(p).has('front_squat'));
+  assertEquals(exerciseIndex(p).get('calves')?.name, 'Икры стоя');
+  assertEquals(ids(p, 'thu'), ['dips', 'calves', 'neck_flex', 'neck_ext']);
+  assertEquals(p.intensityPairs, []);
+  assertEquals(p.conditionalNotes.filter((n) => n.exercise === 'front_squat'), []);
+  const one = { ...program, rotation: ['mon'], days: program.days.slice(0, 1) };
+  assert(!deleteDay(one, 'mon').ok, 'единственный день');
+  assert(!deleteDay(program, 'sun').ok);
+});
+
+Deno.test('цель: подписи подходов остаются, только если их столько же', () => {
+  const abs = (p: Program) => exerciseIndex(p).get('abs');
+  const three = value(changeGoal(program, 'abs', { workSets: { min: 2, max: 3 }, repRange: null }));
+  const kept = abs(three);
+  assertEquals(kept && 'setTargets' in kept ? kept.setTargets?.length : null, 3);
+  const two = value(changeGoal(program, 'abs', { workSets: { min: 2, max: 2 }, repRange: null }));
+  const dropped = abs(two);
+  assertEquals(dropped && 'setTargets' in dropped ? dropped.setTargets : null, undefined);
+});
+
+Deno.test('порядок: соседи меняются местами, за край — нельзя', () => {
+  assertEquals(value(moveDay(program, 'tue', 'up')).rotation.slice(0, 2), ['tue', 'mon']);
+  assert(!moveDay(program, 'mon', 'up').ok);
+  assert(!moveDay(program, 'fri', 'down').ok);
+  assertEquals(ids(value(moveExercise(program, 'tue', 'abs', 'down')), 'tue'), [
+    'incline_press',
+    'neck_flex',
+    'abs',
+    'neck_ext',
+  ]);
+  assert(!moveExercise(program, 'wed', 'deadlift', 'down').ok);
+});
+
+Deno.test('программа с нуля: id custom, один день, разминочные таблицы — как в шаблоне спеки', () => {
+  assertEquals(BLANK_WARMUP_TIERS, program.warmupTiers);
+  assertEquals(BLANK_ADDED_TIERS, program.addedWeightTiers);
+  const p = value(createProgram('Фулбади', 'День А', {
+    name: 'Подтягивания',
+    loadType: 'weighted_bodyweight',
+    goal: { workSets: { min: 3, max: 3 }, repRange: { min: 5, max: 8 } },
+  }));
+  assertEquals([p.id, p.name, p.rotation], ['custom', 'Фулбади', ['day_1']]);
+  assertEquals(ids(p, 'day_1'), ['ex_1']);
+  assertEquals(nextDayId(p), 'day_2');
+  assertEquals(nextDayId(program), 'day_1');
 });
