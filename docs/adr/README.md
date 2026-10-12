@@ -5,7 +5,7 @@ ADR — снимок на дату принятия. Решение измени
 
 | ADR | Статус | Дата | Решение | Читать, когда |
 |---|---|---|---|---|
-| [0001](0001-hosting-and-db.md) | accepted | 2026-09-28 | Supabase на бесплатном плане: одна Edge Function `bot` (Deno, grammY, webhook) и Postgres через Drizzle и пулер Supavisor (transaction, `prepare: false`). Функция без проверки JWT, защита — секрет в заголовке и whitelist. Бэкап и защита от паузы — ежедневный workflow GitHub Actions | Хостинг, БД, подключение, бэкап, почему не Workers/Firebase/VPS |
+| [0001](0001-hosting-and-db.md) | accepted | 2026-09-28 | Supabase на бесплатном плане: одна Edge Function `bot` (Deno, grammY, webhook) и Postgres через Drizzle и пулер Supavisor (transaction, `prepare: false`). Функция без проверки JWT, защита — секрет в заголовке и whitelist. Бэкап и защита от паузы — workflow GitHub Actions; с 12.10 дамп раз в неделю, `/health` каждый день (.specs/decisions.md) | Хостинг, БД, подключение, бэкап, почему не Workers/Firebase/VPS |
 | [0002](0002-units-lb.md) | accepted | 2026-09-22 | Фунты (lb) везде: интерфейс, расчёты, БД. Вес в коде — branded-тип, его не перепутать с повторениями или килограммами | Веса, единицы, новые поля с весом |
 | [0003](0003-warmup-by-work-weight.md) | superseded by ADR-0008 | 2026-09-28 | Разминка ступенями от рабочего веса, сингл только у базовых и «не в дни на 70%». Заменён ADR-0008 после отмены 100/70 | Только история решения; действующее — ADR-0008 |
 | [0004](0004-timezone-iana.md) | accepted | 2026-09-22 | В настройках — IANA-зона, в интерфейсе `UTC−4 · New York`. Тренировка фиксирует `local_date`, `iso_week`, смещение на момент старта; время в БД — `timestamptz` | Даты, часовой пояс, недели, «сегодня» |
