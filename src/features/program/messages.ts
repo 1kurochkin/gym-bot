@@ -10,6 +10,26 @@ const ru = {
   none: 'Программы пока нет.',
   orBuild: 'Или составь её кнопками.',
   create: '🆕 Составить программу',
+  fromText: '📝 Программа из текста',
+  textAsk: 'Пришли программу текстом одним сообщением — как она записана у тебя или у тренера: ' +
+    'дни, упражнения, подходы и повторения. Я разберу её и покажу, что получилось; ' +
+    'сохраню только после подтверждения.\n\n' +
+    'Текст обработает внешняя нейросеть — не пиши в нём ничего личного.',
+  converting: '⏳ Разбираю программу… Обычно это занимает до 30 секунд.',
+  draft: (d: string) => `Вот что получилось: ${d}`,
+  unparsed: 'Не понял — добавь вручную в редакторе:',
+  replaces: (current: string) =>
+    `Текущая программа «${current}» будет архивирована, история сохранится.`,
+  save: '💾 Сохранить',
+  convertFailed: {
+    unavailable:
+      'Нейросеть сейчас недоступна. Попробуй позже, пришли JSON или составь программу кнопками.',
+    not_understood:
+      'Не получилось разобрать программу. Проверь, что в тексте есть дни и упражнения ' +
+      'с подходами, и пришли ещё раз — или составь программу кнопками.',
+    limit:
+      'Лимит разборов программы за сутки исчерпан. Попробуй завтра или составь программу кнопками.',
+  },
   invalid: (n: number) => `Программа не принята — ${pluralRu(n, 'ошибка', 'ошибки', 'ошибок')}:`,
   more: (n: number) => `…и ещё ${n}`,
   fixAndResend: 'Исправь и пришли снова.',
@@ -157,6 +177,26 @@ const en: typeof ru = {
   none: 'No program yet.',
   orBuild: 'Or build one with buttons.',
   create: '🆕 Build a program',
+  fromText: '📝 Program from text',
+  textAsk: 'Send the program as text in one message — the way you or your coach wrote it: ' +
+    'days, exercises, sets and reps. I’ll parse it and show the result; ' +
+    'nothing is saved until you confirm.\n\n' +
+    'The text is processed by an external AI — don’t include anything personal.',
+  converting: '⏳ Parsing the program… This usually takes up to 30 seconds.',
+  draft: (d: string) => `Here’s what I got: ${d}`,
+  unparsed: 'Didn’t understand — add these in the editor:',
+  replaces: (current: string) =>
+    `The current program “${current}” will be archived; history is kept.`,
+  save: '💾 Save',
+  convertFailed: {
+    unavailable:
+      'The AI is unavailable right now. Try later, send JSON or build the program with buttons.',
+    not_understood:
+      'Couldn’t parse the program. Make sure the text has days and exercises with sets, ' +
+      'and send it again — or build the program with buttons.',
+    limit:
+      'Today’s program parsing limit is used up. Try tomorrow or build the program with buttons.',
+  },
   invalid: (n: number) => `Program rejected — ${pluralEn(n, 'error', 'errors')}:`,
   more: (n: number) => `…and ${n} more`,
   fixAndResend: 'Fix it and send again.',

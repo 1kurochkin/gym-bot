@@ -29,6 +29,7 @@ const SIMPLE_CODES = {
   editor_day_new: 'dn',
   editor_day_delete: 'dd',
   editor_create: 'ek',
+  program_text: 'tx',
   seed_next: 'sn',
   seed_stop: 'ss',
   settings_back: 'sb',
@@ -97,6 +98,7 @@ function encodeAction(a: Action): string {
     case 'editor_day_new':
     case 'editor_day_delete':
     case 'editor_create':
+    case 'program_text':
     case 'seed_next':
     case 'seed_stop':
     case 'settings_back':

@@ -14,8 +14,8 @@ import {
 } from './schema.ts';
 
 export const NAME_MAX = 60;
-const SETS_MAX = 20;
-const REPS_MAX = 100;
+export const SETS_MAX = 20;
+export const REPS_MAX = 100;
 
 const { barbell, machine, weighted_bodyweight, reps_only, light_load } = LoadTypeSchema.enum;
 
@@ -86,7 +86,7 @@ export function nextExerciseId(program: Program): string {
   return `ex_${n}`;
 }
 
-function buildExercise(id: string, draft: NewExercise): Exercise {
+export function buildExercise(id: string, draft: NewExercise): Exercise {
   const base = { id, name: draft.name, isBase: false, workSets: draft.goal.workSets };
   const repRange = draft.goal.repRange ?? draft.goal.workSets;
   switch (draft.loadType) {

@@ -30,6 +30,13 @@ import {
   requestRemove,
   requestRename,
 } from './program-editor.ts';
+import {
+  cancelDraft,
+  convertText,
+  receiveDraft,
+  requestConvert,
+  saveDraft,
+} from './program-convert.ts';
 import { requestSeed, seedText, skipSeed, stopSeed } from './seed.ts';
 import {
   answerCancel,
@@ -132,9 +139,14 @@ function transition(state: Session, event: BotEvent, ctx: StepContext): StepResu
     case 'program_file_rejected':
       return rejectProgramFile(state, event.reason);
     case 'program_confirmed':
-      return confirmProgram(state);
+      return state.step === S.program_draft ? saveDraft(state) : confirmProgram(state);
     case 'program_cancelled':
+      if (state.step === S.program_draft) return cancelDraft(state);
       return state.step === S.program_confirm ? cancelProgram(state) : unchanged(state);
+    case 'convert_requested':
+      return requestConvert(state, ctx);
+    case 'program_drafted':
+      return receiveDraft(state, ctx, event.requestId, event.outcome);
     case 'editor_opened':
       return openEditor(state, ctx);
     case 'editor_day_picked':
@@ -219,6 +231,7 @@ function transition(state: Session, event: BotEvent, ctx: StepContext): StepResu
       return requestWarmupComment(state, ctx);
     case 'back_pressed':
       if (isEditor(state)) return editorBack(state, ctx);
+      if (state.step === S.program_text) return requestProgram(state, ctx);
       return isHistory(state) ? historyBack(state, ctx) : goBack(state, ctx);
     case 'history_requested':
       return openHistory(state, ctx);
@@ -281,6 +294,11 @@ function onText(state: Session, text: string, ctx: StepContext): StepResult {
     case S.program_upload:
     case S.program_confirm:
       return receiveProgram(state, text, ctx);
+    case S.program_text:
+      return convertText(state, ctx, text);
+    case S.program_converting:
+    case S.program_draft:
+      return unchanged(state);
     case S.program_days:
     case S.program_day:
     case S.program_exercise:

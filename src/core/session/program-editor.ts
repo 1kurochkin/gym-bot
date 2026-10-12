@@ -82,7 +82,7 @@ const fresh: EditContext = {
   newProgramName: null,
 };
 
-const toView = (e: Exercise): EditorExercise => ({
+export const toView = (e: Exercise): EditorExercise => ({
   id: e.id,
   name: e.name,
   loadType: e.loadType,
@@ -90,7 +90,11 @@ const toView = (e: Exercise): EditorExercise => ({
   repRange: 'repRange' in e ? e.repRange : null,
 });
 
-function daysScreen(state: Session, program: Program, notice: EditorNotice | null): StepResult {
+export function daysScreen(
+  state: Session,
+  program: Program,
+  notice: EditorNotice | null,
+): StepResult {
   const byId = new Map(program.days.map((d) => [d.id, d.name]));
   return moveTo(state, S.program_days, {
     type: 'program_days',

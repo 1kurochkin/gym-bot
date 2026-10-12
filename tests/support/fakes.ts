@@ -19,6 +19,7 @@ import type {
   WorkoutStatus,
 } from '../../src/core/workout/schema.ts';
 import type { Commit, Store, UserState, WorkoutWrite } from '../../src/ports/store.ts';
+import type { LlmCall } from '../../src/ports/llm.ts';
 import {
   HISTORY_PAGE_SIZE,
   type HistoryData,
@@ -56,6 +57,15 @@ export type MemoryStore = Store & {
   readonly members: Map<number, Member & { invitedBy: number; revoked: boolean }>;
   readonly invites: Map<string, { createdBy: number; expiresAt: Date; usedBy: number | null }>;
   commits: number;
+  readonly llmCalls: (LlmCall & { userId: number; at: Date })[];
+  now: () => Date;
+};
+
+export const NO_LLM = {
+  llm: null,
+  llmDailyLimit: 10,
+  defer: () => {},
+  serialize: (run: () => Promise<void>) => run(),
 };
 
 export function memoryStore(): MemoryStore {
@@ -71,6 +81,8 @@ export function memoryStore(): MemoryStore {
     members: new Map(),
     invites: new Map(),
     commits: 0,
+    llmCalls: [],
+    now: () => new Date(),
     load(userId: number, opts = { withMembers: false }): Promise<UserState> {
       const settings = store.settings.get(userId) ?? defaultSettings(userId);
       const program = settings.activeProgramId
@@ -205,6 +217,15 @@ export function memoryStore(): MemoryStore {
       return Promise.resolve();
     },
     ping: () => Promise.resolve(),
+    countLlmCalls: (userId, since) =>
+      Promise.resolve(
+        store.llmCalls.filter((c) => c.userId === userId && c.at.getTime() > since.getTime())
+          .length,
+      ),
+    recordLlmCall: (userId, call) => {
+      store.llmCalls.push({ ...call, userId, at: store.now() });
+      return Promise.resolve();
+    },
   };
   return store;
 }

@@ -10,6 +10,7 @@ import {
   LastWorkoutSchema,
 } from '../core/workout/schema.ts';
 import { SettingsSchema } from '../core/settings/settings.ts';
+import type { LlmCall } from './llm.ts';
 
 export const UserStateSchema = z.object({
   session: SessionSchema,
@@ -87,4 +88,6 @@ export type Store = {
   ) => Promise<{ readonly invitedBy: number } | null>;
   readonly commit: (userId: number, change: Commit) => Promise<void>;
   readonly ping: () => Promise<void>;
+  readonly countLlmCalls: (userId: number, since: Date) => Promise<number>;
+  readonly recordLlmCall: (userId: number, call: LlmCall) => Promise<void>;
 };
