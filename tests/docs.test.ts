@@ -60,3 +60,27 @@ Deno.test('docs: ADR и спецификации не ссылаются на к
   }
   assertEquals(offenders, []);
 });
+
+Deno.test('docs: оглавление ADR перечисляет каждый ADR с его статусом и датой', async () => {
+  const dir = join(ROOT, 'docs/adr');
+  const index = await Deno.readTextFile(join(dir, 'README.md'));
+  const problems: string[] = [];
+  for await (const e of Deno.readDir(dir)) {
+    const m = /^(\d{4})-.+\.md$/.exec(e.name);
+    if (!m || m[1] === '0000') continue;
+    const text = await Deno.readTextFile(join(dir, e.name));
+    const status = /^Статус: (.+)$/m.exec(text)?.[1]?.trim();
+    const date = /^Дата: (.+)$/m.exec(text)?.[1]?.trim();
+    const row = index.split('\n').find((l) => l.startsWith(`| [${m[1]}](${e.name}) |`));
+    if (!row) {
+      problems.push(`${e.name}: нет строки в оглавлении`);
+      continue;
+    }
+    const [, , rowStatus, rowDate] = row.split('|').map((c) => c.trim());
+    if (rowStatus !== status) {
+      problems.push(`${e.name}: статус «${rowStatus}», в файле «${status}»`);
+    }
+    if (rowDate !== date) problems.push(`${e.name}: дата «${rowDate}», в файле «${date}»`);
+  }
+  assertEquals(problems, []);
+});
