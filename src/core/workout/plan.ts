@@ -11,8 +11,9 @@ export function suggestedWeight(
   exercise: Exercise,
   settings: Settings,
   last: LastResult | null,
+  programKey: string,
 ): Lb | null {
-  if (weightGrid(exercise, settings) === null) return null;
+  if (weightGrid(exercise, settings, programKey) === null) return null;
   return last?.weightLb ?? null;
 }
 
@@ -63,7 +64,7 @@ export function warmupFor(
   settings: Settings,
   workLb: Lb,
 ): WarmupForExercise | null {
-  const grid = weightGrid(exercise, settings);
+  const grid = weightGrid(exercise, settings, program.id);
   if (grid === null || exercise.warmup === null) return null;
   const input = { workLb, isBase: exercise.isBase };
 

@@ -19,7 +19,8 @@ export type ProgramView = Extract<
     type:
       | 'program_status'
       | 'program_invalid'
-      | 'program_confirm'
+      | 'program_switch'
+      | 'program_archive_confirm'
       | 'program_saved'
       | 'program_unchanged'
       | 'program_cancelled'
@@ -68,16 +69,46 @@ export function renderProgramView(view: ProgramView, lang: Language): Rendered {
       const fromText: Button[][] = view.fromText
         ? [[{ label: t.fromText, action: { type: 'program_text' } }]]
         : [];
-      return view.current
-        ? text(t.current(describe(view.current)), [
+      const create: Button[] = [{ label: t.create, action: { type: 'editor_create' } }];
+      const notice = view.archived ? t.archivedNotice(view.archived) : null;
+      const names = view.others.map(t.quoted).join(', ');
+      if (!view.current) {
+        return text(lines(notice, t.none, '', t.howToSend, t.orBuild), [create, ...fromText]);
+      }
+      return text(
+        lines(
+          notice,
+          t.current(describe(view.current)),
+          ...(names ? ['', t.inWork(names)] : []),
+          '',
+          t.addHint,
+        ),
+        [
           [{ label: t.editor, action: { type: 'editor_open' } }],
+          create,
           ...fromText,
-        ])
-        : text(`${t.none}\n\n${t.howToSend}\n${t.orBuild}`, [
-          [{ label: t.create, action: { type: 'editor_create' } }],
-          ...fromText,
-        ]);
+          ...(view.switchable
+            ? [[{ label: t.otherProgram, action: { type: 'program_switch' } } satisfies Button]]
+            : []),
+          ...(view.archivable
+            ? [[{ label: t.archive, action: { type: 'program_archive' } } satisfies Button]]
+            : []),
+        ],
+      );
     }
+    case 'program_switch':
+      return text(t.switchAsk, [
+        ...column(view.options.map((o): Button => ({
+          label: o.current ? `✓ ${o.name}` : o.name,
+          action: { type: 'program_switch_pick', programId: o.id },
+        }))),
+        [{ label: t.back, action: { type: 'back' } }],
+      ]);
+    case 'program_archive_confirm':
+      return text(t.archiveAsk(view.name), [
+        [{ label: t.archive, action: { type: 'program_archive_answer', confirm: true } }],
+        [{ label: t.cancel, action: { type: 'program_archive_answer', confirm: false } }],
+      ]);
     case 'program_text_ask':
       return text(t.textAsk, [[{ label: t.back, action: { type: 'back' } }]]);
     case 'program_converting':
@@ -95,7 +126,7 @@ export function renderProgramView(view: ProgramView, lang: Language): Rendered {
           t.draft(describe(view.summary)),
           ...body,
           ...(unparsed.length ? ['', t.unparsed, ...unparsed] : []),
-          ...(view.replaces ? ['', t.replaces(view.replaces)] : []),
+          ...(view.others.length ? ['', t.stays(view.others.map(t.quoted).join(', '))] : []),
         ),
         [
           [{ label: t.save, action: { type: 'program_confirm' } }],
@@ -117,17 +148,12 @@ export function renderProgramView(view: ProgramView, lang: Language): Rendered {
           (more > 0 ? `\n${t.more(more)}` : '') + `\n\n${t.fixAndResend}`,
       );
     }
-    case 'program_confirm':
-      return {
-        text: t.incoming(describe(view.incoming), view.currentName),
-        keyboard: [
-          [{ label: t.replace, action: { type: 'program_confirm' } }],
-          [{ label: t.cancel, action: { type: 'program_cancel' } }],
-        ],
-        replyKeyboard: null,
-      };
-    case 'program_saved':
-      return text(t.saved(describe(view.summary)));
+    case 'program_saved': {
+      const names = view.others.map(t.quoted).join(', ');
+      return text(
+        lines(t.saved(describe(view.summary)), ...(names ? ['', t.savedOthers(names)] : [])),
+      );
+    }
     case 'program_unchanged':
       return text(t.unchanged);
     case 'program_cancelled':

@@ -49,7 +49,7 @@ export function seedText(state: Session, text: string, ctx: StepContext): StepRe
       reps,
       comment,
       localDate: localDateOf(ctx.now, zone),
-      stepLbUsed: weightStep(exercise, ctx.settings),
+      stepLbUsed: weightStep(exercise, ctx.settings, ctx.activeProgram?.id ?? ''),
     },
   }]);
 }

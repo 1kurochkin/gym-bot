@@ -58,6 +58,14 @@ function callbackEvent(action: Action): BotEvent | null {
       return { type: 'editor_create_requested' };
     case 'program_text':
       return { type: 'convert_requested' };
+    case 'program_switch':
+      return { type: 'program_switch_requested' };
+    case 'program_switch_pick':
+      return { type: 'program_switched', programId: action.programId };
+    case 'program_archive':
+      return { type: 'program_archive_requested' };
+    case 'program_archive_answer':
+      return { type: 'program_archive_answered', confirm: action.confirm };
     default:
       return null;
   }

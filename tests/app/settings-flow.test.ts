@@ -128,7 +128,10 @@ Deno.test('шаг по упражнениям: без штанги и пресс
   await press({ type: 'step_pick', exerciseId: 'calves' });
   assertEquals(labels(ui), [['1', '2,5', '✓ 5', '10'], ['Назад']]);
   await send(text('7.5'));
-  assertEquals(store.settings.get(1)?.exerciseOverrides, { calves: { stepLb: 7.5 } } as unknown);
+  assertEquals(
+    store.settings.get(1)?.exerciseOverrides,
+    { 'base6-5d/calves': { stepLb: 7.5 } } as unknown,
+  );
   assertEquals(labels(ui)[0], ['Икры стоя — 7,5 lb']);
 
   await press({ type: 'step_pick', exerciseId: 'calves' });

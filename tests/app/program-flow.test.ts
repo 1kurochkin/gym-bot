@@ -54,8 +54,6 @@ const file = (text: string): Incoming => ({
   problem: null,
 });
 const lastText = (ui: ReturnType<typeof fakeUi>): string => ui.shown.at(-1)?.rendered.text ?? '';
-const stepNo = (store: ReturnType<typeof memoryStore>): number =>
-  store.sessions.get(1)?.stepNo ?? -1;
 const versions = (store: ReturnType<typeof memoryStore>): [number, boolean][] =>
   [...store.programs.values()].map((p) => [p.version, p.active]);
 
@@ -85,44 +83,34 @@ Deno.test('та же программа повторно — «не измени
   assertEquals(versions(store), [[1, true]]);
 });
 
-Deno.test('замена: подтверждение кнопкой, старая архивируется, версия растёт', async () => {
+Deno.test('файл с тем же id — новая версия этой программы, без вопроса', async () => {
   const { deps, store, ui } = setup();
   await send(deps, file(await programText()));
   await send(deps, file(await programText((p) => (p.name = '6 базовых, v2'))));
-
-  assertEquals(versions(store), [[1, true]], 'до подтверждения ничего не сохранено');
-  const confirm = ui.shown.at(-1)?.rendered;
-  assert(confirm?.text.includes('«6 базовых, 5 дней» будет архивирована, история сохранится'));
-  assertEquals(confirm?.keyboard.map((row) => row.map((b) => b.label)), [['Заменить'], ['Отмена']]);
-
-  await send(
-    deps,
-    { kind: 'callback', action: { type: 'program_confirm' }, stepNo: stepNo(store) },
-    7,
-  );
   assertEquals(versions(store), [[1, false], [2, true]]);
-  assert(lastText(ui).startsWith('Программа сохранена: «6 базовых, v2»'));
+  assert(lastText(ui).startsWith('Программа сохранена: «6 базовых, v2»'), lastText(ui));
+  assert(!lastText(ui).includes('в работе остаются'), 'это та же программа');
 });
 
-Deno.test('отмена замены: текущая остаётся, старая кнопка «Заменить» больше не работает', async () => {
+Deno.test('файл с другим id — добавляется к программам и становится текущей', async () => {
   const { deps, store, ui } = setup();
   await send(deps, file(await programText()));
-  await send(deps, file(await programText((p) => (p.name = 'другая'))));
-  const confirmStep = stepNo(store);
   await send(
     deps,
-    { kind: 'callback', action: { type: 'program_cancel' }, stepNo: confirmStep },
-    7,
+    file(
+      await programText((p) => {
+        p.id = 'other';
+        p.name = 'Другая';
+      }),
+    ),
   );
-  assertEquals(lastText(ui), 'Отменено. Текущая программа осталась.');
-
-  await send(
-    deps,
-    { kind: 'callback', action: { type: 'program_confirm' }, stepNo: confirmStep },
-    7,
+  assertEquals(versions(store), [[1, true], [1, true]], 'старая не архивируется');
+  assert(
+    lastText(ui).endsWith(
+      'Она стала текущей; в работе остаются: «6 базовых, 5 дней». Переключиться — /program.',
+    ),
+    lastText(ui),
   );
-  assertEquals(versions(store), [[1, true]]);
-  assertEquals(ui.dropped, [7], 'у устаревшей кнопки убрана клавиатура');
 });
 
 Deno.test('ошибки программы — списком с путями, не больше 10', async () => {

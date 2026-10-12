@@ -17,6 +17,8 @@ const noWorkout = {
   history: { page: null, workout: null },
   newIds: [],
   llm: { enabled: false, used: 0, limit: 10 },
+  programs: [],
+  programKeys: [],
 };
 
 const now = new Date('2026-09-28T22:40:00Z');

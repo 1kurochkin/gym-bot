@@ -13,6 +13,8 @@ const ru = {
         : []),
       '• или пришли файл .json',
       'Потом её можно править: /program → 📅 Дни и упражнения.',
+      'Программ может быть несколько: новая добавляется к остальным, ' +
+      'переключиться — /program → 🔄 Другая программа.',
     ].join('\n'),
   seed: '2️⃣ Стартовые веса — /seed (можно пропустить): последние рабочие веса, ' +
     'чтобы бот сразу их предлагал.',
@@ -39,6 +41,8 @@ const en: typeof ru = {
         : []),
       '• or send a .json file',
       'Edit it later: /program → 📅 Days and exercises.',
+      'You can keep several programs: a new one is added to the others, ' +
+      'switch — /program → 🔄 Another program.',
     ].join('\n'),
   seed: '2️⃣ Starting weights — /seed (optional): your latest working weights, ' +
     'so the bot suggests them right away.',

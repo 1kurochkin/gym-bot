@@ -46,7 +46,8 @@ export function render(view: View, lang: Language, env: RenderEnv): Rendered {
       return renderOnboarding(view, lang);
     case 'program_status':
     case 'program_invalid':
-    case 'program_confirm':
+    case 'program_switch':
+    case 'program_archive_confirm':
     case 'program_saved':
     case 'program_unchanged':
     case 'program_cancelled':

@@ -18,6 +18,7 @@ import { defaultSettings, type Settings, SettingsSchema } from '../../core/setti
 import {
   emptyContext,
   initialSession,
+  type ProgramRef,
   type Session,
   SessionContextSchema,
   SessionSchema,
@@ -73,15 +74,26 @@ export function createPostgresStore(db: Db): Store {
       const st = await db.select().from(schema.settings).where(eq(schema.settings.userId, userId));
       const settings = st[0] ? toSettings(st[0]) : defaultSettings(userId);
       const activeProgram = await loadProgram(db, settings.activeProgramId);
+      const programs = await loadProgramsInWork(db, userId);
+      const programKeys = await loadProgramKeys(db, userId);
+      const versionIds = activeProgram ? await loadVersionIds(db, userId, activeProgram.id) : [];
       const activeWorkout = await loadActiveWorkout(db, userId);
-      const lastWorkout = await loadLastWorkout(db, userId);
+      const lastWorkout = await loadLastWorkout(db, userId, versionIds);
       const exerciseIds = activeProgram ? [...exerciseIndex(activeProgram).keys()] : [];
-      const lastResults = await loadLastResults(db, userId, exerciseIds, activeWorkout?.id ?? null);
+      const lastResults = await loadLastResults(
+        db,
+        userId,
+        versionIds,
+        exerciseIds,
+        activeWorkout?.id ?? null,
+      );
       const members = opts.withMembers ? await loadMembers(db) : [];
       return {
         session: s[0] ? toSession(s[0]) : initialSession(userId),
         settings,
         activeProgram,
+        programs,
+        programKeys,
         lastResults,
         activeWorkout,
         lastWorkout,
@@ -92,6 +104,11 @@ export function createPostgresStore(db: Db): Store {
     async commit(userId: number, change: Commit): Promise<void> {
       await db.transaction(async (tx) => {
         if (change.newProgram) await saveProgram(tx, userId, change.newProgram);
+        if (change.archiveProgram) {
+          await tx.update(schema.programs).set({ status: archived, archivedAt: sql`now()` }).where(
+            and(eq(schema.programs.userId, userId), eq(schema.programs.id, change.archiveProgram)),
+          );
+        }
         for (const r of change.manualResults ?? []) await saveManualResult(tx, userId, r);
         for (const w of change.workout?.writes ?? []) {
           await saveWorkoutWrite(tx, userId, change.workout?.programId ?? '', w);
@@ -197,13 +214,38 @@ async function loadProgram(db: Db, id: string | null): Promise<Program | null> {
 const { done } = ExerciseLogStatusSchema.enum;
 const { work } = SetKindSchema.enum;
 
+async function loadProgramsInWork(db: Db, userId: number): Promise<ProgramRef[]> {
+  const rows = await db.select({
+    id: schema.programs.id,
+    key: schema.programs.programKey,
+    name: schema.programs.name,
+  }).from(schema.programs).where(
+    and(eq(schema.programs.userId, userId), eq(schema.programs.status, active)),
+  ).orderBy(desc(schema.programs.createdAt));
+  return rows;
+}
+
+async function loadProgramKeys(db: Db, userId: number): Promise<string[]> {
+  const rows = await db.selectDistinct({ key: schema.programs.programKey }).from(schema.programs)
+    .where(eq(schema.programs.userId, userId));
+  return rows.map((r) => r.key);
+}
+
+async function loadVersionIds(db: Db, userId: number, key: string): Promise<string[]> {
+  const rows = await db.select({ id: schema.programs.id }).from(schema.programs).where(
+    and(eq(schema.programs.userId, userId), eq(schema.programs.programKey, key)),
+  );
+  return rows.map((r) => r.id);
+}
+
 async function loadLastResults(
   db: Db,
   userId: number,
+  versionIds: readonly string[],
   exerciseIds: readonly string[],
   excludeWorkoutId: string | null,
 ): Promise<Record<string, LastResult>> {
-  if (exerciseIds.length === 0) return {};
+  if (exerciseIds.length === 0 || versionIds.length === 0) return {};
   const logs = await db.selectDistinctOn([schema.exerciseLogs.exerciseId], {
     id: schema.exerciseLogs.id,
     exerciseId: schema.exerciseLogs.exerciseId,
@@ -214,6 +256,7 @@ async function loadLastResults(
   }).from(schema.exerciseLogs).where(and(
     eq(schema.exerciseLogs.userId, userId),
     eq(schema.exerciseLogs.status, done),
+    inArray(schema.exerciseLogs.programId, [...versionIds]),
     inArray(schema.exerciseLogs.exerciseId, [...exerciseIds]),
     excludeWorkoutId === null ? undefined : or(
       isNull(schema.exerciseLogs.workoutId),
@@ -333,7 +376,12 @@ async function loadHistory(db: Db, userId: number, query: HistoryQuery): Promise
   return { page: page.success ? page.data : null, workout };
 }
 
-async function loadLastWorkout(db: Db, userId: number): Promise<LastWorkout | null> {
+async function loadLastWorkout(
+  db: Db,
+  userId: number,
+  versionIds: readonly string[],
+): Promise<LastWorkout | null> {
+  if (versionIds.length === 0) return null;
   const [w] = await db.select({
     dayId: schema.workouts.dayId,
     dayName: schema.workouts.dayName,
@@ -341,6 +389,7 @@ async function loadLastWorkout(db: Db, userId: number): Promise<LastWorkout | nu
   }).from(schema.workouts).where(and(
     eq(schema.workouts.userId, userId),
     eq(schema.workouts.status, completed),
+    inArray(schema.workouts.programId, [...versionIds]),
   )).orderBy(desc(schema.workouts.startedAt)).limit(1);
   const parsed = LastWorkoutSchema.safeParse(w);
   return parsed.success ? parsed.data : null;
@@ -474,7 +523,11 @@ async function saveProgram(
 ): Promise<void> {
   const { program } = next;
   await tx.update(schema.programs).set({ status: archived, archivedAt: sql`now()` }).where(
-    and(eq(schema.programs.userId, userId), eq(schema.programs.status, active)),
+    and(
+      eq(schema.programs.userId, userId),
+      eq(schema.programs.status, active),
+      eq(schema.programs.programKey, program.id),
+    ),
   );
   const [last] = await tx.select({ version: max(schema.programs.version) }).from(schema.programs)
     .where(and(eq(schema.programs.userId, userId), eq(schema.programs.programKey, program.id)));

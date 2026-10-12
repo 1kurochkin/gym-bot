@@ -6,7 +6,16 @@ import { pluralEn, pluralRu } from '../i18n/format.ts';
 const ru = {
   howToSend:
     'Пришли JSON программы файлом (.json). Небольшую программу можно прислать текстом одним сообщением.',
-  current: (d: string) => `Текущая программа: ${d}\n\nЧтобы заменить — пришли новый JSON файлом.`,
+  current: (d: string) => `Текущая программа: ${d}`,
+  inWork: (names: string) => `В работе ещё: ${names}.`,
+  addHint: 'Новую программу можно прислать файлом .json — она добавится и станет текущей.',
+  archivedNotice: (name: string) => `✅ «${name}» в архиве.`,
+  otherProgram: '🔄 Другая программа',
+  archive: '🗄 В архив',
+  switchAsk: 'Какую программу выбрать?',
+  archiveAsk: (name: string) =>
+    `Отправить «${name}» в архив? История тренировок сохранится, программа пропадёт из выбора.`,
+  quoted: (name: string) => `«${name}»`,
   none: 'Программы пока нет.',
   orBuild: 'Или составь её кнопками.',
   create: '🆕 Составить программу',
@@ -30,8 +39,7 @@ const ru = {
   converting: '⏳ Разбираю программу… Обычно это занимает до 30 секунд.',
   draft: (d: string) => `Вот что получилось: ${d}`,
   unparsed: 'Не понял — добавь вручную в редакторе:',
-  replaces: (current: string) =>
-    `Текущая программа «${current}» будет архивирована, история сохранится.`,
+  stays: (names: string) => `Программа добавится и станет текущей; в работе останутся: ${names}.`,
   save: '💾 Сохранить',
   convertFailed: {
     unavailable:
@@ -45,11 +53,10 @@ const ru = {
   invalid: (n: number) => `Программа не принята — ${pluralRu(n, 'ошибка', 'ошибки', 'ошибок')}:`,
   more: (n: number) => `…и ещё ${n}`,
   fixAndResend: 'Исправь и пришли снова.',
-  incoming: (d: string, current: string) =>
-    `Новая программа: ${d}\n\nТекущая программа «${current}» будет архивирована, история сохранится.`,
-  replace: 'Заменить',
   cancel: 'Отмена',
   saved: (d: string) => `Программа сохранена: ${d}\n\nДальше — стартовые веса: /seed`,
+  savedOthers: (names: string) =>
+    `Она стала текущей; в работе остаются: ${names}. Переключиться — /program.`,
   unchanged: 'Программа не изменилась — ничего не сохранял.',
   cancelled: 'Отменено. Текущая программа осталась.',
   tooLarge: 'Файл больше 100 КБ — программа столько весить не должна.',
@@ -185,7 +192,16 @@ const ru = {
 const en: typeof ru = {
   howToSend:
     'Send the program JSON as a file (.json). A small program can be sent as text in one message.',
-  current: (d: string) => `Current program: ${d}\n\nTo replace it, send a new JSON file.`,
+  current: (d: string) => `Current program: ${d}`,
+  inWork: (names: string) => `Also in progress: ${names}.`,
+  addHint: 'Send a new program as a .json file — it will be added and become current.',
+  archivedNotice: (name: string) => `✅ “${name}” archived.`,
+  otherProgram: '🔄 Another program',
+  archive: '🗄 Archive',
+  switchAsk: 'Which program?',
+  archiveAsk: (name: string) =>
+    `Archive “${name}”? Workout history is kept; the program leaves the list.`,
+  quoted: (name: string) => `“${name}”`,
   none: 'No program yet.',
   orBuild: 'Or build one with buttons.',
   create: '🆕 Build a program',
@@ -209,8 +225,8 @@ const en: typeof ru = {
   converting: '⏳ Parsing the program… This usually takes up to 30 seconds.',
   draft: (d: string) => `Here’s what I got: ${d}`,
   unparsed: 'Didn’t understand — add these in the editor:',
-  replaces: (current: string) =>
-    `The current program “${current}” will be archived; history is kept.`,
+  stays: (names: string) =>
+    `The program will be added and become current; still in progress: ${names}.`,
   save: '💾 Save',
   convertFailed: {
     unavailable:
@@ -224,11 +240,10 @@ const en: typeof ru = {
   invalid: (n: number) => `Program rejected — ${pluralEn(n, 'error', 'errors')}:`,
   more: (n: number) => `…and ${n} more`,
   fixAndResend: 'Fix it and send again.',
-  incoming: (d: string, current: string) =>
-    `New program: ${d}\n\nThe current program “${current}” will be archived; history is kept.`,
-  replace: 'Replace',
   cancel: 'Cancel',
   saved: (d: string) => `Program saved: ${d}\n\nNext — starting weights: /seed`,
+  savedOthers: (names: string) =>
+    `It’s now current; still in progress: ${names}. Switch — /program.`,
   unchanged: 'The program hasn’t changed — nothing saved.',
   cancelled: 'Cancelled. The current program stays.',
   tooLarge: 'The file is over 100 KB — a program shouldn’t be that big.',

@@ -136,6 +136,7 @@ export function chooseDayScreen(state: Session, ctx: StepContext): StepResult {
   const choice = nextDay(program.rotation, ctx.lastWorkout?.dayId ?? null);
   return moveTo(state, S.workout_day, {
     type: 'workout_days',
+    programName: ctx.programs.length > 1 ? program.name : null,
     last: ctx.lastWorkout,
     next: ref(choice.next),
     others: choice.others.map(ref),
@@ -254,9 +255,9 @@ export function card(
 ): StepResult {
   const program = ctx.activeProgram;
   if (!program) return unchanged(state);
-  const grid = weightGrid(ex, ctx.settings);
+  const grid = weightGrid(ex, ctx.settings, ctx.activeProgram?.id ?? '');
   const last = ctx.lastResults[ex.id] ?? null;
-  const base = suggestedWeight(ex, ctx.settings, last);
+  const base = suggestedWeight(ex, ctx.settings, last, program.id);
   return moveTo(state, S.workout_card, {
     type: 'workout_card',
     exerciseName: ex.name,
@@ -370,7 +371,7 @@ export function repsPrompt(
   const recorded = opts.recorded ?? asView(workSetsOf(logOf(ctx.activeWorkout, ex.id)));
   const setIndex = recorded.length + 1;
   const workLb = c.log?.workLb ?? null;
-  const grid = weightGrid(ex, ctx.settings);
+  const grid = weightGrid(ex, ctx.settings, ctx.activeProgram?.id ?? '');
   const anchor = recorded.at(-1)?.reps ?? ctx.lastResults[ex.id]?.reps ?? null;
   return moveTo(state, S.workout_reps, {
     type: 'workout_reps',
@@ -667,7 +668,7 @@ export function openLog(
       status: ExerciseLogStatusSchema.enum.done,
       intensity: null,
       plannedWorkWeightLb,
-      stepLbUsed: weightStep(ex, ctx.settings),
+      stepLbUsed: weightStep(ex, ctx.settings, ctx.activeProgram?.id ?? ''),
       warmupTier,
       localDate: c.localDate,
     },

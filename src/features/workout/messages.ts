@@ -9,6 +9,8 @@ const ru = {
   lastWorkout: (weekday: string, date: string, day: string) =>
     `Прошлая тренировка: ${weekday}, ${date} — ${day}.`,
   pickDay: 'Выбери день:',
+  programLine: (name: string) => `Программа: «${name}»`,
+  otherProgram: '🔄 Другая программа',
   menuHead: (day: string, date: string) => `${day} · ${date}`,
   addExercise: '➕ Добавить упражнение',
   addAsk: 'Какое упражнение добавить?',
@@ -93,6 +95,8 @@ const en: typeof ru = {
   lastWorkout: (weekday: string, date: string, day: string) =>
     `Last workout: ${weekday}, ${date} — ${day}.`,
   pickDay: 'Pick a day:',
+  programLine: (name: string) => `Program: “${name}”`,
+  otherProgram: '🔄 Another program',
   menuHead: (day: string, date: string) => `${day} · ${date}`,
   addExercise: '➕ Add exercise',
   addAsk: 'Which exercise to add?',

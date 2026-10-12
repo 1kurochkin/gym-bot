@@ -28,9 +28,9 @@ updated: 2026-10-12
 ```ts
 { userId, timezone: 'America/New_York', barWeightLb: 45,
   platesLb: [5, 10, 25, 35, 45],        // после покупки: [2.5, 5, 10, 25, 35, 45]
-  exerciseOverrides: { [exerciseId]: { stepLb?: number } },  // JSON-колонка
+  exerciseOverrides: { ['programId/exerciseId']: { stepLb?: number } },  // JSON-колонка; ключ без программы (старые записи) читается для любой программы, пока не переписан
   language: 'ru' | 'en' | null,         // null — по языку Telegram (product.md → «Язык интерфейса»)
-  activeProgramId }
+  activeProgramId }  // текущая программа (последняя добавленная или выбранная)
 ```
 
 **`programs`**
@@ -38,6 +38,7 @@ updated: 2026-10-12
 ```ts
 { id, userId, programKey, version, name, definition: ProgramJson /* JSON */,
   status: 'active' | 'archived', createdAt, archivedAt? }
+// active — «в работе»: у каждого programKey не больше одной active-версии, программ в работе может быть несколько (ADR-0009)
 ```
 
 Определение программы хранится целиком (снапшот). Повторная загрузка с тем же `programKey` и изменённым содержимым создаёт новую `version`, тренировки ссылаются на конкретную версию.
