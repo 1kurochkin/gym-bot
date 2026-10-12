@@ -2,6 +2,7 @@ import { type TimeZone, zoneLabel } from '../schedule/timezone.ts';
 import {
   type Effect,
   emptyContext,
+  type Guide,
   type Session,
   type SessionStep,
   SessionStepSchema,
@@ -27,10 +28,26 @@ export const withEffects = (result: StepResult, effects: readonly Effect[]): Ste
   effects: [...effects, ...result.effects],
 });
 
-export function home(state: Session, zone: TimeZone, ctx: StepContext): StepResult {
+export const guideFor = (ctx: StepContext): Guide => ({
+  owner: ctx.isOwner,
+  fromText: ctx.llm.enabled,
+});
+
+export function home(
+  state: Session,
+  zone: TimeZone,
+  ctx: StepContext,
+  withGuide = false,
+): StepResult {
   return moveTo(state, SessionStepSchema.enum.idle, {
     type: 'home',
     zone: zoneLabel(zone, ctx.now),
     programName: ctx.activeProgram?.name ?? null,
+    guide: withGuide ? guideFor(ctx) : null,
   });
 }
+
+export const help = (state: Session, ctx: StepContext): StepResult => ({
+  state,
+  effects: [{ type: 'render', view: { type: 'help', guide: guideFor(ctx) } }],
+});
