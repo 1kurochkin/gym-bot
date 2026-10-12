@@ -5,6 +5,7 @@
 #   prod.sh check              — какие обязательные переменные пусты (имена)
 #   prod.sh fill               — сгенерировать WEBHOOK_SECRET, CRON_SECRET, BOT_INFO, FUNCTION_REGION, если пусты
 #   prod.sh set-ref <ref>      — записать FUNCTION_URL для проекта
+#   prod.sh llm-from-env       — перенести пустые LLM_* из .env (адреса и модели — из шаблона)
 #   prod.sh ref                — project ref из FUNCTION_URL
 #   prod.sh secrets            — загрузить секреты функции в Supabase
 #   prod.sh db-push            — применить миграции (MIGRATION_DB_URL, session pooler)
@@ -84,6 +85,15 @@ case "${1:-}" in
         [[ -n $region ]] && { set_var FUNCTION_REGION "$region"; echo "FILLED: FUNCTION_REGION ($region)"; } ||
         echo "WARN: регион проекта не определился — supabase login?"
     fi
+    ;;
+  llm-from-env)
+    [[ -f $ENV_FILE ]] || { echo "NO_FILE: нет $ENV_FILE"; exit 2; }
+    for k in LLM_BASE_URL LLM_MODEL LLM_API_KEY LLM_FALLBACK_BASE_URL LLM_FALLBACK_MODEL LLM_FALLBACK_API_KEY; do
+      [[ -z $(get "$k") ]] || { echo "KEEP: $k"; continue; }
+      v=$(ENV_FILE=.env get "$k")
+      [[ -n $v || $k == *_API_KEY ]] || v=$(ENV_FILE=.env.prod.example get "$k")
+      if [[ -n $v ]]; then set_var "$k" "$v"; echo "FILLED: $k"; else echo "EMPTY: $k"; fi
+    done
     ;;
   set-ref)
     [[ ${2:-} =~ ^[a-z0-9]{20}$ ]] || { echo "ref — 20 символов [a-z0-9]" >&2; exit 1; }
