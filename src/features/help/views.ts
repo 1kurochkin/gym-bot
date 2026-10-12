@@ -2,8 +2,9 @@ import type { View } from '../../core/session/types.ts';
 import type { Language } from '../../core/settings/settings.ts';
 import type { Rendered } from '../../ports/ui.ts';
 import { commandsFor } from './commands.ts';
+import { guideText } from './guide.ts';
 
-export type HelpView = Extract<View, { type: 'unknown_command' }>;
+export type HelpView = Extract<View, { type: 'unknown_command' | 'help' }>;
 
 const UNKNOWN: Record<Language, (name: string) => string> = {
   ru: (name) => `Не знаю команду /${name}. Доступно:`,
@@ -11,6 +12,9 @@ const UNKNOWN: Record<Language, (name: string) => string> = {
 };
 
 export function renderHelpView(view: HelpView, lang: Language): Rendered {
+  if (view.type === 'help') {
+    return { text: guideText(lang, view.guide), keyboard: [], replyKeyboard: null };
+  }
   const list = commandsFor(lang, view.owner).map((c) => `/${c.command} — ${c.description}`).join(
     '\n',
   );

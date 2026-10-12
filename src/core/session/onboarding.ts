@@ -39,7 +39,7 @@ export function saveTimezone(state: Session, zone: TimeZone, ctx: StepContext): 
       settings,
     }]);
   }
-  return withEffects(home(state, zone, ctx), [{ type: 'save_settings', settings }]);
+  return withEffects(home(state, zone, ctx, true), [{ type: 'save_settings', settings }]);
 }
 
 export function onTimeEntered(state: Session, text: string, ctx: StepContext): StepResult {

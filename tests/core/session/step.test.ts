@@ -81,6 +81,7 @@ Deno.test('время → кнопки зон с этим смещением →
     type: 'home',
     zone: { offset: 'UTC−4', city: 'New York' },
     programName: null,
+    guide: { owner: false, fromText: false },
   });
 });
 
