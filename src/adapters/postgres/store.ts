@@ -25,6 +25,7 @@ import {
 } from '../../core/session/types.ts';
 import { lb } from '../../core/units/lb.ts';
 import type { Commit, Store, UserState, WorkoutWrite } from '../../ports/store.ts';
+import type { LlmCall } from '../../ports/llm.ts';
 import {
   type ActiveWorkout,
   ActiveWorkoutSchema,
@@ -57,6 +58,16 @@ const { active, archived } = ProgramStatusSchema.enum;
 
 export function createPostgresStore(db: Db): Store {
   return {
+    async countLlmCalls(userId: number, since: Date): Promise<number> {
+      const [row] = await db.select({ n: sql<number>`count(*)::int` }).from(schema.llmCalls)
+        .where(and(eq(schema.llmCalls.userId, userId), gt(schema.llmCalls.createdAt, since)));
+      return row?.n ?? 0;
+    },
+
+    async recordLlmCall(userId: number, call: LlmCall): Promise<void> {
+      await db.insert(schema.llmCalls).values({ userId, ...call });
+    },
+
     async load(userId: number, opts = { withMembers: false }): Promise<UserState> {
       const s = await db.select().from(schema.session).where(eq(schema.session.userId, userId));
       const st = await db.select().from(schema.settings).where(eq(schema.settings.userId, userId));

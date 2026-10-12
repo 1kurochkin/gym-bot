@@ -2,7 +2,7 @@
 title: "Модель данных"
 brief_sections: [7]
 source: "бриф «Спецификация: Telegram-бот помощник для тренировок», rev 47"
-updated: 2026-10-01
+updated: 2026-10-12
 ---
 
 # Модель данных
@@ -88,6 +88,13 @@ updated: 2026-10-01
 
 ```ts
 { code, createdBy, createdAt, expiresAt, usedBy?, usedAt? }  // одноразовое: usedBy заполняется при входе
+```
+
+**`llm_calls`** (учёт разборов LLM: лимит и выбор модели; текста запроса и ответа нет)
+
+```ts
+{ id, userId, kind: 'program', provider, model, ok, ms, promptTokens?, completionTokens?, createdAt }
+// один разбор = одна строка: провайдер последнего ответа, время и токены — сумма с повтором
 ```
 
 **`session`** (одна строка, состояние диалога)

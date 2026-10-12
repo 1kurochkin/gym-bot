@@ -1,7 +1,7 @@
 import { assert, assertEquals } from '@std/assert';
 import { handleUpdate, type UpdateDeps } from '../../src/app/handle-update.ts';
 import type { Incoming, IncomingUpdate } from '../../src/ports/ui.ts';
-import { fakeUi, memoryStore, OWNERS, TESTER } from '../support/fakes.ts';
+import { fakeUi, memoryStore, NO_LLM, OWNERS, TESTER } from '../support/fakes.ts';
 import { specProgramJson } from '../support/spec.ts';
 
 function setup(): {
@@ -20,6 +20,7 @@ function setup(): {
     newId: () => `00000000-0000-4000-8000-${String(++n).padStart(12, '0')}`,
     owners: OWNERS,
     botUsername: () => 'gym_test_bot',
+    ...NO_LLM,
   };
   return { deps, store, ui };
 }

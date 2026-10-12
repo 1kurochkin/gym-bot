@@ -2,6 +2,7 @@ import { assertNever } from '../../shared/result.ts';
 import type { ProgramSummary } from '../../core/program/program.ts';
 import {
   type EditorExercise,
+  type FileProblem,
   FileProblemSchema,
   RenameTargetSchema,
   type View,
@@ -36,7 +37,11 @@ export type ProgramView = Extract<
       | 'program_day_new'
       | 'program_first'
       | 'program_day_delete_confirm'
-      | 'program_create';
+      | 'program_create'
+      | 'program_text_ask'
+      | 'program_converting'
+      | 'program_draft'
+      | 'program_convert_failed';
   }
 >;
 
@@ -59,16 +64,51 @@ export function renderProgramView(view: ProgramView, lang: Language): Rendered {
   const describe = (s: ProgramSummary): string =>
     t.describe(s.name, s.days, s.exercises, s.dayNames.join(', '));
   switch (view.type) {
-    case 'program_status':
+    case 'program_status': {
+      const fromText: Button[][] = view.fromText
+        ? [[{ label: t.fromText, action: { type: 'program_text' } }]]
+        : [];
       return view.current
-        ? text(t.current(describe(view.current)), [[{
-          label: t.editor,
-          action: { type: 'editor_open' },
-        }]])
-        : text(`${t.none}\n\n${t.howToSend}\n${t.orBuild}`, [[{
-          label: t.create,
-          action: { type: 'editor_create' },
-        }]]);
+        ? text(t.current(describe(view.current)), [
+          [{ label: t.editor, action: { type: 'editor_open' } }],
+          ...fromText,
+        ])
+        : text(`${t.none}\n\n${t.howToSend}\n${t.orBuild}`, [
+          [{ label: t.create, action: { type: 'editor_create' } }],
+          ...fromText,
+        ]);
+    }
+    case 'program_text_ask':
+      return text(t.textAsk, [[{ label: t.back, action: { type: 'back' } }]]);
+    case 'program_converting':
+      return text(t.converting);
+    case 'program_draft': {
+      const bold = view.days.map((d) => d.name);
+      const body = view.days.flatMap((d) => [
+        '',
+        d.name,
+        ...d.exercises.map((e, i) => `${i + 1}. ${e.name} — ${goalText(t, e)}`),
+      ]);
+      const unparsed = view.unparsed.slice(0, MAX_ISSUES).map((u) => `• ${u}`);
+      return text(
+        lines(
+          t.draft(describe(view.summary)),
+          ...body,
+          ...(unparsed.length ? ['', t.unparsed, ...unparsed] : []),
+          ...(view.replaces ? ['', t.replaces(view.replaces)] : []),
+        ),
+        [
+          [{ label: t.save, action: { type: 'program_confirm' } }],
+          [{ label: t.cancel, action: { type: 'program_cancel' } }],
+        ],
+        bold,
+      );
+    }
+    case 'program_convert_failed':
+      return text(
+        t.convertFailed[view.reason],
+        view.reason === 'limit' ? [] : [[{ label: t.fromText, action: { type: 'program_text' } }]],
+      );
     case 'program_invalid': {
       const shown = view.issues.slice(0, MAX_ISSUES).map((i) => `• ${issueText(i, lang)}`);
       const more = view.issues.length - shown.length;
@@ -93,16 +133,7 @@ export function renderProgramView(view: ProgramView, lang: Language): Rendered {
     case 'program_cancelled':
       return text(t.cancelled);
     case 'program_file_rejected':
-      switch (view.reason) {
-        case too_large:
-          return text(t.tooLarge);
-        case not_json:
-          return text(`${t.notJson} ${t.howToSend}`);
-        case download_failed:
-          return text(t.downloadFailed);
-        default:
-          return assertNever(view.reason);
-      }
+      return text(fileProblem(view.reason, t));
     default:
       return renderEditorView(view, lang);
   }
@@ -140,10 +171,7 @@ function renderEditorView(view: EditorView, lang: Language): Rendered {
     return row.length ? [row] : [];
   };
   const optional = (show: boolean, button: Button): Button[][] => (show ? [[button]] : []);
-  const goal = (e: EditorExercise): string =>
-    e.repRange === null
-      ? t.setsOnly(e.workSets.min, e.workSets.max)
-      : `${range(e.workSets.min, e.workSets.max)}×${range(e.repRange.min, e.repRange.max)}`;
+  const goal = (e: EditorExercise): string => goalText(t, e);
   switch (view.type) {
     case 'program_days':
       return text(
@@ -273,3 +301,21 @@ function renderEditorView(view: EditorView, lang: Language): Rendered {
 }
 
 const range = (min: number, max: number): string => (min === max ? `${min}` : `${min}–${max}`);
+
+function fileProblem(reason: FileProblem, t: (typeof MESSAGES)[Language]): string {
+  switch (reason) {
+    case too_large:
+      return t.tooLarge;
+    case not_json:
+      return `${t.notJson} ${t.howToSend}`;
+    case download_failed:
+      return t.downloadFailed;
+    default:
+      return assertNever(reason);
+  }
+}
+
+const goalText = (t: (typeof MESSAGES)[Language], e: EditorExercise): string =>
+  e.repRange === null
+    ? t.setsOnly(e.workSets.min, e.workSets.max)
+    : `${range(e.workSets.min, e.workSets.max)}×${range(e.repRange.min, e.repRange.max)}`;

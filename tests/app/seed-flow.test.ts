@@ -3,7 +3,7 @@ import { handleUpdate, type UpdateDeps } from '../../src/app/handle-update.ts';
 import { TimeZoneSchema } from '../../src/core/schedule/timezone.ts';
 import { defaultSettings } from '../../src/core/settings/settings.ts';
 import type { Incoming } from '../../src/ports/ui.ts';
-import { fakeUi, memoryStore, OWNERS, TESTER } from '../support/fakes.ts';
+import { fakeUi, memoryStore, NO_LLM, OWNERS, TESTER } from '../support/fakes.ts';
 import { specProgramJson } from '../support/spec.ts';
 
 async function setup(opts: { program?: boolean; timezone?: boolean } = {}): Promise<{
@@ -24,6 +24,7 @@ async function setup(opts: { program?: boolean; timezone?: boolean } = {}): Prom
     newId: () => `00000000-0000-4000-8000-${String(++n).padStart(12, '0')}`,
     owners: OWNERS,
     botUsername: () => 'gym_test_bot',
+    ...NO_LLM,
   };
   const send = (input: Incoming, messageId: number | null = null): Promise<void> =>
     handleUpdate(deps, {

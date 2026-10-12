@@ -85,16 +85,17 @@ supabase db push                 # применить миграции
 cp .env.prod.example .env.prod
 ```
 
-| Переменная         | Откуда взять                                                                                                                                     |
-| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `BOT_TOKEN`        | токен боевого бота                                                                                                                               |
-| `ALLOWED_USER_IDS` | Telegram user id владельцев (несколько — через запятую); остальных владелец приглашает в боте командой `/invite`                                 |
-| `DATABASE_URL`     | Dashboard → **Connect** → **Transaction pooler** (порт **6543**), подставить пароль БД                                                           |
-| `MIGRATION_DB_URL` | Dashboard → **Connect** → **Session pooler** (порт **5432**), подставить пароль БД — для миграций, в функцию не загружается                      |
-| `WEBHOOK_SECRET`   | `openssl rand -hex 32`                                                                                                                           |
-| `CRON_SECRET`      | `openssl rand -hex 32`                                                                                                                           |
-| `BOT_INFO`         | необязательно: `curl https://api.telegram.org/bot<BOT_TOKEN>/getMe \| jq -c .result` — функция не будет вызывать getMe на каждом холодном старте |
-| `FUNCTION_URL`     | `https://<ref>.supabase.co/functions/v1/bot`                                                                                                     |
+| Переменная         | Откуда взять                                                                                                                                                                                                                                                                                           |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `BOT_TOKEN`        | токен боевого бота                                                                                                                                                                                                                                                                                     |
+| `ALLOWED_USER_IDS` | Telegram user id владельцев (несколько — через запятую); остальных владелец приглашает в боте командой `/invite`                                                                                                                                                                                       |
+| `DATABASE_URL`     | Dashboard → **Connect** → **Transaction pooler** (порт **6543**), подставить пароль БД                                                                                                                                                                                                                 |
+| `MIGRATION_DB_URL` | Dashboard → **Connect** → **Session pooler** (порт **5432**), подставить пароль БД — для миграций, в функцию не загружается                                                                                                                                                                            |
+| `WEBHOOK_SECRET`   | `openssl rand -hex 32`                                                                                                                                                                                                                                                                                 |
+| `CRON_SECRET`      | `openssl rand -hex 32`                                                                                                                                                                                                                                                                                 |
+| `BOT_INFO`         | необязательно: `curl https://api.telegram.org/bot<BOT_TOKEN>/getMe \| jq -c .result` — функция не будет вызывать getMe на каждом холодном старте                                                                                                                                                       |
+| `FUNCTION_URL`     | `https://<ref>.supabase.co/functions/v1/bot`                                                                                                                                                                                                                                                           |
+| `LLM_*`            | необязательно, для «Программы из текста»: ключ Groq (console.groq.com) в `LLM_API_KEY`, запасной ключ Google AI Studio в `LLM_FALLBACK_API_KEY`; адреса и модели — в `.env.prod.example`. Текст программы уходит этим провайдерам, бесплатный тариф Google может использовать его для обучения моделей |
 
 Загрузить их в Supabase (значения не попадают в историю shell):
 

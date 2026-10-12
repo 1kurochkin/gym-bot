@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { LlmProvider } from '../adapters/llm/openai-compatible.ts';
 
 const optionalEnv = <T extends z.ZodType>(schema: T) =>
   z.preprocess((v) => (v === '' ? undefined : v), schema.optional());
@@ -31,7 +32,24 @@ const EnvSchema = z.object({
   WEBHOOK_SECRET: optionalEnv(z.string().min(16)),
   CRON_SECRET: optionalEnv(z.string().min(16)),
   BOT_INFO: optionalEnv(JsonStringSchema.pipe(BotInfoSchema)),
+  LLM_BASE_URL: optionalEnv(z.url()),
+  LLM_MODEL: optionalEnv(z.string().min(1)),
+  LLM_API_KEY: optionalEnv(z.string().min(1)),
+  LLM_FALLBACK_BASE_URL: optionalEnv(z.url()),
+  LLM_FALLBACK_MODEL: optionalEnv(z.string().min(1)),
+  LLM_FALLBACK_API_KEY: optionalEnv(z.string().min(1)),
+  LLM_DAILY_LIMIT: optionalEnv(z.coerce.number().int().nonnegative()),
 });
+
+const DEFAULT_LLM_DAILY_LIMIT = 10;
+
+function provider(
+  baseUrl: string | undefined,
+  model: string | undefined,
+  apiKey: string | undefined,
+): LlmProvider[] {
+  return baseUrl && model && apiKey ? [{ baseUrl, model, apiKey }] : [];
+}
 
 export const ConfigSchema = EnvSchema.transform((env) => ({
   botToken: env.BOT_TOKEN,
@@ -40,6 +58,11 @@ export const ConfigSchema = EnvSchema.transform((env) => ({
   webhookSecret: env.WEBHOOK_SECRET ?? null,
   cronSecret: env.CRON_SECRET ?? null,
   botInfo: env.BOT_INFO ?? null,
+  llmProviders: [
+    ...provider(env.LLM_BASE_URL, env.LLM_MODEL, env.LLM_API_KEY),
+    ...provider(env.LLM_FALLBACK_BASE_URL, env.LLM_FALLBACK_MODEL, env.LLM_FALLBACK_API_KEY),
+  ],
+  llmDailyLimit: env.LLM_DAILY_LIMIT ?? DEFAULT_LLM_DAILY_LIMIT,
 })).readonly();
 export type Config = z.output<typeof ConfigSchema>;
 

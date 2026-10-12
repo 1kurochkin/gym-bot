@@ -30,6 +30,7 @@ export const ActionSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('editor_day_new') }).readonly(),
   z.object({ type: z.literal('editor_day_delete') }).readonly(),
   z.object({ type: z.literal('editor_create') }).readonly(),
+  z.object({ type: z.literal('program_text') }).readonly(),
   z.object({ type: z.literal('seed_next') }).readonly(),
   z.object({ type: z.literal('seed_stop') }).readonly(),
   z.object({ type: z.literal('settings_section'), section: SettingsSectionSchema }).readonly(),
