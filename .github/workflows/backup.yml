@@ -1,11 +1,13 @@
-# Ежедневный бэкап БД (.specs/nfr.md, docs/architecture.md §3).
+# Бэкап БД раз в неделю и ежедневный /health (.specs/nfr.md, docs/architecture.md §3).
 # Репозиторий публичный: дамп не коммитится, не сохраняется как артефакт и не печатается в лог.
-# Дамп уходит только в BACKUP_CHAT_ID. Затем /health — защита бесплатного проекта от паузы.
+# Дамп уходит только в BACKUP_CHAT_ID. /health каждый день — защита бесплатного проекта от паузы
+# (пауза после 7 дней без активности в БД, недельного запуска для неё мало).
 name: backup
 
 on:
   schedule:
-    - cron: '17 7 * * *' # ежедневно, 07:17 UTC
+    - cron: '17 7 * * 0' # бэкап: воскресенье, 07:17 UTC
+    - cron: '17 7 * * 1-6' # только /health: остальные дни
   workflow_dispatch:
 
 permissions:
@@ -13,6 +15,7 @@ permissions:
 
 jobs:
   backup:
+    if: github.event_name == 'workflow_dispatch' || github.event.schedule == '17 7 * * 0'
     runs-on: ubuntu-latest
     steps:
       - uses: supabase/setup-cli@v1
@@ -44,13 +47,18 @@ jobs:
             "https://api.telegram.org/bot$BOT_TOKEN/sendMediaGroup")
           test "$code" = 200 || { echo "Telegram вернул HTTP $code"; exit 1; }
 
+      - name: Cleanup
+        if: always()
+        run: rm -f ./*.sql ./*.sql.gz
+
+  health:
+    needs: backup
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
       - name: Health ping
         env:
           FUNCTION_URL: ${{ secrets.FUNCTION_URL }}
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
         run: |
           curl -fsS -o /dev/null -H "x-cron-secret: $CRON_SECRET" "$FUNCTION_URL/health"
-
-      - name: Cleanup
-        if: always()
-        run: rm -f ./*.sql ./*.sql.gz

@@ -125,9 +125,9 @@ Secrets and variables → Actions:
 | `CRON_SECRET`    | тот же, что в `.env.prod`                                                                                 |
 
 Затем Actions → **backup** → Run workflow: в личный чат с ботом должны прийти два файла
-`gym-bot-schema-*.sql.gz` и `gym-bot-data-*.sql.gz`. Дальше workflow работает ежедневно и заодно не
-даёт бесплатному проекту уйти в паузу. Один раз проверить восстановление по
-[docs/runbook-restore.md](docs/runbook-restore.md).
+`gym-bot-schema-*.sql.gz` и `gym-bot-data-*.sql.gz`. Дальше дамп приходит раз в неделю (воскресенье,
+07:17 UTC), а `/health` workflow дёргает каждый день, чтобы бесплатный проект не ушёл в паузу. Один
+раз проверить восстановление по [docs/runbook-restore.md](docs/runbook-restore.md).
 
 ### Обычный деплой (после изменений)
 
