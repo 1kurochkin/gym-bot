@@ -37,3 +37,18 @@ Deno.test('workflows: бэкап можно запустить вручную и
   const triggers = Object.keys((backup?.on ?? {}) as Record<string, unknown>).sort();
   assertEquals(triggers, ['schedule', 'workflow_dispatch']);
 });
+
+Deno.test('workflows: дамп — по одному из расписаний, /health — после него всегда', async () => {
+  const backup = (await workflows()).find(([where]) => where.endsWith('backup.yml'))?.[1];
+  const on = (backup?.on ?? {}) as { schedule?: { cron: string }[] };
+  const crons = (on.schedule ?? []).map((s) => s.cron);
+  const jobs = (backup?.jobs ?? {}) as Record<string, { if?: string; needs?: string }>;
+  const dumpIf = jobs.backup?.if ?? '';
+  const dumpCron = /github\.event\.schedule == '([^']+)'/.exec(dumpIf)?.[1];
+  assert(
+    dumpCron && crons.includes(dumpCron),
+    `условие бэкапа «${dumpIf}» не совпадает с ${crons}`,
+  );
+  assert(dumpIf.includes("github.event_name == 'workflow_dispatch'"), 'ручной запуск делает дамп');
+  assertEquals([jobs.health?.needs, jobs.health?.if], ['backup', 'always()']);
+});
