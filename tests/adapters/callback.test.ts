@@ -58,10 +58,20 @@ Deno.test('кодек: кнопки редактора программы', () =
     { type: 'editor_type', loadType: 'weighted_bodyweight' },
     { type: 'editor_from' },
     { type: 'editor_from_pick', exerciseId: 'ex_12' },
+    { type: 'editor_type', loadType: 'light_load' },
+    { type: 'editor_day_rename' },
+    { type: 'editor_program_rename' },
+    { type: 'editor_goal' },
+    { type: 'editor_move', move: 'up' },
+    { type: 'editor_move', move: 'down' },
+    { type: 'editor_day_new' },
+    { type: 'editor_day_delete' },
+    { type: 'editor_create' },
   ] as const;
   for (const a of actions) {
     const decoded = decodeCallback(encodeCallback(ActionSchema.parse(a), 999999));
     assertEquals(decoded, { stepNo: 999999, action: a } as unknown);
   }
-  assertEquals(decodeCallback('3|et:light_load'), null, 'создать можно только 4 типа');
+  assertEquals(decodeCallback('3|et:reps'), null, 'неизвестный тип отсекается схемой');
+  assertEquals(decodeCallback('3|em:left'), null, 'только вверх и вниз');
 });
