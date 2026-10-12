@@ -22,6 +22,7 @@ import type { Intensity } from '../../core/program/schema.ts';
 import type { WorkoutStatus } from '../../core/workout/schema.ts';
 import type { SessionStep } from '../../core/session/types.ts';
 import type { ProgramStatus } from './program-status.ts';
+import type { LlmCallKind } from '../../ports/llm.ts';
 
 export const settings = pgTable('settings', {
   userId: bigint('user_id', { mode: 'number' }).primaryKey(),
@@ -137,3 +138,16 @@ export const invites = pgTable('invites', {
   usedBy: bigint('used_by', { mode: 'number' }),
   usedAt: timestamp('used_at', { withTimezone: true }),
 }).enableRLS();
+
+export const llmCalls = pgTable('llm_calls', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: bigint('user_id', { mode: 'number' }).notNull(),
+  kind: text('kind').$type<LlmCallKind>().notNull(),
+  provider: text('provider').notNull(),
+  model: text('model').notNull(),
+  ok: boolean('ok').notNull(),
+  ms: integer('ms').notNull(),
+  promptTokens: integer('prompt_tokens'),
+  completionTokens: integer('completion_tokens'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [index('llm_calls_user_created').on(t.userId, t.createdAt)]).enableRLS();

@@ -3,7 +3,7 @@ import { handleUpdate, type UpdateDeps } from '../../src/app/handle-update.ts';
 import { TimeZoneSchema } from '../../src/core/schedule/timezone.ts';
 import { defaultSettings } from '../../src/core/settings/settings.ts';
 import type { Action, Incoming } from '../../src/ports/ui.ts';
-import { fakeUi, memoryStore, OWNERS } from '../support/fakes.ts';
+import { fakeUi, memoryStore, NO_LLM, OWNERS } from '../support/fakes.ts';
 
 const OWNER = 1;
 const FRIEND = 2;
@@ -30,6 +30,7 @@ function world(): {
     newId: () => `0000000${++n}-0000-4000-8000-000000000000`.slice(-36),
     owners: OWNERS,
     botUsername: () => 'gym_test_bot',
+    ...NO_LLM,
   };
   store.settings.set(OWNER, {
     ...defaultSettings(OWNER),

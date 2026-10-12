@@ -1,6 +1,7 @@
 import type { Bot } from 'grammy';
 import type { UserFromGetMe } from 'grammy/types';
 import { tzLookup } from '../adapters/geo/tz-lookup.ts';
+import { createLlm } from '../adapters/llm/openai-compatible.ts';
 import { connect, createPostgresStore } from '../adapters/postgres/store.ts';
 import { createBot, createTelegramUi } from '../adapters/telegram/bot.ts';
 import type { Store } from '../ports/store.ts';
@@ -16,15 +17,18 @@ export function buildDeps(
   const store = overrides.store ?? createPostgresStore(connect(config.databaseUrl));
   let updateDeps: UpdateDeps | null = null;
   let queue: Promise<void> = Promise.resolve();
+  const serialize = (run: () => Promise<void>): Promise<void> => {
+    const next = queue.then(run);
+    queue = next.catch(() => {});
+    return next;
+  };
   const bot = createBot({
     token: config.botToken,
     botInfo: overrides.botInfo ?? toBotInfo(config.botInfo),
     onUpdate: (update) => {
       const deps = updateDeps;
       if (!deps) throw new Error('deps not ready');
-      const run = queue.then(() => handleUpdate(deps, update));
-      queue = run.catch(() => {});
-      return run;
+      return serialize(() => handleUpdate(deps, update));
     },
   });
   bot.api.config.use(async (prev, method, payload, signal) => {
@@ -43,6 +47,10 @@ export function buildDeps(
     newId: () => crypto.randomUUID(),
     owners: config.ownerIds,
     botUsername: () => bot.botInfo.username,
+    llm: config.llmProviders.length ? createLlm(config.llmProviders) : null,
+    llmDailyLimit: config.llmDailyLimit,
+    defer,
+    serialize,
   };
   return { bot, store };
 }
@@ -61,4 +69,15 @@ function toBotInfo(info: Config['botInfo']): UserFromGetMe | undefined {
     supports_join_request_queries: false,
     ...info,
   };
+}
+
+function defer(task: () => Promise<void>): void {
+  const run = task().catch((e) => {
+    console.error(JSON.stringify({ deferred: e instanceof Error ? e.name : 'error' }));
+  });
+  const runtime: unknown = Reflect.get(globalThis, 'EdgeRuntime');
+  const waitUntil: unknown = runtime && typeof runtime === 'object'
+    ? Reflect.get(runtime, 'waitUntil')
+    : undefined;
+  if (typeof waitUntil === 'function') Reflect.apply(waitUntil, runtime, [run]);
 }

@@ -24,6 +24,7 @@ import {
 import { SetInputErrorSchema } from '../input/set-input.ts';
 import { ProgramIssueSchema, ProgramSummarySchema } from '../program/program.ts';
 import { MoveSchema, NewExerciseTypeSchema } from '../program/edit.ts';
+import { ConvertFailureSchema, ConvertOutcomeSchema } from '../program/draft.ts';
 import { IdSchema, LoadTypeSchema, ProgramSchema } from '../program/schema.ts';
 import { SettingsSectionSchema, StepSourceSchema } from '../settings/options.ts';
 import { LanguageSchema, SettingsSchema } from '../settings/settings.ts';
@@ -50,6 +51,9 @@ export const SessionStepSchema = z.enum([
   'program_first',
   'program_day_delete_confirm',
   'program_create',
+  'program_text',
+  'program_converting',
+  'program_draft',
   'seed',
   'settings',
   'settings_bar',
@@ -94,6 +98,12 @@ export type RenameTarget = z.infer<typeof RenameTargetSchema>;
 export const SessionContextSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('none') }).readonly(),
   z.object({ kind: z.literal('program_pending'), program: ProgramSchema }).readonly(),
+  z.object({ kind: z.literal('program_converting'), requestId: z.string() }).readonly(),
+  z.object({
+    kind: z.literal('program_draft'),
+    program: ProgramSchema,
+    unparsed: z.array(z.string()).readonly(),
+  }).readonly(),
   z.object({
     kind: z.literal('program_edit'),
     dayId: z.string().nullable(),
@@ -193,6 +203,12 @@ export const BotEventSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('editor_day_new_requested') }).readonly(),
   z.object({ type: z.literal('editor_day_delete_requested') }).readonly(),
   z.object({ type: z.literal('editor_create_requested') }).readonly(),
+  z.object({ type: z.literal('convert_requested') }).readonly(),
+  z.object({
+    type: z.literal('program_drafted'),
+    requestId: z.string(),
+    outcome: ConvertOutcomeSchema,
+  }).readonly(),
   z.object({ type: z.literal('program_cancelled') }).readonly(),
   z.object({ type: z.literal('seed_requested') }).readonly(),
   z.object({ type: z.literal('seed_next') }).readonly(),
@@ -278,6 +294,9 @@ const SummaryItemSchema = z.object({
 }).readonly();
 export type SummaryItem = z.infer<typeof SummaryItemSchema>;
 
+export const ConvertRefusalSchema = z.enum([...ConvertFailureSchema.options, 'limit']);
+export type ConvertRefusal = z.infer<typeof ConvertRefusalSchema>;
+
 export const HistoryNoticeSchema = z.enum(['fixed', 'added', 'deleted']);
 export const EditorNoticeSchema = z.enum([
   'saved',
@@ -311,8 +330,11 @@ export const ViewSchema = z.discriminatedUnion('type', [
     zone: ZoneLabelSchema,
     programName: z.string().nullable(),
   }).readonly(),
-  z.object({ type: z.literal('program_status'), current: ProgramSummarySchema.nullable() })
-    .readonly(),
+  z.object({
+    type: z.literal('program_status'),
+    current: ProgramSummarySchema.nullable(),
+    fromText: z.boolean(),
+  }).readonly(),
   z.object({ type: z.literal('program_invalid'), issues: z.array(ProgramIssueSchema).readonly() })
     .readonly(),
   z.object({
@@ -363,6 +385,20 @@ export const ViewSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('program_first'), dayName: z.string(), fromProgram: z.boolean() })
     .readonly(),
   z.object({ type: z.literal('program_day_delete_confirm'), dayName: z.string() }).readonly(),
+  z.object({ type: z.literal('program_text_ask') }).readonly(),
+  z.object({ type: z.literal('program_converting') }).readonly(),
+  z.object({
+    type: z.literal('program_draft'),
+    summary: ProgramSummarySchema,
+    days: z.array(
+      z.object({ name: z.string(), exercises: z.array(EditorExerciseSchema).readonly() })
+        .readonly(),
+    ).readonly(),
+    unparsed: z.array(z.string()).readonly(),
+    replaces: z.string().nullable(),
+  }).readonly(),
+  z.object({ type: z.literal('program_convert_failed'), reason: ConvertRefusalSchema })
+    .readonly(),
   z.object({
     type: z.literal('program_remove_confirm'),
     exerciseName: z.string(),
@@ -605,6 +641,8 @@ export const EffectSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('render'), view: ViewSchema }).readonly(),
   z.object({ type: z.literal('clear_chat') }).readonly(),
   z.object({ type: z.literal('save_program'), program: ProgramSchema }).readonly(),
+  z.object({ type: z.literal('convert_program'), requestId: z.string(), text: z.string() })
+    .readonly(),
   z.object({ type: z.literal('record_manual_result'), result: ManualResultSchema }).readonly(),
   z.object({ type: z.literal('start_workout'), workout: NewWorkoutSchema }).readonly(),
   z.object({
@@ -641,6 +679,13 @@ export const EffectSchema = z.discriminatedUnion('type', [
 ]);
 export type Effect = z.infer<typeof EffectSchema>;
 
+export const LlmAccessSchema = z.object({
+  enabled: z.boolean(),
+  used: z.number().int().nonnegative(),
+  limit: z.number().int().nonnegative(),
+}).readonly();
+export type LlmAccess = z.infer<typeof LlmAccessSchema>;
+
 export const StepContextSchema = z.object({
   now: z.date(),
   settings: SettingsSchema,
@@ -653,6 +698,7 @@ export const StepContextSchema = z.object({
   history: HistoryDataSchema,
   members: z.array(MemberSchema).readonly(),
   newIds: z.array(z.string()).readonly(),
+  llm: LlmAccessSchema,
 }).readonly();
 export type StepContext = z.infer<typeof StepContextSchema>;
 

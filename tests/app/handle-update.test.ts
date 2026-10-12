@@ -2,7 +2,7 @@ import { assertEquals } from '@std/assert';
 import { handleUpdate, type UpdateDeps } from '../../src/app/handle-update.ts';
 import { TimeZoneSchema } from '../../src/core/schedule/timezone.ts';
 import type { Incoming, IncomingUpdate } from '../../src/ports/ui.ts';
-import { fakeUi, memoryStore, OWNERS, TESTER } from '../support/fakes.ts';
+import { fakeUi, memoryStore, NO_LLM, OWNERS, TESTER } from '../support/fakes.ts';
 
 function setup(): {
   deps: UpdateDeps;
@@ -19,6 +19,7 @@ function setup(): {
     newId: () => crypto.randomUUID(),
     owners: OWNERS,
     botUsername: () => 'gym_test_bot',
+    ...NO_LLM,
   };
   return { deps, store, ui };
 }

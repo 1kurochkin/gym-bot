@@ -15,6 +15,7 @@ export const requestProgram = (state: Session, ctx: StepContext): StepResult =>
   moveTo(state, program_upload, {
     type: 'program_status',
     current: ctx.activeProgram ? programSummary(ctx.activeProgram) : null,
+    fromText: ctx.llm.enabled,
   });
 
 export function receiveProgram(state: Session, text: string, ctx: StepContext): StepResult {

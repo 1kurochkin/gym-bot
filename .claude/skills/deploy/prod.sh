@@ -16,7 +16,9 @@ cd "$(git rev-parse --show-toplevel)"
 ENV_FILE=.env.prod
 
 # Секреты функции; остальное (MIGRATION_DB_URL, FUNCTION_URL) в функцию не загружается.
-FUNCTION_KEYS=(BOT_TOKEN ALLOWED_USER_IDS DATABASE_URL WEBHOOK_SECRET CRON_SECRET BOT_INFO)
+FUNCTION_KEYS=(BOT_TOKEN ALLOWED_USER_IDS DATABASE_URL WEBHOOK_SECRET CRON_SECRET BOT_INFO
+  LLM_BASE_URL LLM_MODEL LLM_API_KEY LLM_FALLBACK_BASE_URL LLM_FALLBACK_MODEL LLM_FALLBACK_API_KEY
+  LLM_DAILY_LIMIT)
 REQUIRED=(BOT_TOKEN ALLOWED_USER_IDS DATABASE_URL MIGRATION_DB_URL WEBHOOK_SECRET CRON_SECRET FUNCTION_URL)
 
 get() { grep -E "^$1=" "$ENV_FILE" 2>/dev/null | tail -1 | cut -d= -f2- || true; }
@@ -110,7 +112,8 @@ case "${1:-}" in
     jq -r --arg want "$want" '.result |
       "url: \(if .url == $want then "OK" elif .url == "" then "NOT_SET" else "MISMATCH (\(.url))" end)",
       "pending: \(.pending_update_count)",
-      "last_error: \(.last_error_message // "none")"' <<<"$info"
+      "last_error: \(.last_error_message // "none")",
+      "last_error_at: \(if .last_error_date then (.last_error_date | todate) else "none" end)"' <<<"$info"
     ;;
   inspect)
     # Только чтение: supabase inspect db <locks|blocking|long-running-queries|…> по MIGRATION_DB_URL.

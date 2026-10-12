@@ -1,0 +1,96 @@
+{
+  "draft": {
+    "name": "Фулбади, 3 дня",
+    "days": [
+      {
+        "name": "Понедельник",
+        "exercises": [
+          {
+            "name": "Присед",
+            "type": "barbell",
+            "setsMin": 3,
+            "setsMax": 3,
+            "repsMin": 5,
+            "repsMax": 5,
+            "note": null
+          },
+          {
+            "name": "Тяга в наклоне",
+            "type": "barbell",
+            "setsMin": 3,
+            "setsMax": 3,
+            "repsMin": 10,
+            "repsMax": 8,
+            "note": null
+          },
+          {
+            "name": "Пресс",
+            "type": "reps_only",
+            "setsMin": 3,
+            "setsMax": 3,
+            "repsMin": null,
+            "repsMax": null,
+            "note": null
+          }
+        ]
+      },
+      {
+        "name": "",
+        "exercises": [
+          {
+            "name": "Подтягивания с весом",
+            "type": "weighted_bodyweight",
+            "setsMin": 3,
+            "setsMax": 3,
+            "repsMin": 6,
+            "repsMax": 8,
+            "note": null
+          },
+          {
+            "name": "Жим гантелей сидя",
+            "type": "machine",
+            "setsMin": 30,
+            "setsMax": 3,
+            "repsMin": null,
+            "repsMax": null,
+            "note": null
+          }
+        ]
+      },
+      {
+        "name": "Пятница",
+        "exercises": [
+          {
+            "name": "  присед ",
+            "type": "barbell",
+            "setsMin": 3,
+            "setsMax": 3,
+            "repsMin": 5,
+            "repsMax": 5,
+            "note": null
+          },
+          {
+            "name": "Шея",
+            "type": "light_load",
+            "setsMin": 2,
+            "setsMax": 2,
+            "repsMin": 15,
+            "repsMax": 15,
+            "note": " лёгкий блин, медленно "
+          }
+        ]
+      },
+      { "name": "Отдых", "exercises": [] }
+    ],
+    "unparsed": ["Отдых между подходами 2-3 минуты."]
+  },
+  "expected": {
+    "name": "Фулбади, 3 дня",
+    "rotation": ["day_1", "day_2", "day_3"],
+    "days": [
+      "Понедельник: Присед 3×5; Тяга в наклоне 3×8–10; Пресс 3 подхода",
+      "Подтягивания с весом: Подтягивания с весом 3×6–8; Жим гантелей сидя 3–20×8–12",
+      "Пятница: Присед 3×5; Шея 2×15 (лёгкий блин, медленно)"
+    ]
+  }
+}

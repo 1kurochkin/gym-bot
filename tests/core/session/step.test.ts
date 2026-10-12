@@ -16,6 +16,7 @@ const noWorkout = {
   members: [],
   history: { page: null, workout: null },
   newIds: [],
+  llm: { enabled: false, used: 0, limit: 10 },
 };
 
 const now = new Date('2026-09-28T22:40:00Z');

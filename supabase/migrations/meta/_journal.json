@@ -50,6 +50,13 @@
       "when": 1790975563917,
       "tag": "20261002211243_exercise_finished_at",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1791836570872,
+      "tag": "20261012202250_llm_calls",
+      "breakpoints": true
     }
   ]
 }

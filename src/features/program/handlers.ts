@@ -56,6 +56,8 @@ function callbackEvent(action: Action): BotEvent | null {
       return { type: 'editor_day_delete_requested' };
     case 'editor_create':
       return { type: 'editor_create_requested' };
+    case 'program_text':
+      return { type: 'convert_requested' };
     default:
       return null;
   }
