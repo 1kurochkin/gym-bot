@@ -14,6 +14,18 @@ const ru = {
   textAsk: 'Пришли программу текстом одним сообщением — как она записана у тебя или у тренера: ' +
     'дни, упражнения, подходы и повторения. Я разберу её и покажу, что получилось; ' +
     'сохраню только после подтверждения.\n\n' +
+    'Например:\n\n' +
+    'Понедельник — Грудь и спина\n' +
+    'Жим лёжа (штанга) 3×8–10\n' +
+    'Подтягивания (свой вес) 3×6–8\n' +
+    'Жим гантелей на наклонной (гантели) 3×10–12\n' +
+    'Пресс (без веса) 3 подхода\n\n' +
+    'Среда — Ноги\n' +
+    'Присед (штанга) 4×5\n' +
+    'Жим ногами (тренажёр) 3×12–15\n' +
+    'Шея (лёгкий вес) 2×15\n\n' +
+    'Тип в скобках — штанга, тренажёр или гантели, свой вес, без веса, лёгкий вес — ' +
+    'можно не писать, но с ним точнее.\n\n' +
     'Текст обработает внешняя нейросеть — не пиши в нём ничего личного.',
   converting: '⏳ Разбираю программу… Обычно это занимает до 30 секунд.',
   draft: (d: string) => `Вот что получилось: ${d}`,
@@ -181,6 +193,18 @@ const en: typeof ru = {
   textAsk: 'Send the program as text in one message — the way you or your coach wrote it: ' +
     'days, exercises, sets and reps. I’ll parse it and show the result; ' +
     'nothing is saved until you confirm.\n\n' +
+    'For example:\n\n' +
+    'Monday — Chest and back\n' +
+    'Bench press (barbell) 3×8–10\n' +
+    'Pull-ups (bodyweight) 3×6–8\n' +
+    'Incline dumbbell press (dumbbells) 3×10–12\n' +
+    'Abs (no weight) 3 sets\n\n' +
+    'Wednesday — Legs\n' +
+    'Squat (barbell) 4×5\n' +
+    'Leg press (machine) 3×12–15\n' +
+    'Neck (light load) 2×15\n\n' +
+    'The type in brackets — barbell, machine or dumbbells, bodyweight, no weight, light load — ' +
+    'is optional but makes it more accurate.\n\n' +
     'The text is processed by an external AI — don’t include anything personal.',
   converting: '⏳ Parsing the program… This usually takes up to 30 seconds.',
   draft: (d: string) => `Here’s what I got: ${d}`,

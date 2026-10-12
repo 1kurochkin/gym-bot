@@ -33,6 +33,8 @@ Deno.test('программа из текста: ожидание → предп
   await w.send(program);
   await w.press({ type: 'program_text' });
   assert(w.last().startsWith('Пришли программу текстом одним сообщением'), w.last());
+  assert(w.last().includes('Жим лёжа (штанга) 3×8–10\nПодтягивания (свой вес) 3×6–8'), 'пример');
+  assert(w.last().includes('Тип в скобках'), 'подсказка про тип');
   await w.type('Понедельник: присед 3х5, тяга в наклоне 3х8-10…');
   assertEquals(w.last(), '⏳ Разбираю программу… Обычно это занимает до 30 секунд.');
   assertEquals(w.buttons(), []);

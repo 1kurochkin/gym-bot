@@ -18,6 +18,10 @@ Rules:
   weighted_bodyweight = pull-ups, chin-ups, dips, push-ups, other bodyweight moves where weight can be added;
   reps_only = abs, planks and moves where weight is not tracked;
   light_load = neck, rehab and other very light-weight work.
+  A type hint in brackets wins over your guess: (barbell / штанга), (machine / тренажёр),
+  (dumbbells / гантели) = machine, (bodyweight / свой вес) = weighted_bodyweight,
+  (no weight / без веса) = reps_only, (light load / лёгкий вес) = light_load.
+  Hints are not part of the exercise name.
 - setsMin/setsMax: working sets only, not warm-up sets. "3x8" -> 3,3; "2-3 sets" -> 2,3; not stated -> 3,3.
 - repsMin/repsMax: reps per working set. "8-12" -> 8,12; "x5" -> 5,5. null for reps_only or when not stated.
 - note: a short instruction from the source for this exercise (technique, tempo, rest, RPE, %), else null.
