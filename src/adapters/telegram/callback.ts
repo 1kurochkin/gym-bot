@@ -23,6 +23,12 @@ const SIMPLE_CODES = {
   editor_remove: 'ev',
   editor_new: 'en',
   editor_from: 'ei',
+  editor_day_rename: 'dr',
+  editor_program_rename: 'pr',
+  editor_goal: 'eg',
+  editor_day_new: 'dn',
+  editor_day_delete: 'dd',
+  editor_create: 'ek',
   seed_next: 'sn',
   seed_stop: 'ss',
   settings_back: 'sb',
@@ -71,6 +77,7 @@ const PARAM_CODES = {
   editor_remove_answer: 'ec',
   editor_type: 'et',
   editor_from_pick: 'ea',
+  editor_move: 'em',
 } as const;
 
 function encodeAction(a: Action): string {
@@ -84,6 +91,12 @@ function encodeAction(a: Action): string {
     case 'editor_remove':
     case 'editor_new':
     case 'editor_from':
+    case 'editor_day_rename':
+    case 'editor_program_rename':
+    case 'editor_goal':
+    case 'editor_day_new':
+    case 'editor_day_delete':
+    case 'editor_create':
     case 'seed_next':
     case 'seed_stop':
     case 'settings_back':
@@ -114,6 +127,8 @@ function encodeAction(a: Action): string {
       return `${PARAM_CODES[a.type]}:${a.confirm ? 1 : 0}`;
     case 'editor_type':
       return `${PARAM_CODES[a.type]}:${a.loadType}`;
+    case 'editor_move':
+      return `${PARAM_CODES[a.type]}:${a.move}`;
     case 'menu_pick':
     case 'add_pick':
       return `${PARAM_CODES[a.type]}:${a.exerciseId}`;
@@ -182,6 +197,8 @@ function rawAction(code: string): Record<string, unknown> | null {
       return { type, confirm: value === '1' };
     case 'editor_type':
       return { type, loadType: value };
+    case 'editor_move':
+      return { type, move: value };
     case 'warmup':
       return { type, variant: value };
     case 'reps_set':

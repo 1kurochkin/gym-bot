@@ -16,7 +16,7 @@ export type World = {
   buttons: () => string[];
 };
 
-export async function world(): Promise<World> {
+export async function world(options: { program?: boolean } = {}): Promise<World> {
   const store = memoryStore();
   const ui = fakeUi();
   let n = 0;
@@ -45,12 +45,14 @@ export async function world(): Promise<World> {
     ...defaultSettings(1),
     timezone: TimeZoneSchema.parse('America/New_York'),
   });
-  await send({
-    kind: 'document',
-    fileName: 'p.json',
-    text: JSON.stringify(await specProgramJson()),
-    problem: null,
-  });
+  if (options.program !== false) {
+    await send({
+      kind: 'document',
+      fileName: 'p.json',
+      text: JSON.stringify(await specProgramJson()),
+      problem: null,
+    });
+  }
   return {
     store,
     ui,

@@ -42,6 +42,20 @@ function callbackEvent(action: Action): BotEvent | null {
       return { type: 'editor_from_requested' };
     case 'editor_from_pick':
       return { type: 'editor_from_picked', exerciseId: action.exerciseId };
+    case 'editor_day_rename':
+      return { type: 'editor_day_rename_requested' };
+    case 'editor_program_rename':
+      return { type: 'editor_program_rename_requested' };
+    case 'editor_goal':
+      return { type: 'editor_goal_requested' };
+    case 'editor_move':
+      return { type: 'editor_moved', move: action.move };
+    case 'editor_day_new':
+      return { type: 'editor_day_new_requested' };
+    case 'editor_day_delete':
+      return { type: 'editor_day_delete_requested' };
+    case 'editor_create':
+      return { type: 'editor_create_requested' };
     default:
       return null;
   }
