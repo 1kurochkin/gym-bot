@@ -1,5 +1,5 @@
 import { assertNever } from '../../shared/result.ts';
-import { home, unchanged } from './flow.ts';
+import { help, home, unchanged } from './flow.ts';
 import { askTime, isOnboarding, onTimeEntered, saveTimezone } from './onboarding.ts';
 import {
   cancelProgram,
@@ -125,6 +125,8 @@ function transition(state: Session, event: BotEvent, ctx: StepContext): StepResu
         : home(state, ctx.settings.timezone, ctx);
       return { ...screen, effects: [{ type: 'clear_chat' }, ...screen.effects] };
     }
+    case 'help_requested':
+      return help(state, ctx);
     case 'tz_chosen':
       return isOnboarding(state.step) ? saveTimezone(state, event.zone, ctx) : unchanged(state);
     case 'tz_located':

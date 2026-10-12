@@ -9,6 +9,7 @@ import { toEvent as onboardingEvent } from '../features/onboarding/handlers.ts';
 import { renderView as renderOnboarding } from '../features/onboarding/views.ts';
 import { KNOWN_COMMANDS } from '../features/help/commands.ts';
 import { renderHelpView } from '../features/help/views.ts';
+import { toEvent as helpEvent } from '../features/help/handlers.ts';
 import { toEvent as programEvent } from '../features/program/handlers.ts';
 import { renderProgramView } from '../features/program/views.ts';
 import { toEvent as seedEvent } from '../features/seed/handlers.ts';
@@ -30,7 +31,8 @@ export async function routeEvent(input: Incoming, zoneAt: ZoneLocator): Promise<
   if (input.kind === 'command' && !KNOWN_COMMANDS.has(input.name)) {
     return { type: 'unknown_command', name: input.name };
   }
-  return accessEvent(input) ?? historyEvent(input) ?? programEvent(input) ?? seedEvent(input) ??
+  return helpEvent(input) ?? accessEvent(input) ?? historyEvent(input) ?? programEvent(input) ??
+    seedEvent(input) ??
     settingsEvent(input) ??
     workoutEvent(input) ??
     onboardingEvent(input);
@@ -73,6 +75,7 @@ export function render(view: View, lang: Language, env: RenderEnv): Rendered {
     case 'needs_program':
       return renderSeedView(view, lang);
     case 'unknown_command':
+    case 'help':
       return renderHelpView(view, lang);
     case 'settings_menu':
     case 'settings_bar':

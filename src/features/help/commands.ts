@@ -19,6 +19,7 @@ const COMMANDS: readonly {
     description: { ru: 'Прошлые тренировки: исправить, удалить', en: 'Past workouts: fix, delete' },
   },
   { command: 'start', description: { ru: 'Главный экран', en: 'Home screen' } },
+  { command: 'help', description: { ru: 'Как пользоваться ботом', en: 'How to use the bot' } },
   {
     command: 'program',
     description: { ru: 'Загрузить или показать программу', en: 'Upload or show the program' },
