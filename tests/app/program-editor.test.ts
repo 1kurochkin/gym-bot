@@ -6,7 +6,10 @@ import { workout, type World, world } from '../support/world.ts';
 const program: Incoming = { kind: 'command', name: 'program', args: '' };
 const lines = (w: World): string[] => w.last().split('\n');
 
-const active = (w: World) => [...w.store.programs.values()].find((p) => p.active);
+const active = (w: World) => {
+  const id = w.store.settings.get(1)?.activeProgramId;
+  return id ? w.store.programs.get(id) : undefined;
+};
 
 async function openDay(w: World, dayId: string): Promise<void> {
   await w.send(program);
@@ -17,7 +20,7 @@ async function openDay(w: World, dayId: string): Promise<void> {
 Deno.test('редактор: /program → дни → день → упражнение', async () => {
   const w = await world();
   await w.send(program);
-  assertEquals(w.buttons(), ['📅 Дни и упражнения']);
+  assertEquals(w.buttons(), ['📅 Дни и упражнения', '🆕 Составить программу', '🗄 В архив']);
   await w.press({ type: 'editor_open' });
   assertEquals(lines(w), ['6 базовых, 5 дней', 'Дни программы:']);
   assertEquals(w.ui.shown.at(-1)?.rendered.bold, ['6 базовых, 5 дней']);

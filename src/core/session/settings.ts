@@ -1,7 +1,7 @@
 import { parseLbNumber } from '../input/set-input.ts';
 import { exerciseIndex } from '../program/program.ts';
 import { type Exercise, LoadTypeSchema } from '../program/schema.ts';
-import { barbellStep, weightStepWithSource } from '../program/weight-step.ts';
+import { barbellStep, overrideKey, weightStepWithSource } from '../program/weight-step.ts';
 import { zoneLabel } from '../schedule/timezone.ts';
 import {
   BAR_RANGE_LB,
@@ -10,6 +10,7 @@ import {
   SettingsSectionSchema,
   STEP_RANGE_LB,
   type StepSource,
+  StepSourceSchema,
 } from '../settings/options.ts';
 import { type Language, languageFor, type Settings } from '../settings/settings.ts';
 import { type Lb, lb } from '../units/lb.ts';
@@ -31,8 +32,8 @@ export function settingsMenu(
     barLb: settings.barWeightLb,
     platesLb: settings.platesLb,
     barStepLb: barbellStep(settings),
-    overrides: Object.values(settings.exerciseOverrides).filter((o) =>
-      o.stepLb !== undefined
+    overrides: stepExercises({ ...ctx, settings }).filter((s) =>
+      s.source === StepSourceSchema.enum.override
     ).length,
     language: languageFor(settings.language, ctx.languageCode),
     saved,
@@ -125,10 +126,11 @@ export function chooseLanguage(state: Session, ctx: StepContext, language: Langu
 type StepItem = { readonly exercise: Exercise; readonly stepLb: Lb; readonly source: StepSource };
 
 function stepExercises(ctx: StepContext): StepItem[] {
-  if (!ctx.activeProgram) return [];
-  return [...exerciseIndex(ctx.activeProgram).values()].flatMap((e) => {
+  const program = ctx.activeProgram;
+  if (!program) return [];
+  return [...exerciseIndex(program).values()].flatMap((e) => {
     if (e.loadType === LoadTypeSchema.enum.barbell) return [];
-    const step = weightStepWithSource(e, ctx.settings);
+    const step = weightStepWithSource(e, ctx.settings, program.id);
     return step ? [{ exercise: e, ...step }] : [];
   });
 }
@@ -179,8 +181,11 @@ export function setStep(state: Session, ctx: StepContext, value: number | null):
   if (value !== null && !(value >= STEP_RANGE_LB.min && value <= STEP_RANGE_LB.max)) {
     return stepEditScreen(state, ctx, c.exerciseId, true);
   }
-  const { [c.exerciseId]: _removed, ...rest } = ctx.settings.exerciseOverrides;
-  const overrides = value === null ? rest : { ...rest, [c.exerciseId]: { stepLb: lb(value) } };
+  const key = overrideKey(ctx.activeProgram?.id ?? '', c.exerciseId);
+  const rest = Object.fromEntries(
+    Object.entries(ctx.settings.exerciseOverrides).filter(([k]) => k !== key && k !== c.exerciseId),
+  );
+  const overrides = value === null ? rest : { ...rest, [key]: { stepLb: lb(value) } };
   const settings = { ...ctx.settings, exerciseOverrides: overrides };
   const result = stepsScreen(state, { ...ctx, settings });
   return withEffects(result, [{ type: 'save_settings', settings }]);

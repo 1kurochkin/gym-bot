@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { InviteCodeSchema, MemberSchema, type Person } from '../core/access/schema.ts';
 import { LastResultSchema, ManualResultSchema } from '../core/history/schema.ts';
 import { ProgramSchema } from '../core/program/schema.ts';
-import { type Effect, SessionSchema } from '../core/session/types.ts';
+import { type Effect, ProgramRefSchema, SessionSchema } from '../core/session/types.ts';
 import {
   ActiveWorkoutSchema,
   type HistoryData,
@@ -16,6 +16,8 @@ export const UserStateSchema = z.object({
   session: SessionSchema,
   settings: SettingsSchema,
   activeProgram: ProgramSchema.nullable(),
+  programs: z.array(ProgramRefSchema).readonly(),
+  programKeys: z.array(z.string()).readonly(),
   lastResults: z.record(z.string(), LastResultSchema).readonly(),
   activeWorkout: ActiveWorkoutSchema.nullable(),
   lastWorkout: LastWorkoutSchema.nullable(),
@@ -37,6 +39,7 @@ export const CommitSchema = z.object({
   ).readonly().optional(),
   newInvite: z.object({ code: InviteCodeSchema, expiresAt: z.date() }).readonly().optional(),
   revokeMember: z.number().int().positive().optional(),
+  archiveProgram: z.uuid().optional(),
 }).readonly();
 export type Commit = z.infer<typeof CommitSchema> & {
   readonly workout?: { readonly programId: string; readonly writes: readonly WorkoutWrite[] };

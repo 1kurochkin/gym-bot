@@ -31,11 +31,13 @@ export const OWNERS: ReadonlySet<number> = new Set([1]);
 export const TESTER: Person = { name: 'Tester', username: null };
 
 type WorkoutRow = NewWorkout & {
+  programKey: string;
   status: WorkoutStatus;
   comment: string | null;
   finishedAt: Date | null;
 };
 type LogRow = Omit<NewExerciseLog, 'workoutId'> & {
+  programKey: string;
   workoutId: string | null;
   source: LogSource;
   warmupVariant: string;
@@ -49,7 +51,10 @@ type SetRow = NewSet & { seq: number };
 export type MemoryStore = Store & {
   readonly sessions: Map<number, Session>;
   readonly settings: Map<number, Settings>;
-  readonly programs: Map<string, { program: Program; version: number; active: boolean }>;
+  readonly programs: Map<
+    string,
+    { program: Program; version: number; active: boolean; seq: number }
+  >;
   readonly manual: ManualResult[];
   readonly workouts: Map<string, WorkoutRow>;
   readonly logs: LogRow[];
@@ -90,15 +95,20 @@ export function memoryStore(): MemoryStore {
         : null;
       const active =
         [...store.workouts.values()].filter((w) => w.status === 'in_progress').at(-1) ?? null;
+      const entries = [...store.programs.entries()];
       return Promise.resolve({
         session: store.sessions.get(userId) ?? initialSession(userId),
         settings,
         activeProgram: program,
+        programs: entries.filter(([, p]) => p.active).sort(([, a], [, b]) => b.seq - a.seq).map((
+          [id, p],
+        ) => ({ id, key: p.program.id, name: p.program.name })),
+        programKeys: [...new Set(entries.map(([, p]) => p.program.id))],
         lastResults: program
-          ? lastResults(store, [...exerciseIndex(program).keys()], active?.id ?? null)
+          ? lastResults(store, program.id, [...exerciseIndex(program).keys()], active?.id ?? null)
           : {},
         activeWorkout: active ? snapshot(store, active) : null,
-        lastWorkout: lastWorkout(store),
+        lastWorkout: program ? lastWorkout(store, program.id) : null,
         members: opts.withMembers
           ? [...store.members.values()].filter((m) => !m.revoked).map((m) => ({
             userId: m.userId,
@@ -158,16 +168,23 @@ export function memoryStore(): MemoryStore {
       if (change.newProgram) {
         const key = change.newProgram.program.id;
         const versions = [...store.programs.values()].filter((p) => p.program.id === key);
-        for (const p of store.programs.values()) p.active = false;
+        for (const p of versions) p.active = false;
         store.programs.set(change.newProgram.id, {
           program: change.newProgram.program,
           version: versions.length + 1,
           active: true,
+          seq: ++seq,
         });
       }
+      if (change.archiveProgram) {
+        const archived = store.programs.get(change.archiveProgram);
+        if (archived) archived.active = false;
+      }
+      const keyOf = (programId: string): string => store.programs.get(programId)?.program.id ?? '';
       for (const r of change.manualResults ?? []) {
         store.manual.push(r.result);
         store.logs.push({
+          programKey: keyOf(r.programId),
           id: r.logId,
           workoutId: null,
           exerciseId: r.result.exerciseId,
@@ -200,7 +217,8 @@ export function memoryStore(): MemoryStore {
           seq: ++seq,
         });
       }
-      for (const w of change.workout?.writes ?? []) apply(store, w, () => ++seq);
+      const workoutKey = keyOf(change.workout?.programId ?? '');
+      for (const w of change.workout?.writes ?? []) apply(store, w, () => ++seq, workoutKey);
       if (change.newInvite) {
         store.invites.set(change.newInvite.code, {
           createdBy: userId,
@@ -230,11 +248,17 @@ export function memoryStore(): MemoryStore {
   return store;
 }
 
-function apply(store: MemoryStore, w: WorkoutWrite, next: () => number): void {
+function apply(
+  store: MemoryStore,
+  w: WorkoutWrite,
+  next: () => number,
+  programKey: string,
+): void {
   switch (w.type) {
     case 'start_workout':
       store.workouts.set(w.workout.id, {
         ...w.workout,
+        programKey,
         status: 'in_progress',
         comment: null,
         finishedAt: null,
@@ -253,6 +277,7 @@ function apply(store: MemoryStore, w: WorkoutWrite, next: () => number): void {
     case 'open_exercise_log':
       store.logs.push({
         ...w.log,
+        programKey,
         source: LogSourceSchema.enum.workout,
         warmupVariant: 'none',
         comment: null,
@@ -326,13 +351,14 @@ const workSets = (store: MemoryStore, logId: string): { weightLb: Lb | null; rep
 
 function lastResults(
   store: MemoryStore,
+  programKey: string,
   ids: readonly string[],
   activeId: string | null,
 ): Record<string, LastResult> {
   const result: Record<string, LastResult> = {};
   const logs = store.logs
     .filter((l) =>
-      l.status === 'done' && ids.includes(l.exerciseId) &&
+      l.status === 'done' && l.programKey === programKey && ids.includes(l.exerciseId) &&
       (l.workoutId === null || l.workoutId !== activeId)
     )
     .sort((a, b) =>
@@ -381,8 +407,10 @@ function snapshot(store: MemoryStore, w: WorkoutRow): ActiveWorkout {
   };
 }
 
-function lastWorkout(store: MemoryStore): UserState['lastWorkout'] {
-  const w = [...store.workouts.values()].filter((x) => x.status === 'completed').at(-1);
+function lastWorkout(store: MemoryStore, programKey: string): UserState['lastWorkout'] {
+  const w = [...store.workouts.values()].filter((x) =>
+    x.status === 'completed' && x.programKey === programKey
+  ).at(-1);
   return w ? { dayId: w.dayId, dayName: w.dayName, localDate: w.localDate } : null;
 }
 

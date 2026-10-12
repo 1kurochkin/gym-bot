@@ -16,6 +16,7 @@ import {
   MoveSchema,
   type NewExerciseType,
   nextDayId,
+  nextProgramKey,
   parseGoal,
   parseName,
   removeFromDay,
@@ -173,7 +174,7 @@ const firstScreen = (state: Session, ctx: StepContext, c: EditContext): StepResu
   moveTo(state, S.program_first, {
     type: 'program_first',
     dayName: c.newDayName ?? '',
-    fromProgram: ctx.activeProgram !== null,
+    fromProgram: c.newProgramName === null && ctx.activeProgram !== null,
   }, { ...c, draftName: null, draftType: null });
 
 const newNameScreen = (state: Session, c: EditContext, invalid: boolean): StepResult =>
@@ -199,8 +200,8 @@ export function openEditor(state: Session, ctx: StepContext): StepResult {
   return daysScreen(state, program, null);
 }
 
-export function requestCreate(state: Session, ctx: StepContext): StepResult {
-  if (ctx.activeProgram || state.step !== S.program_upload) return unchanged(state);
+export function requestCreate(state: Session): StepResult {
+  if (state.step !== S.program_upload) return unchanged(state);
   return createScreen(state, false);
 }
 
@@ -375,7 +376,7 @@ const typeScreen = (state: Session, c: EditContext): StepResult =>
 export function requestFromProgram(state: Session, ctx: StepContext): StepResult {
   const c = editContext(state);
   const program = ctx.activeProgram;
-  if (!c || !program) return unchanged(state);
+  if (!c || !program || c.newProgramName !== null) return unchanged(state);
   if (!(c.dayId && state.step === S.program_day) && !choosesFirst(state, c)) {
     return unchanged(state);
   }
@@ -489,6 +490,13 @@ function newGoalText(state: Session, ctx: StepContext, c: EditContext, text: str
   const goal = parseGoal(text, draftType);
   if (!goal) return goalScreen(state, c, true);
   const draft = { name: draftName, loadType: draftType, goal };
+  if (newProgramName !== null && newDayName !== null) {
+    return applied(
+      createProgram(newProgramName, newDayName, draft, nextProgramKey(ctx.programKeys)),
+      (next) => dayScreen(state, ctx, next, next.rotation[0] ?? '', NOTICE.created),
+      () => createScreen(state, false),
+    );
+  }
   if (program && dayId) {
     return applied(
       addNewExercise(program, dayId, draft),
@@ -502,13 +510,6 @@ function newGoalText(state: Session, ctx: StepContext, c: EditContext, text: str
       addDayWithNew(program, newDayName, draft),
       (next) => dayScreen(state, ctx, next, newDayId, NOTICE.added),
       () => daysScreen(state, program, NOTICE.failed),
-    );
-  }
-  if (!program && newProgramName !== null && newDayName !== null) {
-    return applied(
-      createProgram(newProgramName, newDayName, draft),
-      (next) => dayScreen(state, ctx, next, next.rotation[0] ?? '', NOTICE.created),
-      () => createScreen(state, false),
     );
   }
   return unchanged(state);
@@ -560,7 +561,9 @@ export function editorBack(state: Session, ctx: StepContext): StepResult {
     case S.program_create:
       return requestProgram(state, ctx);
     case S.program_day_new:
-      return program ? daysScreen(state, program, null) : createScreen(state, false);
+      return program && c.newProgramName === null
+        ? daysScreen(state, program, null)
+        : createScreen(state, false);
     case S.program_first:
       return dayNameScreen(state, c, false);
     case S.program_new_name:

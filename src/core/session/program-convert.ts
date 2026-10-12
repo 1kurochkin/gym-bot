@@ -1,7 +1,8 @@
 import type { ConvertOutcome } from '../program/draft.ts';
 import { dayExercises, programSummary } from '../program/program.ts';
 import { moveTo, unchanged, withEffects } from './flow.ts';
-import { cancelProgram } from './program.ts';
+import { nextProgramKey } from '../program/edit.ts';
+import { cancelProgram, otherPrograms } from './program.ts';
 import { daysScreen, toView } from './program-editor.ts';
 import {
   type BotEvent,
@@ -62,7 +63,8 @@ export function receiveDraft(
       reason: outcome.reason,
     });
   }
-  const { program, unparsed } = outcome;
+  const { unparsed } = outcome;
+  const program = { ...outcome.program, id: nextProgramKey(ctx.programKeys) };
   const byId = new Map(program.days.map((d) => [d.id, d.name]));
   return moveTo(state, S.program_draft, {
     type: 'program_draft',
@@ -72,7 +74,7 @@ export function receiveDraft(
       exercises: dayExercises(program, id).map(toView),
     })),
     unparsed,
-    replaces: ctx.activeProgram?.name ?? null,
+    others: otherPrograms(ctx, program.id),
   }, { kind: 'program_draft', program, unparsed });
 }
 

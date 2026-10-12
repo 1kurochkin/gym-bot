@@ -10,7 +10,10 @@ const { draft } = JSON.parse(
 );
 const program: Incoming = { kind: 'command', name: 'program', args: '' };
 const lines = (w: World): string[] => w.last().split('\n');
-const active = (w: World) => [...w.store.programs.values()].find((p) => p.active);
+const active = (w: World) => {
+  const id = w.store.settings.get(1)?.activeProgramId;
+  return id ? w.store.programs.get(id) : undefined;
+};
 
 async function convert(w: World, text = 'Понедельник: присед 3х5…'): Promise<void> {
   await w.send(program);
@@ -21,10 +24,15 @@ async function convert(w: World, text = 'Понедельник: присед 3�
 Deno.test('программа из текста: кнопка только при настроенной LLM', async () => {
   const off = await world();
   await off.send(program);
-  assertEquals(off.buttons(), ['📅 Дни и упражнения']);
+  assertEquals(off.buttons(), ['📅 Дни и упражнения', '🆕 Составить программу', '🗄 В архив']);
   const on = await world({ llm: scriptedLlm() });
   await on.send(program);
-  assertEquals(on.buttons(), ['📅 Дни и упражнения', '📝 Программа из текста']);
+  assertEquals(on.buttons(), [
+    '📅 Дни и упражнения',
+    '🆕 Составить программу',
+    '📝 Программа из текста',
+    '🗄 В архив',
+  ]);
 });
 
 Deno.test('программа из текста: ожидание → предпросмотр → «Сохранить» → редактор', async () => {
@@ -60,7 +68,7 @@ Deno.test('программа из текста: ожидание → предп
     'Не понял — добавь вручную в редакторе:',
     '• Отдых между подходами 2-3 минуты.',
     '',
-    'Текущая программа «6 базовых, 5 дней» будет архивирована, история сохранится.',
+    'Программа добавится и станет текущей; в работе останутся: «6 базовых, 5 дней».',
   ]);
   assertEquals(w.buttons(), ['💾 Сохранить', 'Отмена']);
   assertEquals(active(w)?.program.id, 'base6-5d', 'до «Сохранить» ничего не записано');

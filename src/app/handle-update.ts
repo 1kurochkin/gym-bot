@@ -123,6 +123,8 @@ async function runStep(
     settings,
     languageCode: target.languageCode,
     activeProgram,
+    programs: loaded.programs,
+    programKeys: loaded.programKeys,
     lastResults,
     activeWorkout: loaded.activeWorkout,
     lastWorkout: loaded.lastWorkout,
@@ -138,6 +140,7 @@ async function runStep(
   let newProgram: Commit['newProgram'];
   let newInvite: Commit['newInvite'];
   let revokeMember: Commit['revokeMember'];
+  let archiveProgram: Commit['archiveProgram'];
   const manualResults: NonNullable<Commit['manualResults']>[number][] = [];
   for (const e of result.effects) {
     if (e.type === 'save_settings') newSettings = e.settings;
@@ -151,6 +154,7 @@ async function runStep(
     }
     if (e.type === 'create_invite') newInvite = { code: e.code, expiresAt: e.expiresAt };
     if (e.type === 'revoke_member') revokeMember = e.userId;
+    if (e.type === 'archive_program') archiveProgram = e.programId;
     if (e.type === 'save_program') {
       newProgram = { id: deps.newId(), program: e.program };
       newSettings = { ...(newSettings ?? settings), activeProgramId: newProgram.id };
@@ -163,6 +167,7 @@ async function runStep(
     newProgram,
     newInvite,
     revokeMember,
+    archiveProgram,
     manualResults,
     workout: writes.length ? { programId: settings.activeProgramId ?? '', writes } : undefined,
   });
@@ -184,6 +189,11 @@ async function runStep(
   }
   mark('show');
   startDeferred(deps, target, result.effects);
+  for (const e of result.effects) {
+    if (e.type !== 'follow_up') continue;
+    const reloaded = await deps.store.load(target.userId, { withMembers: isOwner });
+    await runStep(deps, target, reloaded, reloaded.session, e.event, mark);
+  }
 }
 
 const UNAVAILABLE: Conversion = {

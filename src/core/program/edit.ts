@@ -46,6 +46,14 @@ export type Move = z.infer<typeof MoveSchema>;
 
 export const CUSTOM_PROGRAM_ID = 'custom';
 
+export function nextProgramKey(taken: readonly string[]): string {
+  const used = new Set(taken);
+  if (!used.has(CUSTOM_PROGRAM_ID)) return CUSTOM_PROGRAM_ID;
+  let n = 2;
+  while (used.has(`${CUSTOM_PROGRAM_ID}_${n}`)) n++;
+  return `${CUSTOM_PROGRAM_ID}_${n}`;
+}
+
 export function parseName(text: string): string | null {
   const name = text.trim();
   return name.length >= 1 && name.length <= NAME_MAX ? name : null;
@@ -262,11 +270,12 @@ export function createProgram(
   name: string,
   dayName: string,
   draft: NewExercise,
+  id: string = CUSTOM_PROGRAM_ID,
 ): Result<Program, readonly ProgramIssue[]> {
   const dayId = 'day_1';
   return checked({
     schemaVersion: 1,
-    id: CUSTOM_PROGRAM_ID,
+    id,
     name,
     units: 'lb',
     rotation: [dayId],

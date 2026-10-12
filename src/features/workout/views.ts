@@ -76,9 +76,13 @@ export function renderWorkoutView(view: WorkoutView, lang: Language): Rendered {
         label: d.name,
         action: { type: 'day_pick', dayId: d.id },
       }));
-      return text(`${head}${t.pickDay}`, [
+      const program = view.programName ? `${t.programLine(view.programName)}\n` : '';
+      return text(`${program}${head}${t.pickDay}`, [
         [{ label: `▶ ${view.next.name}`, action: { type: 'day_pick', dayId: view.next.id } }],
         ...column(others),
+        ...(view.programName
+          ? [[{ label: t.otherProgram, action: { type: 'program_switch' } } satisfies Button]]
+          : []),
         [back],
       ]);
     }

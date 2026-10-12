@@ -2,12 +2,13 @@ import { assertNever } from '../../shared/result.ts';
 import { home, unchanged } from './flow.ts';
 import { askTime, isOnboarding, onTimeEntered, saveTimezone } from './onboarding.ts';
 import {
-  cancelProgram,
-  confirmProgram,
-  receiveProgram,
-  rejectProgramFile,
-  requestProgram,
-} from './program.ts';
+  answerArchive,
+  requestArchive,
+  requestSwitch,
+  switchBack,
+  switchProgram,
+} from './programs.ts';
+import { receiveProgram, rejectProgramFile, requestProgram } from './program.ts';
 import {
   answerRemove,
   chooseNewType,
@@ -133,16 +134,23 @@ function transition(state: Session, event: BotEvent, ctx: StepContext): StepResu
     case 'text_entered':
       return onText(state, event.text, ctx);
     case 'program_requested':
-      return requestProgram(state, ctx);
+      return requestProgram(state, ctx, event.archived ?? null);
+    case 'program_switch_requested':
+      return requestSwitch(state, ctx);
+    case 'program_switched':
+      return switchProgram(state, ctx, event.programId);
+    case 'program_archive_requested':
+      return requestArchive(state, ctx);
+    case 'program_archive_answered':
+      return answerArchive(state, ctx, event.confirm);
     case 'program_file':
       return receiveProgram(state, event.text, ctx);
     case 'program_file_rejected':
       return rejectProgramFile(state, event.reason);
     case 'program_confirmed':
-      return state.step === S.program_draft ? saveDraft(state) : confirmProgram(state);
+      return saveDraft(state);
     case 'program_cancelled':
-      if (state.step === S.program_draft) return cancelDraft(state);
-      return state.step === S.program_confirm ? cancelProgram(state) : unchanged(state);
+      return cancelDraft(state);
     case 'convert_requested':
       return requestConvert(state, ctx);
     case 'program_drafted':
@@ -180,7 +188,7 @@ function transition(state: Session, event: BotEvent, ctx: StepContext): StepResu
     case 'editor_day_delete_requested':
       return requestDayDelete(state, ctx);
     case 'editor_create_requested':
-      return requestCreate(state, ctx);
+      return requestCreate(state);
     case 'seed_requested':
       return requestSeed(state, ctx);
     case 'seed_next':
@@ -231,7 +239,10 @@ function transition(state: Session, event: BotEvent, ctx: StepContext): StepResu
       return requestWarmupComment(state, ctx);
     case 'back_pressed':
       if (isEditor(state)) return editorBack(state, ctx);
-      if (state.step === S.program_text) return requestProgram(state, ctx);
+      if (state.step === S.program_text || state.step === S.program_archive_confirm) {
+        return requestProgram(state, ctx);
+      }
+      if (state.step === S.program_switch) return switchBack(state, ctx);
       return isHistory(state) ? historyBack(state, ctx) : goBack(state, ctx);
     case 'history_requested':
       return openHistory(state, ctx);
@@ -292,8 +303,10 @@ function onText(state: Session, text: string, ctx: StepContext): StepResult {
     case S.onboarding_tz_pick:
       return onTimeEntered(state, text, ctx);
     case S.program_upload:
-    case S.program_confirm:
       return receiveProgram(state, text, ctx);
+    case S.program_switch:
+    case S.program_archive_confirm:
+      return unchanged(state);
     case S.program_text:
       return convertText(state, ctx, text);
     case S.program_converting:

@@ -36,7 +36,8 @@ export const SessionStepSchema = z.enum([
   'onboarding_tz',
   'onboarding_tz_pick',
   'program_upload',
-  'program_confirm',
+  'program_switch',
+  'program_archive_confirm',
   'program_days',
   'program_day',
   'program_exercise',
@@ -92,12 +93,22 @@ export type SessionStep = z.infer<typeof SessionStepSchema>;
 export const FileProblemSchema = z.enum(['too_large', 'not_json', 'download_failed']);
 export type FileProblem = z.infer<typeof FileProblemSchema>;
 
+export const SwitchOriginSchema = z.enum(['program', 'workout']);
+export type SwitchOrigin = z.infer<typeof SwitchOriginSchema>;
+
+export const ProgramRefSchema = z.object({
+  id: z.uuid(),
+  key: z.string(),
+  name: z.string(),
+}).readonly();
+export type ProgramRef = z.infer<typeof ProgramRefSchema>;
+
 export const RenameTargetSchema = z.enum(['exercise', 'day', 'program']);
 export type RenameTarget = z.infer<typeof RenameTargetSchema>;
 
 export const SessionContextSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('none') }).readonly(),
-  z.object({ kind: z.literal('program_pending'), program: ProgramSchema }).readonly(),
+  z.object({ kind: z.literal('program_switch'), from: SwitchOriginSchema }).readonly(),
   z.object({ kind: z.literal('program_converting'), requestId: z.string() }).readonly(),
   z.object({
     kind: z.literal('program_draft'),
@@ -182,7 +193,11 @@ export const BotEventSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('text_entered'), text: z.string() }).readonly(),
   z.object({ type: z.literal('tz_chosen'), zone: TimeZoneSchema }).readonly(),
   z.object({ type: z.literal('tz_located'), zone: TimeZoneSchema.nullable() }).readonly(),
-  z.object({ type: z.literal('program_requested') }).readonly(),
+  z.object({ type: z.literal('program_requested'), archived: z.string().optional() }).readonly(),
+  z.object({ type: z.literal('program_switch_requested') }).readonly(),
+  z.object({ type: z.literal('program_switched'), programId: z.uuid() }).readonly(),
+  z.object({ type: z.literal('program_archive_requested') }).readonly(),
+  z.object({ type: z.literal('program_archive_answered'), confirm: z.boolean() }).readonly(),
   z.object({ type: z.literal('program_file'), text: z.string() }).readonly(),
   z.object({ type: z.literal('program_file_rejected'), reason: FileProblemSchema }).readonly(),
   z.object({ type: z.literal('program_confirmed') }).readonly(),
@@ -334,15 +349,24 @@ export const ViewSchema = z.discriminatedUnion('type', [
     type: z.literal('program_status'),
     current: ProgramSummarySchema.nullable(),
     fromText: z.boolean(),
+    others: z.array(z.string()).readonly(),
+    switchable: z.boolean(),
+    archivable: z.boolean(),
+    archived: z.string().nullable(),
   }).readonly(),
+  z.object({
+    type: z.literal('program_switch'),
+    options: z.array(z.object({ id: z.uuid(), name: z.string(), current: z.boolean() }).readonly())
+      .readonly(),
+  }).readonly(),
+  z.object({ type: z.literal('program_archive_confirm'), name: z.string() }).readonly(),
   z.object({ type: z.literal('program_invalid'), issues: z.array(ProgramIssueSchema).readonly() })
     .readonly(),
   z.object({
-    type: z.literal('program_confirm'),
-    incoming: ProgramSummarySchema,
-    currentName: z.string(),
+    type: z.literal('program_saved'),
+    summary: ProgramSummarySchema,
+    others: z.array(z.string()).readonly(),
   }).readonly(),
-  z.object({ type: z.literal('program_saved'), summary: ProgramSummarySchema }).readonly(),
   z.object({ type: z.literal('program_unchanged') }).readonly(),
   z.object({
     type: z.literal('program_days'),
@@ -395,7 +419,7 @@ export const ViewSchema = z.discriminatedUnion('type', [
         .readonly(),
     ).readonly(),
     unparsed: z.array(z.string()).readonly(),
-    replaces: z.string().nullable(),
+    others: z.array(z.string()).readonly(),
   }).readonly(),
   z.object({ type: z.literal('program_convert_failed'), reason: ConvertRefusalSchema })
     .readonly(),
@@ -474,6 +498,7 @@ export const ViewSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('settings_language'), selected: LanguageSchema }).readonly(),
   z.object({
     type: z.literal('workout_days'),
+    programName: z.string().nullable(),
     last: LastWorkoutSchema.nullable(),
     next: DayRefSchema,
     others: z.array(DayRefSchema).readonly(),
@@ -641,6 +666,8 @@ export const EffectSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('render'), view: ViewSchema }).readonly(),
   z.object({ type: z.literal('clear_chat') }).readonly(),
   z.object({ type: z.literal('save_program'), program: ProgramSchema }).readonly(),
+  z.object({ type: z.literal('archive_program'), programId: z.uuid() }).readonly(),
+  z.object({ type: z.literal('follow_up'), event: BotEventSchema }).readonly(),
   z.object({ type: z.literal('convert_program'), requestId: z.string(), text: z.string() })
     .readonly(),
   z.object({ type: z.literal('record_manual_result'), result: ManualResultSchema }).readonly(),
@@ -691,6 +718,8 @@ export const StepContextSchema = z.object({
   settings: SettingsSchema,
   languageCode: z.string().nullable(),
   activeProgram: ProgramSchema.nullable(),
+  programs: z.array(ProgramRefSchema).readonly(),
+  programKeys: z.array(z.string()).readonly(),
   lastResults: z.record(z.string(), LastResultSchema).readonly(),
   activeWorkout: ActiveWorkoutSchema.nullable(),
   lastWorkout: LastWorkoutSchema.nullable(),

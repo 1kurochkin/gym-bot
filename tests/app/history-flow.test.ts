@@ -131,6 +131,7 @@ Deno.test('текущая тренировка в истории не видна
     const day = String(i).padStart(2, '0');
     w.store.workouts.set(`00000000-0000-4000-8000-0000000009${day}`, {
       id: `00000000-0000-4000-8000-0000000009${day}`,
+      programKey: 'base6-5d',
       dayId: 'tue',
       dayName: 'Жим на наклонной',
       startedAt: new Date(`2026-09-${day}T22:40:00Z`),
